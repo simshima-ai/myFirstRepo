@@ -148,9 +148,9 @@
     },
     objectSnap: {
       enabled: true,
-      endpoint: true,
-      center: true,
-      intersection: true,
+      endpoint: false,
+      center: false,
+      intersection: false,
       tangent: false,
       tangentKeep: false, // save tangent relationship as vertex attribute
       vector: false,

@@ -95,8 +95,10 @@ function getPageFrameWorldSize(pageSetup) {
 function drawPageFrame(ctx, canvas, state) {
   if (!state.pageSetup?.showFrame) return;
   const { cadW, cadH, mmW, mmH, scale, unit } = getPageFrameWorldSize(state.pageSetup);
-  const tl = worldToScreen(state.view, { x: 0, y: 0 });
-  const br = worldToScreen(state.view, { x: cadW, y: cadH });
+
+  // Center page at (0,0)
+  const tl = worldToScreen(state.view, { x: -cadW / 2, y: -cadH / 2 });
+  const br = worldToScreen(state.view, { x: cadW / 2, y: cadH / 2 });
   const sw = br.x - tl.x, sh = br.y - tl.y;
   if (Math.abs(sw) < 1 || Math.abs(sh) < 1) return;
 
@@ -105,19 +107,51 @@ function drawPageFrame(ctx, canvas, state) {
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(tl.x, tl.y, sw, sh);
 
-  // Outer frame
+  // Crop marks (Tonbo)
   ctx.strokeStyle = "#94a3b8";
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
-  ctx.strokeRect(tl.x, tl.y, sw, sh);
+
+  const len = 20; // length of crop mark lines in pixels
+  const gap = 5;  // offset outside the paper for center marks in pixels
+
+  // Corners (L-shapes)
+  // Top-Left
+  ctx.beginPath();
+  ctx.moveTo(tl.x, tl.y + len); ctx.lineTo(tl.x, tl.y); ctx.lineTo(tl.x + len, tl.y);
+  ctx.stroke();
+  // Top-Right
+  ctx.beginPath();
+  ctx.moveTo(br.x - len, tl.y); ctx.lineTo(br.x, tl.y); ctx.lineTo(br.x, tl.y + len);
+  ctx.stroke();
+  // Bottom-Right
+  ctx.beginPath();
+  ctx.moveTo(br.x, br.y - len); ctx.lineTo(br.x, br.y); ctx.lineTo(br.x - len, br.y);
+  ctx.stroke();
+  // Bottom-Left
+  ctx.beginPath();
+  ctx.moveTo(tl.x + len, br.y); ctx.lineTo(tl.x, br.y); ctx.lineTo(tl.x, br.y - len);
+  ctx.stroke();
+
+  // Center marks (outside the frame)
+  const cx = (tl.x + br.x) / 2;
+  const cy = (tl.y + br.y) / 2;
+  // Top center
+  ctx.beginPath(); ctx.moveTo(cx, tl.y - gap); ctx.lineTo(cx, tl.y - gap - len); ctx.stroke();
+  // Bottom center
+  ctx.beginPath(); ctx.moveTo(cx, br.y + gap); ctx.lineTo(cx, br.y + gap + len); ctx.stroke();
+  // Left center
+  ctx.beginPath(); ctx.moveTo(tl.x - gap, cy); ctx.lineTo(tl.x - gap - len, cy); ctx.stroke();
+  // Right center
+  ctx.beginPath(); ctx.moveTo(br.x + gap, cy); ctx.lineTo(br.x + gap + len, cy); ctx.stroke();
 
   // Inner margin frame
   const marginMm = Math.max(0, Number(state.pageSetup?.innerMarginMm ?? 10) || 0);
   if (marginMm > 0) {
     const mpU = MM_PER_UNIT[unit] || 1;
     const mCad = marginMm * scale / mpU;
-    const itl = worldToScreen(state.view, { x: mCad, y: mCad });
-    const ibr = worldToScreen(state.view, { x: cadW - mCad, y: cadH - mCad });
+    const itl = worldToScreen(state.view, { x: -cadW / 2 + mCad, y: -cadH / 2 + mCad });
+    const ibr = worldToScreen(state.view, { x: cadW / 2 - mCad, y: cadH / 2 - mCad });
     const iw = ibr.x - itl.x, ih = ibr.y - itl.y;
     if (iw > 4 && ih > 4) {
       ctx.strokeStyle = "#94a3b8";

@@ -1,0 +1,1030 @@
+﻿<!doctype html>
+<html lang="ja">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <title>s-cad (scaffold)</title>
+  <style>
+    :root {
+      --bg: #f2f4f8;
+      --panel: #ffffff;
+      --line: #d5dbe4;
+      --ink: #0f172a;
+      --muted: #475569;
+      --accent: #0ea5e9;
+      --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      height: 100%;
+    }
+
+    body {
+      background: radial-gradient(circle at 20% 10%, #ffffff, var(--bg) 60%);
+      color: var(--ink);
+      font: 14px/1.3 sans-serif;
+    }
+
+    #app {
+      display: grid;
+      grid-template-columns: 168px 1fr;
+      height: 100%;
+      gap: 0;
+    }
+
+    .sidebar {
+      border-right: 1px solid rgba(0, 0, 0, 0);
+      background: transparent;
+      padding: 10px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      overflow-y: auto;
+      min-height: 0;
+    }
+
+    .section {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 7px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: var(--shadow-soft);
+    }
+
+    .section-title {
+      font-weight: 600;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .tool-buttons {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    .tool-buttons .left-sep {
+      height: 1px;
+      margin: 3px 2px;
+      background: linear-gradient(90deg, transparent, rgba(71, 85, 105, 0.25), transparent);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      padding: 7px 10px;
+      cursor: pointer;
+      transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    button:hover {
+      background: #f8fafc;
+    }
+
+    button:disabled {
+      cursor: default;
+      opacity: 0.55;
+    }
+
+    button.active {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.15) inset;
+      background: #f0f9ff;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="select"] {
+      background: #f8fafc;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="create"] {
+      background: #f5fbff;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="edit"] {
+      background: #f6fff4;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="view"] {
+      background: #fffaf0;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="file"] {
+      background: #fff7fb;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="create"]:hover {
+      background: #eaf7ff;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="edit"]:hover {
+      background: #eefce8;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="view"]:hover {
+      background: #fff4da;
+    }
+
+    .sidebar #toolButtons button[data-menu-group="file"]:hover {
+      background: #ffedf7;
+    }
+
+    label {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    label input[type="number"] {
+      width: 88px;
+    }
+
+    .main {
+      position: relative;
+      overflow: hidden;
+      background: #f5f7fb;
+    }
+
+    #cadCanvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      background: #fff;
+    }
+
+    .overlay {
+      position: absolute;
+      inset: 10px 10px auto auto;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: flex-end;
+    }
+
+    .badge,
+    .status {
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.9);
+      border-radius: 8px;
+      padding: 4px 8px;
+      color: var(--muted);
+    }
+
+    .status {
+      font-size: 12px;
+      max-width: 48vw;
+      pointer-events: none;
+    }
+
+    .bottom-left-overlay {
+      position: absolute;
+      bottom: 15px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 100;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .top-context {
+      position: absolute;
+      top: 10px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 20;
+      pointer-events: auto;
+      width: fit-content;
+      max-width: min(980px, calc(100% - 220px - 28px));
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+      align-items: start;
+      justify-items: center;
+    }
+
+    .top-context-panels {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 6px;
+      align-items: start;
+      width: fit-content;
+      max-width: 100%;
+    }
+
+    .top-context .section {
+      display: none;
+      background: rgba(255, 255, 255, 0.96);
+      backdrop-filter: blur(4px);
+      border-radius: 10px;
+      padding: 6px 8px;
+      gap: 5px;
+      box-shadow: var(--shadow-soft);
+      width: auto;
+      max-width: min(360px, calc(100vw - 220px - 36px));
+    }
+
+    .top-context .section-title {
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: #64748b;
+    }
+
+    .top-context label {
+      justify-content: flex-start;
+      gap: 6px;
+      min-height: 24px;
+      color: #334155;
+    }
+
+    .top-context input[type="number"],
+    .top-context input[type="text"],
+    .top-context select {
+      min-width: 0;
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 4px 6px;
+      background: rgba(255, 255, 255, 0.98);
+    }
+
+    .top-context input[type="checkbox"] {
+      margin-left: auto;
+    }
+
+    .top-context button {
+      padding: 6px 9px;
+      border-radius: 8px;
+    }
+
+    .top-context .section>div[style*="grid-template-columns:auto 1fr"] span {
+      color: #475569;
+      font-size: 12px;
+    }
+
+    .top-context-help {
+      width: 100%;
+      display: none;
+      pointer-events: none;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(4px);
+      border-radius: 10px;
+      padding: 6px 10px;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.25;
+      box-shadow: var(--shadow-soft);
+      min-height: 30px;
+      align-items: center;
+    }
+
+    .right-stack {
+      position: absolute;
+      right: 10px;
+      bottom: 10px;
+      z-index: 20;
+      width: min(250px, calc(100% - 230px));
+      display: flex;
+      flex-direction: column;
+      gap: 1px;
+      pointer-events: auto;
+    }
+
+    .left-aux-stack {
+      position: absolute;
+      left: 0px;
+      top: 10px;
+      z-index: 20;
+      width: min(125px, calc(100% - 575px));
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      pointer-events: auto;
+    }
+
+    .left-aux-stack .section {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(4px);
+      border-radius: 10px;
+      padding: 6px 7px;
+      gap: 5px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .left-aux-stack .section-title {
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: #64748b;
+      margin-bottom: 1px;
+    }
+
+    .left-aux-stack .panel-toggle.section-title {
+      width: 100%;
+      text-align: left;
+      padding: 4px 8px;
+      background: rgba(248, 250, 252, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .left-aux-stack .panel-toggle.section-title::after {
+      content: "▾";
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      font-size: 11px;
+    }
+
+    .left-aux-stack .section.collapsed .panel-toggle.section-title::after {
+      content: "▸";
+    }
+
+    .left-aux-stack .section.collapsed> :not(.panel-toggle) {
+      display: none !important;
+    }
+
+    .left-aux-stack label {
+      min-height: 24px;
+      gap: 6px;
+      color: #334155;
+    }
+
+    .left-aux-stack input[type="checkbox"] {
+      margin-left: auto;
+    }
+
+    .right-stack .section {
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(4px);
+      border-radius: 10px;
+      padding: 6px 7px;
+      gap: 5px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .right-stack .section-title {
+      font-size: 11px;
+      letter-spacing: 0.02em;
+      color: #64748b;
+      margin-bottom: 1px;
+    }
+
+    .right-stack .panel-toggle.section-title {
+      width: 100%;
+      text-align: left;
+      padding: 4px 8px;
+      background: rgba(248, 250, 252, 0.95);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px;
+      cursor: pointer;
+      position: relative;
+    }
+
+    .right-stack .panel-toggle.section-title::after {
+      content: "▾";
+      position: absolute;
+      right: 8px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      font-size: 11px;
+    }
+
+    .right-stack .section.collapsed .panel-toggle.section-title::after {
+      content: "▸";
+    }
+
+    .right-stack .section.collapsed> :not(.panel-toggle) {
+      display: none !important;
+    }
+
+    .right-stack label {
+      min-height: 24px;
+      gap: 6px;
+      color: #334155;
+    }
+
+    .right-stack input[type="number"],
+    .right-stack input[type="text"],
+    .right-stack select {
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      padding: 4px 6px;
+      background: rgba(255, 255, 255, 0.98);
+    }
+
+    .right-stack input[type="checkbox"] {
+      margin-left: auto;
+    }
+
+    .right-stack button {
+      padding: 6px 8px;
+      border-radius: 8px;
+    }
+
+    .right-stack .section>div[style*="grid-template-columns:1fr auto"] input[type="text"] {
+      width: 100%;
+    }
+
+    .right-stack #layerList>div,
+    .right-stack #groupList>div {
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 8px;
+      padding: 4px 5px;
+      background: rgba(255, 255, 255, 0.65);
+    }
+
+    .right-stack #groupList>div.dnd-over {
+      border-color: rgba(22, 163, 74, 0.45) !important;
+      background: rgba(220, 252, 231, 0.78) !important;
+    }
+
+    .right-stack .section[data-panel-id="groups"].dnd-over-root>.panel-toggle.section-title {
+      border-color: rgba(22, 163, 74, 0.45);
+      background: rgba(220, 252, 231, 0.78);
+      color: #166534;
+    }
+
+    .right-stack .section[data-panel-id="groups"] {
+      display: flex;
+      flex-direction: column;
+      max-height: calc(100vh - 20px);
+      min-height: 0;
+      position: relative;
+    }
+
+    .right-stack .section[data-panel-id="groups"] #groupList {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 2px;
+    }
+
+    .right-stack .section[data-panel-id="layers"] {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      position: relative;
+    }
+
+    .right-stack .section[data-panel-id="layers"] #layerList {
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding-right: 2px;
+    }
+
+    .panel-resize-handle {
+      position: absolute;
+      z-index: 3;
+      background: transparent;
+    }
+
+    .panel-resize-handle-top {
+      left: 10px;
+      right: 10px;
+      top: -4px;
+      height: 10px;
+      cursor: ns-resize;
+    }
+
+    .panel-resize-handle-left {
+      left: -4px;
+      top: 12px;
+      bottom: 12px;
+      width: 10px;
+      cursor: ew-resize;
+    }
+
+    .panel-resize-handle-top::before,
+    .panel-resize-handle-left::before {
+      content: "";
+      position: absolute;
+      inset: 2px;
+      border-radius: 6px;
+      border: 1px dashed rgba(148, 163, 184, 0.35);
+      opacity: 0;
+      transition: opacity .12s ease;
+    }
+
+    .panel-resize-handle-top:hover::before,
+    .panel-resize-handle-left:hover::before {
+      opacity: 1;
+      border-color: rgba(59, 130, 246, 0.45);
+      background: rgba(219, 234, 254, 0.25);
+    }
+
+    .right-stack #layerList button,
+    .right-stack #groupList button {
+      padding: 4px 7px;
+      border-radius: 7px;
+      font-size: 12px;
+    }
+
+    .compact-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+    }
+
+    .sidebar .section.utilities {
+      margin-top: auto;
+    }
+
+    .sidebar .section.utilities .section-title {
+      margin-bottom: 2px;
+    }
+
+    .sidebar .section+.section {
+      position: relative;
+    }
+
+    .sidebar .section+.section::before {
+      content: "";
+      position: absolute;
+      top: -6px;
+      left: 10px;
+      right: 10px;
+      height: 1px;
+      background: rgba(148, 163, 184, 0.25);
+      pointer-events: none;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <aside class="sidebar">
+      <div class="section">
+        <div class="section-title">Tools</div>
+        <div id="toolButtons" class="tool-buttons"></div>
+      </div>
+      <div class="section utilities" style="display:none;">
+        <div class="section-title">View</div>
+        <label>Grid <input id="gridSizeInput" type="number" value="100" min="1" step="1"></label>
+        <label>Grid Show <input id="gridShowToggle" type="checkbox" checked></label>
+        <label>Auto Grid <input id="gridAutoToggle" type="checkbox" checked></label>
+      </div>
+    </aside>
+    <main class="main">
+      <canvas id="cadCanvas"></canvas>
+      <div class="top-context" id="topContext">
+        <div class="top-context-panels" id="topContextPanels">
+          <div class="section" data-context="vertex">
+            <div class="section-title">Vertex Edit</div>
+            <label>Link Coincident <input id="vertexLinkCoincidentToggle" type="checkbox" checked></label>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>dX</span><input id="vertexMoveDxInput" type="number" value="0" step="1"
+                style="width:100%; min-width:0;">
+              <span>dY</span><input id="vertexMoveDyInput" type="number" value="0" step="1"
+                style="width:100%; min-width:0;">
+            </div>
+            <button id="moveVertexBtn" type="button">Move</button>
+          </div>
+          <div class="section" data-context="line">
+            <div class="section-title">Line</div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>Length</span><input id="lineLengthInput" type="number" value="100" min="0" step="1"
+                style="width:100%; min-width:0;">
+              <span>Angle</span><input id="lineAngleInput" type="number" value="0" step="1"
+                style="width:100%; min-width:0;">
+            </div>
+            <button id="applyLineInputBtn" type="button">Apply</button>
+          </div>
+          <div class="section" data-context="rect">
+            <div class="section-title">Rect</div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>Width</span><input id="rectWidthInput" type="number" value="100" min="0" step="1"
+                style="width:100%; min-width:0;">
+              <span>Height</span><input id="rectHeightInput" type="number" value="100" min="0" step="1"
+                style="width:100%; min-width:0;">
+            </div>
+            <button id="applyRectInputBtn" type="button">Apply</button>
+          </div>
+          <div class="section" data-context="circle">
+            <div class="section-title">Circle</div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>Radius</span><input id="circleRadiusInput" type="number" value="50" min="0" step="1"
+                style="width:100%; min-width:0;">
+            </div>
+            <label>Center Mark <input id="circleCenterMarkToggle" type="checkbox"></label>
+            <button id="applyCircleInputBtn" type="button">Apply</button>
+          </div>
+          <div class="section" data-context="fillet">
+            <div class="section-title">Fillet</div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>Radius</span><input id="filletRadiusInput" type="number" value="20" min="0.1" step="1"
+                style="width:100%; min-width:0;">
+              <span>Line Mode</span>
+              <select id="filletLineModeSelect" style="width:100%; min-width:0;">
+                <option value="trim" selected>Trim</option>
+                <option value="split">Split</option>
+              </select>
+            </div>
+            <button id="applyFilletBtn" type="button">Apply (2 lines)</button>
+          </div>
+          <div class="section" data-context="trim">
+            <div class="section-title">Trim</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <label>削除しない(分割のみ) <input id="trimNoDeleteToggle" type="checkbox"></label>
+            </div>
+          </div>
+          <div class="section" data-context="group">
+            <div class="section-title">グループ</div>
+            <div id="groupCtxObjectOps" style="display:flex; flex-direction:column; gap:6px;">
+              <div
+                style="display:grid; grid-template-columns:auto 12px minmax(120px, 40%) auto; gap:6px; align-items:center; justify-content:start;">
+                <button id="mergeGroupsBtn" type="button">グループを統合</button>
+                <span aria-hidden="true"></span>
+                <input id="newGroupNameInput" type="text" placeholder="グループ名" style="width:100%; min-width:0;">
+                <button id="createGroupBtn" type="button">リネーム</button>
+              </div>
+              <div
+                style="display:grid; grid-template-columns:auto 72px auto 72px auto; gap:6px; align-items:center; justify-content:start;">
+                <span>dX</span><input id="selectMoveDxInput" type="number" value="0" step="1"
+                  style="width:100%; min-width:0;">
+                <span>dY</span><input id="selectMoveDyInput" type="number" value="0" step="1"
+                  style="width:100%; min-width:0;">
+                <button id="moveSelectedShapesBtn" type="button">Move</button>
+              </div>
+              <div id="selectionTextEdit"
+                style="display:none; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:6px;">
+                <span class="section-title">選択中のテキスト編集</span>
+                <input id="selectionTextContentInput" type="text" placeholder="内容を変更" style="width:100%;">
+                <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+                  <span>Size(pt)</span><input id="selectionTextSizePtInput" type="number" min="1" step="1">
+                  <span>Rotate</span><input id="selectionTextRotateInput" type="number" step="1">
+                </div>
+                <select id="selectionTextFontFamilyInput">
+                  <option value="Yu Gothic UI">Yu Gothic UI</option>
+                  <option value="MS Gothic">MS Gothic</option>
+                  <option value="Arial">Arial</option>
+                  <option value="sans-serif">sans-serif</option>
+                </select>
+                <div style="display:flex; gap:10px; align-items:center; justify-content:space-between;">
+                  <div style="display:flex; gap:10px;">
+                    <label>Bold <input id="selectionTextBoldInput" type="checkbox"></label>
+                    <label>Italic <input id="selectionTextItalicInput" type="checkbox"></label>
+                  </div>
+                  <input id="selectionTextColorInput" type="color">
+                </div>
+              </div>
+            </div>
+            <div id="groupCtxGroupOps" style="display:flex; flex-direction:column; gap:6px;">
+              <div class="compact-actions">
+                <button id="deleteGroupBtn" type="button">削除</button>
+                <button id="unparentGroupBtn" type="button">親から外す</button>
+                <button id="moveGroupOriginOnlyBtn" type="button">基準点を移動</button>
+              </div>
+              <label>回転角スナップ
+                <input id="groupRotateSnapInput" type="number" value="5" min="0.1" step="0.1">
+              </label>
+              <div style="display:grid; grid-template-columns:auto 1fr auto 1fr auto; gap:6px; align-items:center;">
+                <span>dX</span><input id="groupMoveDxInput" type="number" value="0" step="1">
+                <span>dY</span><input id="groupMoveDyInput" type="number" value="0" step="1">
+                <button id="moveGroupBtn" type="button">Move</button>
+              </div>
+            </div>
+          </div>
+          <div class="section" data-context="position">
+            <div class="section-title">Position</div>
+            <label>Size
+              <input id="positionSizeInput" type="number" value="20" min="1" step="1" style="width:100%; min-width:0;">
+            </label>
+          </div>
+          <div class="section" data-context="text">
+            <div class="section-title">Text</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <input id="textContentInput" type="text" placeholder="Text content" style="width:100%;">
+              <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+                <span>Size(pt)</span><input id="textSizePtInput" type="number" value="12" min="1" step="1">
+                <span>Rotate</span><input id="textRotateInput" type="number" value="0" step="1">
+              </div>
+              <select id="textFontFamilyInput">
+                <option value="Yu Gothic UI" selected>Yu Gothic UI</option>
+                <option value="MS Gothic">MS Gothic</option>
+                <option value="Arial">Arial</option>
+                <option value="sans-serif">sans-serif</option>
+              </select>
+              <div style="display:flex; gap:10px;">
+                <label>Bold <input id="textBoldInput" type="checkbox"></label>
+                <label>Italic <input id="textItalicInput" type="checkbox"></label>
+                <input id="textColorInput" type="color" value="#0f172a">
+              </div>
+            </div>
+          </div>
+          <div class="section" data-context="dim">
+            <div class="section-title">寸法設定</div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;">
+              <label style="display:inline-flex; align-items:center; gap:4px;">モード
+                <select id="dimLinearMode" style="width:70px; font-size:11px; padding:2px;">
+                  <option value="single" selected>単一</option>
+                  <option value="chain">直列</option>
+                </select>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">ターゲット
+                <select id="dimSnapMode" style="width:90px; font-size:11px; padding:2px;">
+                  <option value="object" selected>オブジェクト</option>
+                  <option value="grid">グリッド</option>
+                </select>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">円/弧
+                <select id="dimCircleMode" style="width:70px; font-size:11px; padding:2px;">
+                  <option value="radius" selected>半径</option>
+                  <option value="diameter">直径</option>
+                </select>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">精度
+                <select id="dimPrecisionSelect" style="width:60px; font-size:11px; padding:2px;">
+                  <option value="0">0</option>
+                  <option value="1" selected>0.1</option>
+                  <option value="2">0.01</option>
+                  <option value="3">0.001</option>
+                </select>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">文字回転
+                <input id="dimTextRotateInput" type="number" value="0" step="1"
+                  style="width:50px; font-size:11px; padding:2px;">
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">補助線オフセット
+                <input id="dimExtOffsetInput" type="number" value="4" step="1"
+                  style="width:40px; font-size:11px; padding:2px;">
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">補助線突き出し
+                <input id="dimExtOverInput" type="number" value="4" step="1"
+                  style="width:40px; font-size:11px; padding:2px;">
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">中心突き出し
+                <input id="dimROvershootInput" type="number" value="5" step="1"
+                  style="width:40px; font-size:11px; padding:2px;">
+              </label>
+              <div id="dimChainOps" style="display:none; align-items:center;">
+                <button id="dimChainPopBtn" type="button" class="btn secondary small"
+                  style="padding:2px 8px; font-size:11px;">点を取り消し</button>
+              </div>
+              <button id="applyDimSettingsBtn" type="button" class="btn secondary small"
+                style="padding:2px 8px; font-size:11px;">選択中に適用</button>
+            </div>
+          </div>
+          <div class="section" data-context="hatch">
+            <div class="section-title">Hatch</div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>Pitch(mm)</span><input id="hatchPitchInput" type="number" value="5" min="0.1" step="1"
+                style="width:100%; min-width:0;">
+              <span>Angle(°)</span><input id="hatchAngleInput" type="number" value="45" step="1"
+                style="width:100%; min-width:0;">
+              <span>Padding(mm)</span><input id="hatchPaddingInput" type="number" value="2" min="0" step="1"
+                style="width:100%; min-width:0;">
+              <span>Pattern</span>
+              <select id="hatchPatternSelect" style="width:100%; min-width:0;">
+                <option value="single">Single</option>
+                <option value="cross">Cross</option>
+              </select>
+              <span>Cross(°)</span><input id="hatchCrossAngleInput" type="number" value="90" step="1"
+                style="width:100%; min-width:0;">
+              <span>LineStyle</span>
+              <select id="hatchLineTypeSelect" style="width:100%; min-width:0;">
+                <option value="solid">Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="dashdot">Dash-Dot</option>
+              </select>
+              <span>Dash/Gap</span>
+              <div style="display:flex; gap:2px;">
+                <input id="hatchDashMmInput" type="number" value="5" min="0.1" step="1" style="width:50%; min-width:0;">
+                <input id="hatchGapMmInput" type="number" value="2" min="0.1" step="1" style="width:50%; min-width:0;">
+              </div>
+            </div>
+            <button id="applyHatchBtn" type="button">Hatch Selected</button>
+          </div>
+
+          <div class="section" data-context="patterncopy">
+            <div class="section-title">パターンコピー</div>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <select id="patternCopyModeSelect" style="width:100%;">
+                <option value="array">配列状 (Array)</option>
+                <option value="rotate">回転 (Rotate)</option>
+                <option value="mirror">反転 (Mirror)</option>
+              </select>
+
+              <div id="patternCopyArrayOptions" style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:4px; align-items:center;">
+                  <span>dX</span><input id="patternCopyArrayDxInput" type="number" value="50" step="1"
+                    style="width:100%; min-width:0;">
+                  <span>dY</span><input id="patternCopyArrayDyInput" type="number" value="50" step="1"
+                    style="width:100%; min-width:0;">
+                </div>
+                <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:4px; align-items:center;">
+                  <span>Cnt X</span><input id="patternCopyArrayCountXInput" type="number" value="5" min="1" step="1"
+                    style="width:100%; min-width:0;">
+                  <span>Cnt Y</span><input id="patternCopyArrayCountYInput" type="number" value="1" min="1" step="1"
+                    style="width:100%; min-width:0;">
+                </div>
+              </div>
+
+              <div id="patternCopyRotateOptions" style="display:none; flex-direction:column; gap:4px;">
+                <div style="display:grid; grid-template-columns:auto 1fr; gap:4px; align-items:center;">
+                  <span>Angle</span><input id="patternCopyRotateAngleInput" type="number" value="45" step="1"
+                    style="width:100%; min-width:0;">
+                </div>
+                <div style="display:grid; grid-template-columns:auto 1fr; gap:4px; align-items:center;">
+                  <span>Count</span><input id="patternCopyRotateCountInput" type="number" value="3" min="1" step="1"
+                    style="width:100%; min-width:0;">
+                </div>
+                <button id="patternCopySetCenterBtn" type="button" class="btn secondary small">中心として設定</button>
+                <div id="patternCopyCenterStatus" style="font-size:11px; color:#64748b; margin-top:2px;"></div>
+              </div>
+
+              <div id="patternCopyMirrorOptions" style="display:none; flex-direction:column; gap:4px;">
+                <button id="patternCopySetAxisBtn" type="button" class="btn secondary small">軸として設定</button>
+                <div id="patternCopyAxisStatus" style="font-size:11px; color:#64748b; margin-top:2px;"></div>
+              </div>
+
+              <button id="patternCopyApplyBtn" type="button">コピー実行</button>
+            </div>
+          </div>
+
+          <div class="section" data-context="doubleline">
+            <div class="section-title">二重線</div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>Offset</span><input id="dlineOffsetInput" type="number" value="10" min="0.1" step="1"
+                style="width:100%; min-width:0;">
+              <span>Mode</span>
+              <select id="dlineModeSelect" style="width:100%; min-width:0;">
+                <option value="both" selected>両側</option>
+                <option value="single">片側</option>
+              </select>
+            </div>
+            <button id="applyDLineBtn" type="button">Apply</button>
+          </div>
+
+          <div class="section" data-context="preview">
+            <div class="section-title">Preview</div>
+            <label>Precision
+              <select id="previewPrecisionSelect">
+                <option value="0">0</option>
+                <option value="1">0.0</option>
+                <option value="2" selected>0.00</option>
+                <option value="3">0.000</option>
+              </select>
+            </label>
+          </div>
+          <div class="section" data-context="grid">
+            <div class="section-title">グリッド</div>
+            <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;">
+              <label style="display:inline-flex; align-items:center; gap:6px;">サイズ
+                <input id="gridSizeContextInput" type="number" value="100" min="1" step="1"
+                  style="width:56px; min-width:0;">
+                <span style="font-size:11px; color:var(--muted);">単位</span>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px;">表示
+                <input id="gridShowContextToggle" type="checkbox" checked>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px;">可変グリッド
+                <input id="gridAutoContextToggle" type="checkbox" checked>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px;">50%切替
+                <input id="gridAutoThreshold50ContextInput" type="number" value="30" min="1" max="1000" step="1"
+                  style="width:56px; min-width:0;">
+                <span style="font-size:11px; color:var(--muted);">px</span>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px;">10%切替
+                <input id="gridAutoThreshold10ContextInput" type="number" value="60" min="1" max="1000" step="1"
+                  style="width:56px; min-width:0;">
+                <span style="font-size:11px; color:var(--muted);">px</span>
+              </label>
+            </div>
+          </div>
+          <div class="section" data-context="settings">
+            <div class="section-title">設定</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-size:12px; color:var(--muted);">用紙設定</div>
+              <label>用紙サイズ
+                <select id="pageSizeSelect">
+                  <option value="A4">A4</option>
+                  <option value="A3">A3</option>
+                  <option value="A2">A2</option>
+                  <option value="A1">A1</option>
+                </select>
+              </label>
+              <label>向き
+                <select id="pageOrientationSelect">
+                  <option value="landscape">横</option>
+                  <option value="portrait">縦</option>
+                </select>
+              </label>
+              <label>縮尺 (1:)
+                <input id="pageScaleInput" type="number" min="0.0001" step="0.1" value="1">
+              </label>
+              <label>単位
+                <select id="pageUnitSelect">
+                  <option value="mm">mm</option>
+                  <option value="cm">cm</option>
+                  <option value="m">m</option>
+                  <option value="inch">inch</option>
+                </select>
+              </label>
+              <label>用紙枠 <input id="pageShowFrameToggle" type="checkbox" checked></label>
+              <label>内側余白(mm)
+                <input id="pageInnerMarginInput" type="number" min="0" step="1" value="10">
+              </label>
+            </div>
+          </div>
+        </div>
+        <div id="topContextHelp" class="top-context-help"></div>
+      </div>
+      <div class="left-aux-stack">
+        <div class="section" data-panel-id="snap">
+          <button class="section-title panel-toggle" type="button">スナップ</button>
+          <label>グリッド <input id="gridSnapToggle" type="checkbox" checked></label>
+          <label>線上 <input id="objSnapToggle" type="checkbox" checked></label>
+          <label>端点 <input id="objSnapEndpointToggle" type="checkbox" checked></label>
+          <label>中心 <input id="objSnapCenterToggle" type="checkbox" checked></label>
+          <label>交点 <input id="objSnapIntersectionToggle" type="checkbox" checked></label>
+          <label>接線 <input id="objSnapTangentToggle" type="checkbox"></label>
+          <label style="margin-left:14px; font-size:0.88em; opacity:0.85">└ 属性を保持 <input id="objSnapTangentKeepToggle" type="checkbox"></label>
+          <label>ベクトル <input id="objSnapVectorToggle" type="checkbox"></label>
+        </div>
+      </div>
+      <div class="right-stack">
+        <div class="section" data-panel-id="groups">
+          <div id="groupPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="高さを変更"></div>
+          <div id="groupPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="幅を変更"></div>
+          <button class="section-title panel-toggle" type="button">グループ</button>
+          <div id="groupList" style="display:flex; flex-direction:column; gap:4px;"></div>
+        </div>
+        <div class="section" data-panel-id="layers">
+          <div id="layerPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="高さを変更"></div>
+          <div id="layerPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="幅を変更"></div>
+          <button class="section-title panel-toggle" type="button">レイヤー</button>
+          <div id="layerList" style="display:flex; flex-direction:column; gap:4px;"></div>
+          <div class="section inner-collapsible" data-inner-owner="layers">
+            <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="ops">レイヤー操作</button>
+            <div data-layer-inner-panel="ops" style="display:flex; flex-direction:column; gap:6px;">
+              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+                <input id="newLayerNameInput" type="text" placeholder="新規レイヤー名">
+                <button id="addLayerBtn" type="button">新規作成</button>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+                <input id="renameLayerNameInput" type="text" placeholder="レイヤー名">
+                <button id="renameLayerBtn" type="button">リネーム</button>
+              </div>
+              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+                <div style="display:flex; align-items:center; color:#64748b; font-size:12px;">現在レイヤーへ</div>
+                <button id="moveSelectionLayerBtn" type="button">オブジェクト移動</button>
+              </div>
+              <label style="display:flex; align-items:center; justify-content:space-between;">
+                <span>カラー分け表示</span>
+                <input id="layerColorizeToggle" type="checkbox">
+              </label>
+              <label style="display:flex; align-items:center; justify-content:space-between;">
+                <span>選択レイヤーのみ編集</span>
+                <input id="editOnlyActiveLayerToggle" type="checkbox">
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="overlay">
+        <div id="buildBadge" class="badge"></div>
+      </div>
+      <div class="bottom-left-overlay">
+        <div id="statusText" class="status"></div>
+      </div>
+    </main>
+  </div>
+  <input id="jsonFileInput" type="file" accept=".json,application/json" hidden>
+  <script type="module" src="./cad/app.js"></script>
+</body>
+
+</html>

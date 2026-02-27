@@ -1,0 +1,22 @@
+# OS generated files
+[Dd]esktop.ini
+$RECYCLE.BIN/
+Thumbs.db
+ehthumbs.db
+ehthumbs_vista.db
+
+# Gemini / AntiGravity artifacts
+.gemini/
+.agents/
+.agent/
+_agents/
+_agent/
+brain/
+walkthrough.md
+implementation_plan.md
+task.md
+
+# Application specific
+*.json
+!example.json
+# (Add other temporary or large files here if needed)

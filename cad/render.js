@@ -108,7 +108,7 @@ function drawPageFrame(ctx, canvas, state) {
   ctx.fillRect(tl.x, tl.y, sw, sh);
 
   // Crop marks (Tonbo)
-  ctx.strokeStyle = "#94a3b8";
+  ctx.strokeStyle = "#475569";
   ctx.lineWidth = 1;
   ctx.setLineDash([]);
 

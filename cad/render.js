@@ -72,6 +72,73 @@ function isInActiveGroup(state, shapeId) {
   return ids.has(Number(shapeId));
 }
 
+const PAGE_SIZES_MM = {
+  A4: [297, 210],
+  A3: [420, 297],
+  A2: [594, 420],
+  A1: [841, 594],
+};
+const MM_PER_UNIT = { mm: 1, cm: 10, m: 1000, inch: 25.4 };
+
+function getPageFrameWorldSize(pageSetup) {
+  const key = String(pageSetup?.size || "A4");
+  const [w, h] = PAGE_SIZES_MM[key] || PAGE_SIZES_MM.A4;
+  const isPortrait = String(pageSetup?.orientation || "landscape") === "portrait";
+  const mmW = isPortrait ? Math.min(w, h) : Math.max(w, h);
+  const mmH = isPortrait ? Math.max(w, h) : Math.min(w, h);
+  const scale = Math.max(0.0001, Number(pageSetup?.scale ?? 1) || 1);
+  const unit = String(pageSetup?.unit || "mm");
+  const mpU = MM_PER_UNIT[unit] || 1;
+  return { cadW: mmW * scale / mpU, cadH: mmH * scale / mpU, mmW, mmH, scale, unit };
+}
+
+function drawPageFrame(ctx, canvas, state) {
+  if (!state.pageSetup?.showFrame) return;
+  const { cadW, cadH, mmW, mmH, scale, unit } = getPageFrameWorldSize(state.pageSetup);
+  const tl = worldToScreen(state.view, { x: 0, y: 0 });
+  const br = worldToScreen(state.view, { x: cadW, y: cadH });
+  const sw = br.x - tl.x, sh = br.y - tl.y;
+  if (Math.abs(sw) < 1 || Math.abs(sh) < 1) return;
+
+  // Paper fill (white)
+  ctx.save();
+  ctx.fillStyle = "#ffffff";
+  ctx.fillRect(tl.x, tl.y, sw, sh);
+
+  // Outer frame
+  ctx.strokeStyle = "#94a3b8";
+  ctx.lineWidth = 1;
+  ctx.setLineDash([]);
+  ctx.strokeRect(tl.x, tl.y, sw, sh);
+
+  // Inner margin frame
+  const marginMm = Math.max(0, Number(state.pageSetup?.innerMarginMm ?? 10) || 0);
+  if (marginMm > 0) {
+    const mpU = MM_PER_UNIT[unit] || 1;
+    const mCad = marginMm * scale / mpU;
+    const itl = worldToScreen(state.view, { x: mCad, y: mCad });
+    const ibr = worldToScreen(state.view, { x: cadW - mCad, y: cadH - mCad });
+    const iw = ibr.x - itl.x, ih = ibr.y - itl.y;
+    if (iw > 4 && ih > 4) {
+      ctx.strokeStyle = "#94a3b8";
+      ctx.lineWidth = 0.5;
+      ctx.setLineDash([4, 4]);
+      ctx.strokeRect(itl.x, itl.y, iw, ih);
+      ctx.setLineDash([]);
+    }
+  }
+
+  // Scale label
+  const labelStr = `${String(state.pageSetup?.size || "A4")} ${state.pageSetup?.orientation === "portrait" ? "縦" : "横"} | 1:${scale} | ${unit}`;
+  ctx.fillStyle = "#94a3b8";
+  ctx.font = "11px sans-serif";
+  ctx.textAlign = "left";
+  ctx.textBaseline = "bottom";
+  ctx.fillText(labelStr, tl.x + 3, tl.y - 2);
+
+  ctx.restore();
+}
+
 function drawGrid(ctx, canvas, state) {
   if (!state.grid.show) return;
   const step = getEffectiveGridSize(state.grid, state.view);
@@ -1037,6 +1104,7 @@ function drawDoubleLinePreview(ctx, state) {
 
 export function render(ctx, canvas, state) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawPageFrame(ctx, canvas, state);
   drawGrid(ctx, canvas, state);
   drawAxes(ctx, canvas, state);
   for (const shape of state.shapes) drawShape(ctx, state, shape);

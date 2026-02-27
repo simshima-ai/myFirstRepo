@@ -293,6 +293,9 @@ const helpers = {
   setFilletRadius: (v) => { setFilletRadius(state, v); draw(); },
   setFilletLineMode: (m) => { setFilletLineMode(state, m); draw(); },
   setTrimNoDelete: (v) => { state.trimSettings.noDelete = !!v; draw(); },
+  setPageSetup: (patch) => { Object.assign(state.pageSetup, patch); draw(); },
+  setDimSettings: (patch) => { Object.assign(state.dimSettings, patch); draw(); },
+  setHatchSettings: (patch) => { Object.assign(state.hatchSettings, patch); draw(); },
   setVertexMoveInputs: (dx, dy) => { setVertexMoveInputs(state, dx, dy); draw(); },
   executeDoubleLine: () => { pushHistory(state); executeDoubleLine(state); draw(); },
   beginMoveActiveGroupOriginOnly: () => {

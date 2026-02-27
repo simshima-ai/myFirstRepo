@@ -45,7 +45,7 @@ function createHtmlLikeLeftMenuRegistry() {
     { type: "action", id: "saveJson", label: "保存", implemented: true, group: "file" },
     { type: "action", id: "saveAs", label: "別名で保存", implemented: false, group: "file" },
     { type: "action", id: "pdf", label: "PDF出力", implemented: false, group: "file" },
-    { type: "action", id: "settings", label: "設定", implemented: false, group: "file" },
+    { type: "tool", id: "settings", label: "設定", group: "file" },
   ];
 }
 

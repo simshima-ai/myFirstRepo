@@ -12,9 +12,9 @@ import {
 } from "./solvers.js";
 import {
     screenToWorld, snapPoint, hitTestLine,
-    getEffectiveGridSize, nearestPointOnSegment
+    getEffectiveGridSize, nearestPointOnSegment, mmPerUnit
 } from "./geom.js";
-import { hitTestDimPart } from "./dim_geom.js";
+import { hitTestDimPart, getDimGeometry, getDimChainGeometry, getCircleDimGeometry, getDimAngleGeometry } from "./dim_geom.js";
 import {
     buildHatchLoopsFromBoundaryIds, isPointInHatch, isHatchBoundaryShape
 } from "./hatch_geom.js";
@@ -87,6 +87,39 @@ export function selectGroupById(state, groupId) {
     if (!g) return false;
     setActiveGroup(state, g.id);
     setSelection(state, collectGroupTreeShapeIds(state, g.id));
+    state.selection.groupIds = [Number(g.id)];
+    return true;
+}
+
+export function toggleGroupSelectionById(state, groupId) {
+    const g = getGroup(state, groupId);
+    if (!g) return false;
+    const gid = Number(g.id);
+    const current = Array.isArray(state.selection?.groupIds)
+        ? state.selection.groupIds.map(Number).filter(Number.isFinite)
+        : [];
+    const exists = current.includes(gid);
+    const nextGroupIds = exists ? current.filter((id) => id !== gid) : current.concat([gid]);
+    state.selection.groupIds = Array.from(new Set(nextGroupIds.map(Number)));
+    if (!state.selection.groupIds.length) {
+        state.selection.ids = [];
+        state.activeGroupId = null;
+        return true;
+    }
+    const shapeSet = new Set();
+    for (const selectedGroupId of state.selection.groupIds) {
+        for (const sid of collectGroupTreeShapeIds(state, selectedGroupId)) {
+            shapeSet.add(Number(sid));
+        }
+    }
+    state.selection.ids = Array.from(shapeSet);
+    if (exists) {
+        if (!state.selection.groupIds.includes(Number(state.activeGroupId))) {
+            state.activeGroupId = Number(state.selection.groupIds[state.selection.groupIds.length - 1]);
+        }
+    } else {
+        state.activeGroupId = gid;
+    }
     return true;
 }
 
@@ -122,6 +155,16 @@ export function getVertexAtKey(shape, key) {
     if (!shape) return null;
     if (key === "p1" && (shape.type === "line" || shape.type === "rect")) return { x: shape.x1, y: shape.y1 };
     if (key === "p2" && (shape.type === "line" || shape.type === "rect")) return { x: shape.x2, y: shape.y2 };
+    if (shape.type === "arc" && key === "a1") {
+        const cx = Number(shape.cx), cy = Number(shape.cy), r = Number(shape.r), a1 = Number(shape.a1);
+        if (![cx, cy, r, a1].every(Number.isFinite)) return null;
+        return { x: cx + Math.cos(a1) * r, y: cy + Math.sin(a1) * r };
+    }
+    if (shape.type === "arc" && key === "a2") {
+        const cx = Number(shape.cx), cy = Number(shape.cy), r = Number(shape.r), a2 = Number(shape.a2);
+        if (![cx, cy, r, a2].every(Number.isFinite)) return null;
+        return { x: cx + Math.cos(a2) * r, y: cy + Math.sin(a2) * r };
+    }
     return null;
 }
 
@@ -133,6 +176,14 @@ export function setVertexAtKey(shape, key, p) {
     if (key === "p2" && (shape.type === "line" || shape.type === "rect")) {
         shape.x2 = p.x; shape.y2 = p.y; return true;
     }
+    if (shape.type === "arc" && (key === "a1" || key === "a2")) {
+        const cx = Number(shape.cx), cy = Number(shape.cy);
+        if (!Number.isFinite(cx) || !Number.isFinite(cy)) return false;
+        const ang = Math.atan2(Number(p.y) - cy, Number(p.x) - cx);
+        if (key === "a1") shape.a1 = ang;
+        else shape.a2 = ang;
+        return true;
+    }
     return false;
 }
 
@@ -142,12 +193,19 @@ export function hitTestVertexHandle(state, world) {
     for (let i = state.shapes.length - 1; i >= 0; i--) {
         const s = state.shapes[i];
         if (!isLayerVisible(state, s.layerId)) continue;
-        if (!(s.type === "line" || s.type === "rect")) continue;
+        if (!(s.type === "line" || s.type === "rect" || s.type === "arc")) continue;
         if (filterShapeId !== null && Number(s.id) !== filterShapeId) continue;
-        const p1d = Math.hypot(world.x - s.x1, world.y - s.y1);
-        if (p1d <= tol) return { shapeId: s.id, key: "p1" };
-        const p2d = Math.hypot(world.x - s.x2, world.y - s.y2);
-        if (p2d <= tol) return { shapeId: s.id, key: "p2" };
+        if (s.type === "line" || s.type === "rect") {
+            const p1d = Math.hypot(world.x - s.x1, world.y - s.y1);
+            if (p1d <= tol) return { shapeId: s.id, key: "p1" };
+            const p2d = Math.hypot(world.x - s.x2, world.y - s.y2);
+            if (p2d <= tol) return { shapeId: s.id, key: "p2" };
+        } else if (s.type === "arc") {
+            const pA1 = getVertexAtKey(s, "a1");
+            const pA2 = getVertexAtKey(s, "a2");
+            if (pA1 && Math.hypot(world.x - pA1.x, world.y - pA1.y) <= tol) return { shapeId: s.id, key: "a1" };
+            if (pA2 && Math.hypot(world.x - pA2.x, world.y - pA2.y) <= tol) return { shapeId: s.id, key: "a2" };
+        }
     }
     return null;
 }
@@ -167,11 +225,15 @@ export function getCoincidentVertexGroup(state, hit) {
     const out = [];
     for (const s of state.shapes) {
         if (!s || !isLayerVisible(state, s.layerId)) continue;
-        if (!(s.type === "line" || s.type === "rect")) continue;
-        const p1 = { x: Number(s.x1), y: Number(s.y1) };
-        const p2 = { x: Number(s.x2), y: Number(s.y2) };
-        if (Math.hypot(p1.x - base.x, p1.y - base.y) <= eps) out.push({ shapeId: Number(s.id), key: "p1" });
-        if (Math.hypot(p2.x - base.x, p2.y - base.y) <= eps) out.push({ shapeId: Number(s.id), key: "p2" });
+        if (!(s.type === "line" || s.type === "rect" || s.type === "arc")) continue;
+        const keys = (s.type === "arc") ? ["a1", "a2"] : ["p1", "p2"];
+        for (const k of keys) {
+            const p = getVertexAtKey(s, k);
+            if (!p) continue;
+            if (Math.hypot(Number(p.x) - base.x, Number(p.y) - base.y) <= eps) {
+                out.push({ shapeId: Number(s.id), key: k });
+            }
+        }
     }
     if (!out.length) out.push({ shapeId: Number(hit.shapeId), key: hit.key });
     return out;
@@ -232,11 +294,16 @@ export function endVertexSelectionBox(state, helpers) {
         const picked = [];
         for (const s of state.shapes) {
             if (!isLayerVisible(state, s.layerId)) continue;
-            if (!(s.type === "line" || s.type === "rect")) continue;
-            const pts = [
-                { shapeId: Number(s.id), key: "p1", x: s.x1, y: s.y1 },
-                { shapeId: Number(s.id), key: "p2", x: s.x2, y: s.y2 },
-            ];
+            if (!(s.type === "line" || s.type === "rect" || s.type === "arc")) continue;
+            const pts = (s.type === "arc")
+                ? [
+                    (() => { const p = getVertexAtKey(s, "a1"); return p ? { shapeId: Number(s.id), key: "a1", x: p.x, y: p.y } : null; })(),
+                    (() => { const p = getVertexAtKey(s, "a2"); return p ? { shapeId: Number(s.id), key: "a2", x: p.x, y: p.y } : null; })(),
+                ].filter(Boolean)
+                : [
+                    { shapeId: Number(s.id), key: "p1", x: s.x1, y: s.y1 },
+                    { shapeId: Number(s.id), key: "p2", x: s.x2, y: s.y2 },
+                ];
             for (const p of pts) {
                 const sx = p.x * state.view.scale + state.view.offsetX;
                 const sy = p.y * state.view.scale + state.view.offsetY;
@@ -303,6 +370,8 @@ export function beginVertexDrag(state, hit, worldRaw, helpers, additive = false)
     state.vertexEdit.drag.modelSnapshotBeforeMove = snapshotModel(state);
     state.vertexEdit.drag.moved = false;
     state.vertexEdit.drag.lastTangentSnap = null;
+    state.vertexEdit.drag.lastIntersectionSnap = null;
+    state.vertexEdit.drag.lastObjectSnap = null;
     setSelection(state, Array.from(new Set(selected.map(v => Number(v.shapeId)))));
     return true;
 }
@@ -315,12 +384,14 @@ export function applyVertexDrag(state, worldRaw) {
     if (!anchorBaseShape) return;
     const baseV = getVertexAtKey(anchorBaseShape, vd.anchorKey);
     if (!baseV) return;
-    const gridStep = getEffectiveGridSize(state.grid, state.view);
-    // Exclude the shapes being dragged so their own endpoints don't interfere with snap
+    const gridStep = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
     const draggingShapeIds = new Set((vd.baseShapeSnapshots || []).map(it => Number(it.id)));
-    const objectSnap = getObjectSnapPoint(state, worldRaw, () => state.objectSnap?.enabled !== false, draggingShapeIds);
+    // Respect current snap panel settings in vertex edit as well.
+    // Keep excluding dragged shapes to avoid self-generated snap candidates.
+    const objectSnap = getObjectSnapPoint(state, worldRaw, null, draggingShapeIds);
 
     state.input.objectSnapHover = objectSnap;
+    vd.lastObjectSnap = objectSnap ? { ...objectSnap } : null;
 
     let target = objectSnap
         ? { x: objectSnap.x, y: objectSnap.y }
@@ -328,6 +399,14 @@ export function applyVertexDrag(state, worldRaw) {
 
     // --- Tangent snap: only for line vertices ---
     let tangentSnapResult = null;
+    let intersectionSnapResult = null;
+    if (objectSnap && objectSnap.kind === "intersection") {
+        const lineAId = Number(objectSnap.lineAId);
+        const lineBId = Number(objectSnap.lineBId);
+        if (Number.isFinite(lineAId) && Number.isFinite(lineBId)) {
+            intersectionSnapResult = { x: Number(objectSnap.x), y: Number(objectSnap.y), lineAId, lineBId };
+        }
+    }
     if (state.objectSnap?.tangent && anchorBaseShape.type === "line") {
         const fixedKey = vd.anchorKey === "p1" ? "p2" : "p1";
         const fixedPt = getVertexAtKey(anchorBaseShape, fixedKey);
@@ -359,10 +438,12 @@ export function applyVertexDrag(state, worldRaw) {
                 target = bestPt;
                 tangentSnapResult = { x: bestPt.x, y: bestPt.y, circleId: bestCircleId };
                 state.input.objectSnapHover = { x: bestPt.x, y: bestPt.y, kind: "tangent" };
+                vd.lastObjectSnap = { x: bestPt.x, y: bestPt.y, kind: "tangent", circleId: bestCircleId };
             }
         }
     }
     vd.lastTangentSnap = tangentSnapResult;
+    vd.lastIntersectionSnap = tangentSnapResult ? null : intersectionSnapResult;
 
     // --- Vector snap: constrain to original line direction (only if no tangent snap) ---
     if (!tangentSnapResult && state.objectSnap?.vector && anchorBaseShape.type === "line") {
@@ -393,7 +474,8 @@ export function applyVertexDrag(state, worldRaw) {
                 }
                 if (axisIntersectionSnap) {
                     target = axisIntersectionSnap;
-                    state.input.objectSnapHover = { x: axisIntersectionSnap.x, y: axisIntersectionSnap.y, kind: "intersection" };
+                    state.input.objectSnapHover = { x: axisIntersectionSnap.x, y: axisIntersectionSnap.y, kind: "vector" };
+                    vd.lastObjectSnap = { x: axisIntersectionSnap.x, y: axisIntersectionSnap.y, kind: "vector" };
                 } else {
                     // Regular projection onto vector axis
                     const t = ((target.x - fixedPt.x) * dirX + (target.y - fixedPt.y) * dirY) / lenSq;
@@ -427,6 +509,8 @@ export function endVertexDrag(state) {
     const anchorShapeId = vd.anchorShapeId;
     const anchorKey = vd.anchorKey;
     const lastTangentSnap = vd.lastTangentSnap || null;
+    const lastIntersectionSnap = vd.lastIntersectionSnap || null;
+    const lastObjectSnap = vd.lastObjectSnap || null;
     vd.active = false;
     vd.anchorShapeId = null;
     vd.anchorKey = null;
@@ -436,7 +520,9 @@ export function endVertexDrag(state) {
     vd.modelSnapshotBeforeMove = null;
     vd.moved = false;
     vd.lastTangentSnap = null;
-    return { moved, snapshot, anchorShapeId, anchorKey, lastTangentSnap };
+    vd.lastIntersectionSnap = null;
+    vd.lastObjectSnap = null;
+    return { moved, snapshot, anchorShapeId, anchorKey, lastTangentSnap, lastIntersectionSnap, lastObjectSnap };
 }
 
 /**
@@ -501,7 +587,86 @@ export function resolveVertexTangentAttribs(state, excludeShapeIds) {
         if (excludeSet && excludeSet.has(Number(shape.id))) continue;
         for (const key of ["p1", "p2"]) {
             const attrib = key === "p1" ? shape.p1Attrib : shape.p2Attrib;
-            if (!attrib || attrib.type !== "tangent") continue;
+            if (!attrib) continue;
+            if (attrib.type === "fixedPoint") {
+                const fx = Number(attrib.x), fy = Number(attrib.y);
+                if (!Number.isFinite(fx) || !Number.isFinite(fy)) {
+                    if (key === "p1") shape.p1Attrib = null; else shape.p2Attrib = null;
+                    continue;
+                }
+                if (key === "p1") { shape.x1 = fx; shape.y1 = fy; }
+                else { shape.x2 = fx; shape.y2 = fy; }
+                continue;
+            }
+            if (attrib.type === "followPoint") {
+                const ref = state.shapes.find(s => Number(s.id) === Number(attrib.shapeId));
+                if (!ref) {
+                    if (key === "p1") shape.p1Attrib = null; else shape.p2Attrib = null;
+                    continue;
+                }
+                let pt = null;
+                if (attrib.refType === "line_endpoint" && ref.type === "line") {
+                    pt = (attrib.refKey === "p2")
+                        ? { x: Number(ref.x2), y: Number(ref.y2) }
+                        : { x: Number(ref.x1), y: Number(ref.y1) };
+                } else if (attrib.refType === "dim_endpoint" && ref.type === "dim") {
+                    pt = (attrib.refKey === "p2")
+                        ? { x: Number(ref.x2), y: Number(ref.y2) }
+                        : { x: Number(ref.x1), y: Number(ref.y1) };
+                } else if (attrib.refType === "rect_corner" && ref.type === "rect") {
+                    const x1 = Number(ref.x1), y1 = Number(ref.y1), x2 = Number(ref.x2), y2 = Number(ref.y2);
+                    if (attrib.refKey === "c2") pt = { x: x2, y: y1 };
+                    else if (attrib.refKey === "c3") pt = { x: x2, y: y2 };
+                    else if (attrib.refKey === "c4") pt = { x: x1, y: y2 };
+                    else pt = { x: x1, y: y1 };
+                } else if (attrib.refType === "line_midpoint" && ref.type === "line") {
+                    pt = {
+                        x: (Number(ref.x1) + Number(ref.x2)) * 0.5,
+                        y: (Number(ref.y1) + Number(ref.y2)) * 0.5
+                    };
+                } else if (attrib.refType === "rect_midpoint" && ref.type === "rect") {
+                    const x1 = Number(ref.x1), y1 = Number(ref.y1), x2 = Number(ref.x2), y2 = Number(ref.y2);
+                    if (attrib.refKey === "m2") pt = { x: x2, y: (y1 + y2) * 0.5 };
+                    else if (attrib.refKey === "m3") pt = { x: (x1 + x2) * 0.5, y: y2 };
+                    else if (attrib.refKey === "m4") pt = { x: x1, y: (y1 + y2) * 0.5 };
+                    else pt = { x: (x1 + x2) * 0.5, y: y1 };
+                } else if (attrib.refType === "circle_center" && ref.type === "circle") {
+                    pt = { x: Number(ref.cx), y: Number(ref.cy) };
+                } else if (attrib.refType === "arc_center" && ref.type === "arc") {
+                    pt = { x: Number(ref.cx), y: Number(ref.cy) };
+                } else if (attrib.refType === "position_center" && ref.type === "position") {
+                    pt = { x: Number(ref.x), y: Number(ref.y) };
+                } else if (attrib.refType === "arc_endpoint" && ref.type === "arc") {
+                    const r = Math.abs(Number(ref.r) || 0);
+                    const cx = Number(ref.cx), cy = Number(ref.cy);
+                    const a = (attrib.refKey === "a2") ? (Number(ref.a2) || 0) : (Number(ref.a1) || 0);
+                    pt = { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
+                }
+                if (!pt || !Number.isFinite(pt.x) || !Number.isFinite(pt.y)) {
+                    if (key === "p1") shape.p1Attrib = null; else shape.p2Attrib = null;
+                    continue;
+                }
+                if (key === "p1") { shape.x1 = pt.x; shape.y1 = pt.y; }
+                else { shape.x2 = pt.x; shape.y2 = pt.y; }
+                continue;
+            }
+            if (attrib.type === "intersection") {
+                const la = state.shapes.find(s => Number(s.id) === Number(attrib.lineAId));
+                const lb = state.shapes.find(s => Number(s.id) === Number(attrib.lineBId));
+                if (!la || !lb || la.type !== "line" || lb.type !== "line") {
+                    if (key === "p1") shape.p1Attrib = null; else shape.p2Attrib = null;
+                    continue;
+                }
+                const ip = segmentIntersectionPoint(
+                    { x: Number(la.x1), y: Number(la.y1) }, { x: Number(la.x2), y: Number(la.y2) },
+                    { x: Number(lb.x1), y: Number(lb.y1) }, { x: Number(lb.x2), y: Number(lb.y2) }
+                );
+                if (!ip) continue;
+                if (key === "p1") { shape.x1 = ip.x; shape.y1 = ip.y; }
+                else { shape.x2 = ip.x; shape.y2 = ip.y; }
+                continue;
+            }
+            if (attrib.type !== "tangent") continue;
             const circle = state.shapes.find(s => Number(s.id) === attrib.circleId);
             if (!circle || (circle.type !== "circle" && circle.type !== "arc")) {
                 // Referenced circle no longer exists — clear the attribute
@@ -523,7 +688,7 @@ export function resolveVertexTangentAttribs(state, excludeShapeIds) {
             }
             // Update line vertex position
             if (key === "p1") { shape.x1 = best.x; shape.y1 = best.y; }
-            else              { shape.x2 = best.x; shape.y2 = best.y; }
+            else { shape.x2 = best.x; shape.y2 = best.y; }
 
             // If referenced shape is an arc, also update the arc endpoint that is
             // at the tangent point (a1 or a2 — whichever is angularly closer).
@@ -571,7 +736,7 @@ export function moveSelectedVerticesByDelta(state, dx, dy, helpers) {
         if (!p) continue;
         const next = { x: p.x + dx, y: p.y + dy };
         if (state.grid.snap) {
-            const gridStep = getEffectiveGridSize(state.grid, state.view);
+            const gridStep = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
             const snapped = snapPoint(next, gridStep);
             setVertexAtKey(shape, key, snapped);
         } else {
@@ -586,18 +751,45 @@ export function moveSelectedVerticesByDelta(state, dx, dy, helpers) {
 }
 
 export function beginGroupOriginDrag(state, group, worldRaw) {
-    const idSet = new Set(collectGroupTreeShapeIds(state, group.id).map(Number));
+    const pickedGroupId = Number(group.id);
+    const selectedGroupIds = Array.isArray(state.selection?.groupIds)
+        ? state.selection.groupIds.map(Number).filter(Number.isFinite)
+        : [];
+    const dragRootGroupIds = (selectedGroupIds.length > 1 && selectedGroupIds.includes(pickedGroupId))
+        ? selectedGroupIds
+        : [pickedGroupId];
+    const dragRootSet = new Set(dragRootGroupIds.map(Number));
+    const idSet = new Set();
+    const dragGroupSnapshotIds = new Set();
+    for (const rootGroupId of dragRootSet) {
+        for (const sid of collectGroupTreeShapeIds(state, rootGroupId)) idSet.add(Number(sid));
+        for (const gs of collectGroupTreeGroupSnapshots(state, rootGroupId)) dragGroupSnapshotIds.add(Number(gs.id));
+    }
     const snaps = [];
     for (const s of state.shapes) {
         if (!idSet.has(Number(s.id))) continue;
         snaps.push({ id: s.id, shape: JSON.parse(JSON.stringify(s)) });
     }
+    const groupSnapshots = [];
+    for (const gs of (state.groups || [])) {
+        const gid = Number(gs.id);
+        if (!dragGroupSnapshotIds.has(gid)) continue;
+        groupSnapshots.push({
+            id: gid,
+            originX: Number(gs.originX) || 0,
+            originY: Number(gs.originY) || 0,
+            rotationDeg: Number(gs.rotationDeg) || 0,
+        });
+    }
     state.input.groupDrag.active = true;
     state.input.groupDrag.startWorldRaw = { x: worldRaw.x, y: worldRaw.y };
-    state.input.groupDrag.groupId = Number(group.id);
+    state.input.groupDrag.groupId = pickedGroupId;
+    state.input.groupDrag.groupIds = Array.from(dragRootSet);
     state.input.groupDrag.groupOrigin = { x: Number(group.originX) || 0, y: Number(group.originY) || 0 };
+    state.input.groupDrag.anchorGroupId = pickedGroupId;
+    state.input.groupDrag.anchorGroupOrigin = { x: Number(group.originX) || 0, y: Number(group.originY) || 0 };
     state.input.groupDrag.shapeSnapshots = snaps;
-    state.input.groupDrag.groupSnapshots = collectGroupTreeGroupSnapshots(state, group.id);
+    state.input.groupDrag.groupSnapshots = groupSnapshots;
     state.input.groupDrag.modelSnapshotBeforeMove = snapshotModel(state);
     state.input.groupDrag.moved = false;
 }
@@ -624,26 +816,27 @@ export function beginGroupRotateDrag(state, group, worldRaw) {
 export function applyGroupOriginDrag(state, worldRaw) {
     const gd = state.input.groupDrag;
     if (!gd.active || !gd.startWorldRaw) return;
-    const gridStep = getEffectiveGridSize(state.grid, state.view);
+    const gridStep = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
+    const anchorOrigin = gd.anchorGroupOrigin || gd.groupOrigin || { x: 0, y: 0 };
 
     // 現在のマウス（ワールド座標）から基準点の新しい位置を計算
     const rawDx = worldRaw.x - gd.startWorldRaw.x;
     const rawDy = worldRaw.y - gd.startWorldRaw.y;
-    const rawTargetX = gd.groupOrigin.x + rawDx;
-    const rawTargetY = gd.groupOrigin.y + rawDy;
+    const rawTargetX = anchorOrigin.x + rawDx;
+    const rawTargetY = anchorOrigin.y + rawDy;
 
     // スナップが有効な場合、移動後の絶対座標をグリッドに乗せる
     const targetX = state.grid.snap ? Math.round(rawTargetX / gridStep) * gridStep : rawTargetX;
     const targetY = state.grid.snap ? Math.round(rawTargetY / gridStep) * gridStep : rawTargetY;
 
-    const dx = targetX - gd.groupOrigin.x;
-    const dy = targetY - gd.groupOrigin.y;
+    const dx = targetX - anchorOrigin.x;
+    const dy = targetY - anchorOrigin.y;
 
     if (Math.abs(dx) > 1e-9 || Math.abs(dy) > 1e-9) gd.moved = true;
-    const g = getGroup(state, gd.groupId);
+    const g = getGroup(state, gd.anchorGroupId ?? gd.groupId);
     if (g) {
-        g.originX = gd.groupOrigin.x + dx;
-        g.originY = gd.groupOrigin.y + dy;
+        g.originX = anchorOrigin.x + dx;
+        g.originY = anchorOrigin.y + dy;
     }
     const groupById = new Map((state.groups || []).map((gg) => [Number(gg.id), gg]));
     for (const gs of (gd.groupSnapshots || [])) {
@@ -672,6 +865,28 @@ export function applyGroupOriginDrag(state, worldRaw) {
             t.x1 = b.x1 + dx; t.y1 = b.y1 + dy;
             t.x2 = b.x2 + dx; t.y2 = b.y2 + dy;
             t.px = b.px + dx; t.py = b.py + dy;
+            if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+                t.tx = Number(b.tx) + dx;
+                t.ty = Number(b.ty) + dy;
+            }
+        } else if (t.type === "dimchain") {
+            if (Array.isArray(b.points) && Array.isArray(t.points)) {
+                t.points = b.points.map(pt => ({ x: Number(pt.x) + dx, y: Number(pt.y) + dy }));
+            }
+            if (Number.isFinite(Number(b.px)) && Number.isFinite(Number(b.py))) {
+                t.px = Number(b.px) + dx;
+                t.py = Number(b.py) + dy;
+            }
+            if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+                t.tx = Number(b.tx) + dx;
+                t.ty = Number(b.ty) + dy;
+            }
+        } else if (t.type === "circleDim") {
+            // circleDim follows referenced circle/arc geometry; move explicit absolute text anchor if present.
+            if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+                t.tx = Number(b.tx) + dx;
+                t.ty = Number(b.ty) + dy;
+            }
         } else if (t.type === "text") {
             t.x1 = b.x1 + dx; t.y1 = b.y1 + dy;
         }
@@ -730,9 +945,37 @@ export function applyGroupRotateDrag(state, worldRaw) {
             t.x1 = p1.x; t.y1 = p1.y;
             t.x2 = p2.x; t.y2 = p2.y;
             t.px = pp.x; t.py = pp.y;
+            if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+                const tp = rotatePointAround(Number(b.tx), Number(b.ty), ox, oy, delta);
+                t.tx = tp.x; t.ty = tp.y;
+            }
+        } else if (t.type === "dimchain") {
+            if (Array.isArray(b.points) && Array.isArray(t.points)) {
+                t.points = b.points.map(pt => rotatePointAround(Number(pt.x), Number(pt.y), ox, oy, delta));
+            }
+            if (Number.isFinite(Number(b.px)) && Number.isFinite(Number(b.py))) {
+                const pp = rotatePointAround(Number(b.px), Number(b.py), ox, oy, delta);
+                t.px = pp.x; t.py = pp.y;
+            }
+            if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+                const tp = rotatePointAround(Number(b.tx), Number(b.ty), ox, oy, delta);
+                t.tx = tp.x; t.ty = tp.y;
+            }
+        } else if (t.type === "circleDim") {
+            t.ang = normalizeRad((Number(b.ang) || 0) + d);
+            if (Number.isFinite(Number(b.tdx)) && Number.isFinite(Number(b.tdy))) {
+                const c = Math.cos(d), s = Math.sin(d);
+                t.tdx = Number(b.tdx) * c - Number(b.tdy) * s;
+                t.tdy = Number(b.tdx) * s + Number(b.tdy) * c;
+            }
+            if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+                const tp = rotatePointAround(Number(b.tx), Number(b.ty), ox, oy, delta);
+                t.tx = tp.x; t.ty = tp.y;
+            }
         } else if (t.type === "text") {
             const p = rotatePointAround(b.x1, b.y1, ox, oy, delta);
             t.x1 = p.x; t.y1 = p.y;
+            t.textRotate = (Number(b.textRotate) || 0) + delta;
         }
     }
 }
@@ -743,7 +986,10 @@ export function endGroupOriginDrag(state) {
     state.input.groupDrag.active = false;
     state.input.groupDrag.startWorldRaw = null;
     state.input.groupDrag.groupId = null;
+    state.input.groupDrag.groupIds = null;
     state.input.groupDrag.groupOrigin = null;
+    state.input.groupDrag.anchorGroupId = null;
+    state.input.groupDrag.anchorGroupOrigin = null;
     state.input.groupDrag.shapeSnapshots = null;
     state.input.groupDrag.groupSnapshots = null;
     state.input.groupDrag.modelSnapshotBeforeMove = null;
@@ -822,21 +1068,30 @@ export function beginSelectionDrag(state, worldRaw, helpers) {
 export function applySelectionDrag(state, worldRaw) {
     const drag = state.selection.drag;
     if (!drag.active || !drag.startWorldRaw || !drag.shapeSnapshots) return;
-    const gridStep = getEffectiveGridSize(state.grid, state.view);
+    const gridStep = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
 
     const objSnapCur = getObjectSnapPoint(state, worldRaw, () => true);
+    const curRaw = objSnapCur
+        ? { x: objSnapCur.x, y: objSnapCur.y }
+        : worldRaw;
     const cur = objSnapCur
         ? { x: objSnapCur.x, y: objSnapCur.y }
         : (state.grid.snap ? snapPoint(worldRaw, gridStep) : worldRaw);
 
     const objSnapStart = getObjectSnapPoint(state, drag.startWorldRaw, () => true);
+    const startRaw = objSnapStart
+        ? { x: objSnapStart.x, y: objSnapStart.y }
+        : drag.startWorldRaw;
     const start = objSnapStart
         ? { x: objSnapStart.x, y: objSnapStart.y }
         : (state.grid.snap ? snapPoint(drag.startWorldRaw, gridStep) : drag.startWorldRaw);
 
     const dx = cur.x - start.x;
     const dy = cur.y - start.y;
+    const dxRaw = curRaw.x - startRaw.x;
+    const dyRaw = curRaw.y - startRaw.y;
     if (Math.abs(dx) > 1e-9 || Math.abs(dy) > 1e-9) drag.moved = true;
+    if (Math.abs(dxRaw) > 1e-9 || Math.abs(dyRaw) > 1e-9) drag.moved = true;
     const byId = new Map(state.shapes.map((s) => [Number(s.id), s]));
     for (const it of drag.shapeSnapshots) {
         const target = byId.get(Number(it.id));
@@ -846,13 +1101,25 @@ export function applySelectionDrag(state, worldRaw) {
             // 線、矩形、寸法線は個別ドラッグでは動かさない（頂点編集かグループ移動のみ）
             continue;
         } else if (target.type === "circle") {
-            target.cx = base.cx + dx; target.cy = base.cy + dy;
+            let nx = base.cx + dxRaw;
+            let ny = base.cy + dyRaw;
+            if (state.grid.snap) {
+                const p = snapPoint({ x: nx, y: ny }, gridStep);
+                nx = p.x; ny = p.y;
+            }
+            target.cx = nx; target.cy = ny;
             target.r = base.r;
         } else if (target.type === "arc") {
             target.cx = base.cx + dx; target.cy = base.cy + dy;
             target.r = base.r; target.a1 = base.a1; target.a2 = base.a2; target.ccw = base.ccw;
         } else if (target.type === "position") {
-            target.x = base.x + dx; target.y = base.y + dy; target.size = base.size;
+            let nx = base.x + dxRaw;
+            let ny = base.y + dyRaw;
+            if (state.grid.snap) {
+                const p = snapPoint({ x: nx, y: ny }, gridStep);
+                nx = p.x; ny = p.y;
+            }
+            target.x = nx; target.y = ny; target.size = base.size;
         } else if (target.type === "text") {
             target.x1 = base.x1 + dx; target.y1 = base.y1 + dy;
         }
@@ -1011,7 +1278,7 @@ export function hitTestShapes(state, world, dom) {
             if (len > 1e-9) {
                 const tx = vx / len, ty = vy / len;
                 const nx = -ty, ny = tx;
-                const off = (s.px - s.x1) * nx + (s.py - s.y1) * ny;
+                const off = (Number(s.px) - s.x1) * nx + (Number(s.py) - s.y1) * ny;
                 const d1 = { x: s.x1 + nx * off, y: s.y1 + ny * off };
                 const d2 = { x: s.x2 + nx * off, y: s.y2 + ny * off };
                 if (hitTestLine(world, { x1: s.x1, y1: s.y1, x2: d1.x, y2: d1.y }, tol)) return s;
@@ -1019,12 +1286,38 @@ export function hitTestShapes(state, world, dom) {
                 if (hitTestLine(world, { x1: d1.x, y1: d1.y, x2: d2.x, y2: d2.y }, tol)) return s;
             }
         }
+        if (s.type === "dimchain") {
+            const geom = getDimChainGeometry(s);
+            if (geom) {
+                for (const seg of geom.segments) {
+                    if (hitTestLine(world, { x1: seg.x1, y1: seg.y1, x2: seg.d1.x, y2: seg.d1.y }, tol)) return s;
+                    if (hitTestLine(world, { x1: seg.x2, y1: seg.y2, x2: seg.d2.x, y2: seg.d2.y }, tol)) return s;
+                    if (hitTestLine(world, { x1: seg.d1.x, y1: seg.d1.y, x2: seg.d2.x, y2: seg.d2.y }, tol)) return s;
+                }
+            }
+        }
+        if (s.type === "dimangle") {
+            const g = getDimAngleGeometry(s, state.shapes);
+            const cx = Number(g?.cx), cy = Number(g?.cy), r = Number(g?.r);
+            if (r > 0) {
+                const d = Math.hypot(world.x - cx, world.y - cy);
+                if (Math.abs(d - r) < tol) return s;
+            }
+        }
+        if (s.type === "circleDim") {
+            const g = getCircleDimGeometry(s, state.shapes);
+            if (g) {
+                if (hitTestLine(world, { x1: g.p1.x, y1: g.p1.y, x2: g.p2.x, y2: g.p2.y }, tol)) return s;
+                if (Math.hypot(world.x - g.tx, world.y - g.ty) < Math.max(tol, 12 / Math.max(1e-9, state.view.scale))) return s;
+            }
+        }
         if (s.type === "text") {
             const p1 = { x: Number(s.x1), y: Number(s.y1) };
             const txt = String(s.text || "");
             const sizePx = (Number(s.textSizePt) || 12) * 1.33;
             const rDeg = Number(s.textRotate) || 0;
-            const tctx = dom.canvas.getContext("2d");
+            const tctx = dom?.canvas?.getContext?.("2d");
+            if (!tctx) continue;
             tctx.save();
             const isBold = !!s.textBold;
             const isItalic = !!s.textItalic;
@@ -1035,10 +1328,26 @@ export function hitTestShapes(state, world, dom) {
             const h = sizePx;
             const rRad = rDeg * Math.PI / 180;
             const cos = Math.cos(rRad), sin = Math.sin(rRad);
-            const dx = world.x - p1.x, dy = world.y - p1.y;
+            // Hit-test in screen space so tiny text remains easy to pick at any zoom.
+            const scale = Math.max(1e-9, Number(state.view?.scale) || 1);
+            const p1sx = p1.x * scale + Number(state.view?.offsetX || 0);
+            const p1sy = p1.y * scale + Number(state.view?.offsetY || 0);
+            const wsx = world.x * scale + Number(state.view?.offsetX || 0);
+            const wsy = world.y * scale + Number(state.view?.offsetY || 0);
+            const dx = wsx - p1sx, dy = wsy - p1sy;
             const rx = dx * cos + dy * sin;
             const ry = -dx * sin + dy * cos;
-            if (rx >= 0 && rx <= w / state.view.scale && ry >= -h * 0.5 / state.view.scale && ry <= h * 0.5 / state.view.scale) return s;
+            const pickPadPx = 10;
+            const minPickWpx = 28;
+            const minPickHpx = 22;
+            const wPx = Math.max(minPickWpx, Number(w) || 0);
+            const hHalfPx = Math.max(minPickHpx * 0.5, Number(h) * 0.5 || 0);
+            if (
+                rx >= -pickPadPx &&
+                rx <= (wPx + pickPadPx) &&
+                ry >= (-hHalfPx - pickPadPx) &&
+                ry <= (hHalfPx + pickPadPx)
+            ) return s;
         }
         if (s.type === "hatch") {
             if (isPointInHatch(state.shapes, s, world, state.view.scale)) return s;
@@ -1050,25 +1359,63 @@ export function hitTestShapes(state, world, dom) {
 export function hitTestDimHandle(state, worldRaw) {
     if (state.tool !== "select") return null;
     const tol = 10 / Math.max(1e-9, state.view.scale);
+    const dimMmToWorld = (mm) => {
+        const pageScale = Math.max(0.0001, Number(state.pageSetup?.scale ?? 1) || 1);
+        const unitMm = mmPerUnit(state.pageSetup?.unit || "mm");
+        return Math.max(0, Number(mm) || 0) * pageScale / Math.max(1e-9, unitMm);
+    };
     const selectedIds = new Set((state.selection.ids || []).map(Number));
     for (let i = state.shapes.length - 1; i >= 0; i--) {
         const s = state.shapes[i];
-        if (!s || (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle")) continue;
+        if (!s || (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim")) continue;
         if (!selectedIds.has(Number(s.id))) continue;
         if (!isLayerVisible(state, s.layerId)) continue;
         const part = hitTestDimPart(s, worldRaw.x, worldRaw.y, state.shapes, state.view.scale);
         if (part) return { id: Number(s.id), dim: s, part };
+        if (s.type === "dim") {
+            const g = getDimGeometry(s);
+            if (g) {
+                const extOffWorld = dimMmToWorld(Number(s.extOffset ?? 2) || 0);
+                const defaultVisWorld = Math.max(0, Math.abs(Number(g.off) || 0) - extOffWorld);
+                const visLens = Array.isArray(s.extVisLens) ? s.extVisLens : [];
+                const sign = Math.sign(Number(g.off) || 0) || 1;
+                const enx = Number(g.nx) * sign, eny = Number(g.ny) * sign;
+                const vis1 = Number.isFinite(Number(visLens[0])) ? Math.max(0, Number(visLens[0])) : defaultVisWorld;
+                const vis2 = Number.isFinite(Number(visLens[1])) ? Math.max(0, Number(visLens[1])) : defaultVisWorld;
+                const hp1 = { x: Number(g.d1.x) - enx * vis1, y: Number(g.d1.y) - eny * vis1 };
+                const hp2 = { x: Number(g.d2.x) - enx * vis2, y: Number(g.d2.y) - eny * vis2 };
+                if (Math.hypot(worldRaw.x - hp1.x, worldRaw.y - hp1.y) < tol) return { id: Number(s.id), dim: s, part: "extVisDim:0" };
+                if (Math.hypot(worldRaw.x - hp2.x, worldRaw.y - hp2.y) < tol) return { id: Number(s.id), dim: s, part: "extVisDim:1" };
+            }
+        }
+        if (s.type === "dimchain") {
+            const g = getDimChainGeometry(s);
+            if (g && Array.isArray(g.dimPoints) && Array.isArray(s.points) && g.dimPoints.length === s.points.length) {
+                const extOffWorld = dimMmToWorld(Number(s.extOffset ?? 2) || 0);
+                const defaultVisWorld = Math.max(0, Math.abs(Number(g.off) || 0) - extOffWorld);
+                const visLens = Array.isArray(s.extVisLens) ? s.extVisLens : [];
+                const sign = Math.sign(Number(g.off) || 0) || 1;
+                const enx = Number(g.nx) * sign, eny = Number(g.ny) * sign;
+                for (let i = 0; i < g.dimPoints.length; i++) {
+                    const dpt = g.dimPoints[i];
+                    const vis = Number.isFinite(Number(visLens[i])) ? Math.max(0, Number(visLens[i])) : defaultVisWorld;
+                    const hp = { x: Number(dpt.x) - enx * vis, y: Number(dpt.y) - eny * vis };
+                    if (Math.hypot(worldRaw.x - hp.x, worldRaw.y - hp.y) < tol) return { id: Number(s.id), dim: s, part: `extVis:${i}` };
+                }
+            }
+        }
     }
     return null;
 }
 
-export function beginDimHandleDrag(state, hit) {
+export function beginDimHandleDrag(state, hit, worldRaw = null) {
     const dim = hit?.dim || hit;
     state.input.dimHandleDrag.active = true;
     state.input.dimHandleDrag.dimId = Number(dim.id);
     state.input.dimHandleDrag.part = String(hit?.part || "line");
     state.input.dimHandleDrag.modelSnapshotBeforeMove = snapshotModel(state);
     state.input.dimHandleDrag.moved = false;
+    state.input.dimHandleDrag.lastWorld = worldRaw ? { x: Number(worldRaw.x) || 0, y: Number(worldRaw.y) || 0 } : null;
 }
 
 export function applyDimHandleDrag(state, worldRaw) {
@@ -1076,37 +1423,214 @@ export function applyDimHandleDrag(state, worldRaw) {
     if (!dd.active) return;
     const dim = state.shapes.find(s => s && (s.id === dd.dimId || Number(s.id) === Number(dd.dimId)));
     if (!dim) return;
-    const p = state.grid.snap ? snapPoint(worldRaw, getEffectiveGridSize(state.grid, state.view)) : worldRaw;
+    const p = state.grid.snap ? snapPoint(worldRaw, getEffectiveGridSize(state.grid, state.view, state.pageSetup)) : worldRaw;
+    const objectSnapPoint = getObjectSnapPoint(state, worldRaw, () => state.objectSnap?.enabled !== false);
+    const pSnap = objectSnapPoint || p;
+    const projectPointToAxis = (base, axis, point) => {
+        const ax = Number(axis?.x) || 0;
+        const ay = Number(axis?.y) || 0;
+        const alen = Math.hypot(ax, ay);
+        if (alen < 1e-9) return { x: Number(base?.x) || 0, y: Number(base?.y) || 0 };
+        const ux = ax / alen, uy = ay / alen;
+        const bx = Number(base?.x) || 0, by = Number(base?.y) || 0;
+        const t = (point.x - bx) * ux + (point.y - by) * uy;
+        return { x: bx + ux * t, y: by + uy * t };
+    };
+    const dimPtToWorld = (pt) => {
+        const mm = Math.max(0, Number(pt) || 0) * (25.4 / 72);
+        const pageScale = Math.max(0.0001, Number(state.pageSetup?.scale ?? 1) || 1);
+        const unitMm = mmPerUnit(state.pageSetup?.unit || "mm");
+        return mm * pageScale / Math.max(1e-9, unitMm);
+    };
+    const alignDimChainTargets = (d) => {
+        if (!d || !Array.isArray(d.points) || d.points.length < 2) return;
+        const p0 = d.points[0];
+        const pN = d.points[d.points.length - 1];
+        const uxRaw = Number(pN.x) - Number(p0.x);
+        const uyRaw = Number(pN.y) - Number(p0.y);
+        const uLen = Math.hypot(uxRaw, uyRaw);
+        if (uLen < 1e-9) return;
+        const ux = uxRaw / uLen, uy = uyRaw / uLen;
+        const bx = Number(p0.x), by = Number(p0.y);
+        for (let i = 1; i < d.points.length - 1; i++) {
+            const pt = d.points[i];
+            const t = (Number(pt.x) - bx) * ux + (Number(pt.y) - by) * uy;
+            pt.x = bx + ux * t;
+            pt.y = by + uy * t;
+        }
+    };
 
     if (dim.type === 'dim') {
-        if (dd.part === 'text') { dim.tx = p.x; dim.ty = p.y; }
+        if (dd.part === 'text') {
+            const g0 = getDimGeometry(dim);
+            if (g0) {
+                const nx = Number(g0.nx), ny = Number(g0.ny);
+                const mx = Number(g0.allCtrl.x);
+                const my = Number(g0.allCtrl.y);
+                const base = {
+                    x: (Number.isFinite(Number(dim.tdx)) && Number.isFinite(Number(dim.tdy)))
+                        ? (mx + Number(dim.tdx))
+                        : (Number.isFinite(Number(dim.tx)) ? Number(dim.tx) : mx),
+                    y: (Number.isFinite(Number(dim.tdx)) && Number.isFinite(Number(dim.tdy)))
+                        ? (my + Number(dim.tdy))
+                        : (Number.isFinite(Number(dim.ty)) ? Number(dim.ty) : my)
+                };
+                const constrained = projectPointToAxis(base, { x: nx, y: ny }, p);
+                dim.tx = constrained.x;
+                dim.ty = constrained.y;
+                dim.tdx = constrained.x - mx;
+                dim.tdy = constrained.y - my;
+            } else {
+                dim.tx = p.x; dim.ty = p.y;
+            }
+        }
         else if (dd.part === 'p1') { dim.x1 = p.x; dim.y1 = p.y; }
         else if (dd.part === 'p2') { dim.x2 = p.x; dim.y2 = p.y; }
+        else if (dd.part === 'all') {
+            const prev = dd.lastWorld || pSnap;
+            const dx = pSnap.x - Number(prev.x || 0);
+            const dy = pSnap.y - Number(prev.y || 0);
+            if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+                dim.x1 = Number(dim.x1) + dx; dim.y1 = Number(dim.y1) + dy;
+                dim.x2 = Number(dim.x2) + dx; dim.y2 = Number(dim.y2) + dy;
+                dim.px = Number(dim.px) + dx; dim.py = Number(dim.py) + dy;
+                if (Number.isFinite(Number(dim.tx)) && Number.isFinite(Number(dim.ty))) {
+                    dim.tx = Number(dim.tx) + dx;
+                    dim.ty = Number(dim.ty) + dy;
+                }
+            }
+        }
         else if (dd.part === 'target1' || dd.part === 'target2') {
             const os = getObjectSnapPoint(state, worldRaw, () => true);
             const tp = os || p;
             if (dd.part === 'target1') { dim.x1 = tp.x; dim.y1 = tp.y; }
             else { dim.x2 = tp.x; dim.y2 = tp.y; }
         }
+        else if (dd.part === 'place') {
+            dim.px = pSnap.x; dim.py = pSnap.y;
+        }
+        else if (dd.part.startsWith("extVisDim:")) {
+            const idx = parseInt(dd.part.substring(10), 10);
+            const g = getDimGeometry(dim);
+            if (!isNaN(idx) && g && (idx === 0 || idx === 1)) {
+                const sign = Math.sign(Number(g.off) || 0) || 1;
+                const enx = Number(g.nx) * sign, eny = Number(g.ny) * sign;
+                const anchor = (idx === 0) ? g.d1 : g.d2;
+                const dist = Math.max(0, (Number(anchor.x) - pSnap.x) * enx + (Number(anchor.y) - pSnap.y) * eny);
+                if (!Array.isArray(dim.extVisLens)) dim.extVisLens = [];
+                dim.extVisLens[idx] = dist;
+            }
+        }
         else if (dd.part === 'edge') { dim.x2 = p.x; dim.y2 = p.y; }
         else { dim.px = p.x; dim.py = p.y; }
     } else if (dim.type === 'dimchain') {
-        if (dd.part === 'text') { dim.tx = p.x; dim.ty = p.y; }
-        else if (dd.part.startsWith('p')) {
-            const idx = parseInt(dd.part.substring(1));
-            if (!isNaN(idx) && dim.points && dim.points[idx]) {
-                dim.points[idx].x = p.x; dim.points[idx].y = p.y;
+        if (dd.part === 'text') {
+            const g = getDimChainGeometry(dim);
+            if (g) {
+                const chainMid = g.chainMid || { x: 0, y: 0 };
+                const defaultOff = dimPtToWorld(Math.max(1, Number(dim.fontSize ?? 12) || 12));
+                const mx = Number(chainMid.x) + Number(g.nx) * defaultOff;
+                const my = Number(chainMid.y) + Number(g.ny) * defaultOff;
+                const base = {
+                    x: Number.isFinite(Number(dim.tx)) ? Number(dim.tx) : mx,
+                    y: Number.isFinite(Number(dim.ty)) ? Number(dim.ty) : my
+                };
+                const constrained = projectPointToAxis(base, { x: Number(g.nx), y: Number(g.ny) }, p);
+                dim.tx = constrained.x;
+                dim.ty = constrained.y;
+            } else {
+                dim.tx = p.x; dim.ty = p.y;
             }
         }
-        else { dim.px = p.x; dim.py = p.y; }
+        else if (dd.part.startsWith('p:')) {
+            const idx = parseInt(dd.part.substring(2), 10);
+            if (!isNaN(idx) && dim.points && dim.points[idx]) {
+                dim.points[idx].x = pSnap.x; dim.points[idx].y = pSnap.y;
+                alignDimChainTargets(dim);
+            }
+        }
+        else if (dd.part.startsWith('target:')) {
+            const idx = parseInt(dd.part.substring(7), 10);
+            if (!isNaN(idx) && dim.points && dim.points[idx]) {
+                dim.points[idx].x = pSnap.x; dim.points[idx].y = pSnap.y;
+                alignDimChainTargets(dim);
+            }
+        }
+        else if (dd.part === "all") {
+            const prev = dd.lastWorld || pSnap;
+            const dx = pSnap.x - Number(prev.x || 0);
+            const dy = pSnap.y - Number(prev.y || 0);
+            if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+                for (const pt of (dim.points || [])) {
+                    pt.x = Number(pt.x) + dx;
+                    pt.y = Number(pt.y) + dy;
+                }
+                dim.px = Number(dim.px || 0) + dx;
+                dim.py = Number(dim.py || 0) + dy;
+                if (Number.isFinite(Number(dim.tx)) && Number.isFinite(Number(dim.ty))) {
+                    dim.tx = Number(dim.tx) + dx;
+                    dim.ty = Number(dim.ty) + dy;
+                }
+            }
+        }
+        else if (dd.part.startsWith("extVis:")) {
+            const idx = parseInt(dd.part.substring(7), 10);
+            const g = getDimChainGeometry(dim);
+            if (!isNaN(idx) && g && Array.isArray(g.dimPoints) && g.dimPoints[idx]) {
+                const sign = Math.sign(Number(g.off) || 0) || 1;
+                const enx = Number(g.nx) * sign, eny = Number(g.ny) * sign;
+                const anchor = g.dimPoints[idx];
+                const dist = Math.max(0, (Number(anchor.x) - pSnap.x) * enx + (Number(anchor.y) - pSnap.y) * eny);
+                if (!Array.isArray(dim.extVisLens)) dim.extVisLens = [];
+                dim.extVisLens[idx] = dist;
+            }
+        }
+        else if (dd.part === "line" || dd.part === "place") { dim.px = pSnap.x; dim.py = pSnap.y; }
+        else { dim.px = pSnap.x; dim.py = pSnap.y; }
     } else if (dim.type === 'dimangle') {
-        if (dd.part === 'text') { dim.tx = p.x; dim.ty = p.y; }
-        else if (dd.part === 'p1') { dim.x1 = p.x; dim.y1 = p.y; }
-        else if (dd.part === 'p2') { dim.x2 = p.x; dim.y2 = p.y; }
-        else if (dd.part === 'p3') { dim.x3 = p.x; dim.y3 = p.y; }
-        else if (dd.part === 'p4') { dim.x4 = p.x; dim.y4 = p.y; }
-        else { dim.px = p.x; dim.py = p.y; }
+        const g = getDimAngleGeometry(dim, state.shapes);
+        if (g) {
+            if (dd.part === 'text') {
+                const off = Math.max(Number(g.r) + 1e-6, (pSnap.x - Number(g.cx)) * Number(g.ux) + (pSnap.y - Number(g.cy)) * Number(g.uy));
+                dim.textOffset = off;
+                dim.tx = Number(g.cx) + Number(g.ux) * off;
+                dim.ty = Number(g.cy) + Number(g.uy) * off;
+            } else if (dd.part === "radius" || dd.part === "line" || dd.part === "place") {
+                const nr = Math.max(1e-6, (pSnap.x - Number(g.cx)) * Number(g.ux) + (pSnap.y - Number(g.cy)) * Number(g.uy));
+                dim.r = nr;
+                if (Number.isFinite(Number(dim.textOffset))) {
+                    dim.textOffset = Math.max(nr + 1e-6, Number(dim.textOffset));
+                }
+            }
+        }
+    } else if (dim.type === 'circleDim') {
+        const g = getCircleDimGeometry(dim, state.shapes);
+        if (g) {
+            if (dd.part === 'pArc') {
+                // pArc is on the circle, so it determines the angle.
+                // Constraint: Ignore snap panel for this handle as requested.
+                // worldRaw is the unsnapped point.
+                const ang = Math.atan2(worldRaw.y - g.cy, worldRaw.x - g.cx);
+                dim.ang = ang;
+            } else if (dd.part === 'centerCtrl') {
+                // Follow-target-center controller is driven by the target circle and is not freely draggable.
+                return;
+            } else if (dd.part === 'off1' || dd.part === 'off2') {
+                // Project p onto the line defined by ang
+                const ux = Math.cos(g.ang), uy = Math.sin(g.ang);
+                const dist = (p.x - g.cx) * ux + (p.y - g.cy) * uy;
+                if (dd.part === 'off1') dim.off1 = dist;
+                else dim.off2 = dist;
+            } else if (dd.part === 'text') {
+                // circleDim text position: free 2D move (no axis lock).
+                dim.tdx = Number(p.x) - Number(g.cx);
+                dim.tdy = Number(p.y) - Number(g.cy);
+                dim.tx = Number(p.x);
+                dim.ty = Number(p.y);
+            }
+        }
     }
+    dd.lastWorld = { x: pSnap.x, y: pSnap.y };
     dd.moved = true;
 }
 
@@ -1119,6 +1643,7 @@ export function endDimHandleDrag(state) {
     dd.part = null;
     dd.modelSnapshotBeforeMove = null;
     dd.moved = false;
+    dd.lastWorld = null;
     return { moved, snapshot };
 }
 
@@ -1153,7 +1678,62 @@ export function endSelectionBox(state, helpers) {
         const pMax = screenToWorld(state.view, { x: xMax, y: yMax });
         const wx1 = pMin.x, wy1 = pMin.y, wx2 = pMax.x, wy2 = pMax.y;
 
+        const aabbFromPoints = (pts) => {
+            const valid = (pts || []).filter(p => p && Number.isFinite(Number(p.x)) && Number.isFinite(Number(p.y)));
+            if (!valid.length) return null;
+            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+            for (const p of valid) {
+                const x = Number(p.x), y = Number(p.y);
+                if (x < minX) minX = x;
+                if (y < minY) minY = y;
+                if (x > maxX) maxX = x;
+                if (y > maxY) maxY = y;
+            }
+            return { minX, minY, maxX, maxY };
+        };
+
+        const getDimLikeBounds = (s) => {
+            if (!s) return null;
+            if (s.type === "dim") {
+                return aabbFromPoints([
+                    { x: Number(s.x1), y: Number(s.y1) },
+                    { x: Number(s.x2), y: Number(s.y2) },
+                    { x: Number(s.px), y: Number(s.py) },
+                    (Number.isFinite(Number(s.tx)) && Number.isFinite(Number(s.ty))) ? { x: Number(s.tx), y: Number(s.ty) } : null
+                ]);
+            }
+            if (s.type === "dimchain") {
+                const g = getDimChainGeometry(s);
+                if (!g) return null;
+                const pts = []
+                    .concat(Array.isArray(s.points) ? s.points : [])
+                    .concat(Array.isArray(g.dimPoints) ? g.dimPoints : [])
+                    .concat(Array.isArray(g.segments) ? g.segments.flatMap(seg => [seg?.d1, seg?.d2]) : [])
+                    .concat((Number.isFinite(Number(s.tx)) && Number.isFinite(Number(s.ty))) ? [{ x: Number(s.tx), y: Number(s.ty) }] : []);
+                return aabbFromPoints(pts);
+            }
+            if (s.type === "circleDim") {
+                const g = getCircleDimGeometry(s, state.shapes || []);
+                if (!g) return null;
+                const c1 = { x: Number(g.cx) + Number(g.ux) * Number(g.r), y: Number(g.cy) + Number(g.uy) * Number(g.r) };
+                const c2 = { x: Number(g.cx) - Number(g.ux) * Number(g.r), y: Number(g.cy) - Number(g.uy) * Number(g.r) };
+                return aabbFromPoints([g.p1, g.p2, c1, c2, { x: Number(g.tx), y: Number(g.ty) }]);
+            }
+            if (s.type === "dimangle") {
+                const g = getDimAngleGeometry(s, state.shapes || []);
+                if (!g) return null;
+                const p1 = { x: Number(g.cx) + Math.cos(Number(g.a1)) * Number(g.r), y: Number(g.cy) + Math.sin(Number(g.a1)) * Number(g.r) };
+                const p2 = { x: Number(g.cx) + Math.cos(Number(g.a2)) * Number(g.r), y: Number(g.cy) + Math.sin(Number(g.a2)) * Number(g.r) };
+                return aabbFromPoints([p1, p2, { x: Number(g.cx), y: Number(g.cy) }, { x: Number(g.tx), y: Number(g.ty) }]);
+            }
+            return null;
+        };
+
         const isInside = (s) => {
+            const dimBounds = getDimLikeBounds(s);
+            if (dimBounds) {
+                return (dimBounds.minX >= wx1 && dimBounds.maxX <= wx2 && dimBounds.minY >= wy1 && dimBounds.maxY <= wy2);
+            }
             if (s.type === "line") {
                 return (s.x1 >= wx1 && s.x1 <= wx2 && s.y1 >= wy1 && s.y1 <= wy2) &&
                     (s.x2 >= wx1 && s.x2 <= wx2 && s.y2 >= wy1 && s.y2 <= wy2);
@@ -1172,15 +1752,14 @@ export function endSelectionBox(state, helpers) {
             if (s.type === "text") {
                 return (s.x1 >= wx1 && s.x1 <= wx2 && s.y1 >= wy1 && s.y1 <= wy2);
             }
-            if (s.type === "dim") {
-                return (s.x1 >= wx1 && s.x1 <= wx2 && s.y1 >= wy1 && s.y1 <= wy2) &&
-                    (s.x2 >= wx1 && s.x2 <= wx2 && s.y2 >= wy1 && s.y2 <= wy2) &&
-                    (s.px >= wx1 && s.px <= wx2 && s.py >= wy1 && s.py <= wy2);
-            }
             return false;
         };
 
         const isCrossing = (s) => {
+            const dimBounds = getDimLikeBounds(s);
+            if (dimBounds) {
+                return !(dimBounds.maxX < wx1 || dimBounds.minX > wx2 || dimBounds.maxY < wy1 || dimBounds.minY > wy2);
+            }
             if (s.type === "line") {
                 const lxMin = Math.min(s.x1, s.x2), lxMax = Math.max(s.x1, s.x2);
                 const lyMin = Math.min(s.y1, s.y2), lyMax = Math.max(s.y1, s.y2);
@@ -1219,11 +1798,6 @@ export function endSelectionBox(state, helpers) {
             }
             if (s.type === "position") { return s.x >= wx1 && s.x <= wx2 && s.y >= wy1 && s.y <= wy2; }
             if (s.type === "text") { return !(s.x1 > wx2 || s.x1 < wx1 || s.y1 > wy2 || s.y1 < wy1); }
-            if (s.type === "dim") {
-                const lxMin = Math.min(s.x1, s.x2, s.px), lxMax = Math.max(s.x1, s.x2, s.px);
-                const lyMin = Math.min(s.y1, s.y2, s.py), lyMax = Math.max(s.y1, s.y2, s.py);
-                return !(lxMax < wx1 || lxMin > wx2 || lyMax < wy1 || lyMin > wy2);
-            }
             if (s.type === "hatch") {
                 const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, s.boundaryIds || [], state.view.scale);
                 if (parsed.ok && parsed.bounds) {
@@ -1238,6 +1812,7 @@ export function endSelectionBox(state, helpers) {
         for (const s of state.shapes) {
             if (!isLayerVisible(state, s.layerId)) continue;
             if (isLayerLocked(state, s.layerId)) continue;
+            if (state.ui?.layerView?.editOnlyActive && Number(s.layerId ?? state.activeLayerId) !== Number(state.activeLayerId)) continue;
             if (leftToRight ? isInside(s) : isCrossing(s)) {
                 picked.push(Number(s.id));
             }
@@ -1249,14 +1824,38 @@ export function endSelectionBox(state, helpers) {
             else state.hatchDraft.boundaryIds = valid;
             if (setStatus) setStatus(`Hatch: 境界を ${state.hatchDraft.boundaryIds.length} 個選択中`);
         } else {
-            if (box.additive) {
-                const cur = new Set(state.selection.ids.map(Number));
-                for (const id of picked) cur.add(id);
-                setSelection(state, Array.from(cur));
+            const pickMode = String(state.ui?.selectPickMode || "object");
+            if (pickMode === "group") {
+                const byId = new Map((state.shapes || []).map(s => [Number(s.id), s]));
+                const pickedGroupIds = new Set();
+                for (const sid of picked) {
+                    const s = byId.get(Number(sid));
+                    const gid = Number(s?.groupId);
+                    if (Number.isFinite(gid)) pickedGroupIds.add(gid);
+                }
+                const nextGroupIds = box.additive
+                    ? Array.from(new Set([...(state.selection?.groupIds || []).map(Number), ...pickedGroupIds]))
+                    : Array.from(pickedGroupIds);
+                const nextShapeIds = new Set();
+                for (const gid of nextGroupIds) {
+                    for (const sid of collectGroupTreeShapeIds(state, gid)) nextShapeIds.add(Number(sid));
+                }
+                setSelection(state, Array.from(nextShapeIds));
+                state.selection.groupIds = nextGroupIds.map(Number).filter(Number.isFinite);
+                state.activeGroupId = state.selection.groupIds.length
+                    ? Number(state.selection.groupIds[state.selection.groupIds.length - 1])
+                    : null;
+                if (setStatus) setStatus(`Selected ${state.selection.groupIds.length} group(s) (${leftToRight ? "Window" : "Crossing"})`);
             } else {
-                setSelection(state, picked);
+                if (box.additive) {
+                    const cur = new Set(state.selection.ids.map(Number));
+                    for (const id of picked) cur.add(id);
+                    setSelection(state, Array.from(cur));
+                } else {
+                    setSelection(state, picked);
+                }
+                if (setStatus) setStatus(`Selected ${picked.length} object(s) (${leftToRight ? "Window" : "Crossing"})`);
             }
-            if (setStatus) setStatus(`Selected ${picked.length} object(s) (${leftToRight ? "Window" : "Crossing"})`);
         }
     } else {
         // 単一クリックかつ Shift 無しの場合は選択解除
@@ -1487,16 +2086,30 @@ export function getTrimHoverCandidateForCircle(state, worldRaw, circle) {
     const dedup = [];
     for (const p of ips) {
         const last = dedup[dedup.length - 1];
-        if (last && Math.abs(last.ang - p.ang) <= 1e-7) continue;
+        if (last) {
+            const diff = Math.abs(last.ang - p.ang);
+            // Wrap-around aware dedup: treat angles near 0 and near 2π as the same
+            if (Math.min(diff, Math.PI * 2 - diff) <= 1e-7) continue;
+        }
         dedup.push(p);
     }
-    if (dedup.length < 1) return null;
+    // Also check wrap-around between first and last (circular list)
+    if (dedup.length >= 2) {
+        const diff = Math.abs(dedup[dedup.length - 1].ang - dedup[0].ang);
+        if (Math.min(diff, Math.PI * 2 - diff) <= 1e-7) dedup.pop();
+    }
+    if (dedup.length < 2) return null;
     let prev = dedup[dedup.length - 1], next = dedup[0];
     for (const p of dedup) {
         if (p.ang <= thetaClick + 1e-9) prev = p;
         if (p.ang >= thetaClick - 1e-9) { next = p; break; }
     }
-    if (Math.abs(prev.ang - next.ang) <= 1e-7) return null;
+    // Guard: same point (direct or wrap-around)
+    const angDiff = Math.abs(prev.ang - next.ang);
+    if (Math.min(angDiff, Math.PI * 2 - angDiff) <= 1e-7) return null;
+    // Guard: removed arc must be large enough to be meaningful (matches arc trim threshold)
+    const removedSpan = ((next.ang - prev.ang) + Math.PI * 2) % (Math.PI * 2);
+    if (removedSpan < 1e-5) return null;
     return { targetType: "circle", circle, mode: "arc-remove-arc", x1: prev.x, y1: prev.y, x2: next.x, y2: next.y, remA1: prev.ang, remA2: next.ang, keepA1: next.ang, keepA2: prev.ang };
 }
 
@@ -1571,6 +2184,18 @@ export function getShapeBoundsForAutoGroup(s) {
         // Approximation for bounds if no actual w/h stored
         return { minX: x, minY: y - 5, maxX: x + 20, maxY: y + 5 };
     }
+    if (s.type === "circleDim") {
+        const g = getCircleDimGeometry(s, state.shapes || []);
+        if (!g) return null;
+        const cx = Number(g.cx), cy = Number(g.cy), r = Math.abs(Number(g.r) || 0);
+        const tx = Number(g.tx ?? cx), ty = Number(g.ty ?? cy);
+        return {
+            minX: Math.min(cx - r, tx),
+            minY: Math.min(cy - r, ty),
+            maxX: Math.max(cx + r, tx),
+            maxY: Math.max(cy + r, ty)
+        };
+    }
     return null;
 }
 
@@ -1593,13 +2218,16 @@ export function createAutoGroupForShapeIds(state, ids, namePrefix = "Group") {
     }
     const gid = Number(state.nextGroupId) || 1;
     state.nextGroupId = gid + 1;
+    const originX = Number.isFinite(minX) ? (minX + maxX) * 0.5 : 0;
+    const originY = Number.isFinite(minY) ? (minY + maxY) * 0.5 : 0;
+    const gridStep = Math.max(1e-9, Number(state.grid?.size) || 10);
     const group = {
         id: gid,
         name: `${namePrefix} ${gid}`,
         shapeIds: targetIds.slice(),
         parentId: null,
-        originX: Number.isFinite(minX) ? (minX + maxX) * 0.5 : 0,
-        originY: Number.isFinite(minY) ? (minY + maxY) * 0.5 : 0,
+        originX: Math.round(originX / gridStep) * gridStep,
+        originY: Math.round(originY / gridStep) * gridStep,
         rotationDeg: 0,
     };
     state.groups.push(group);

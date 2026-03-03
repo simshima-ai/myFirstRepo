@@ -7,29 +7,32 @@ export function normalizeRad(a) {
     return x;
 }
 
-export function isAngleOnArc(theta, a1, a2, ccw) {
+const ARC_ANGLE_EPS = 1e-6;
+const SEGMENT_PARAM_EPS = 1e-6;
+
+export function isAngleOnArc(theta, a1, a2, ccw, eps = ARC_ANGLE_EPS) {
     theta = normalizeRad(theta); a1 = normalizeRad(a1); a2 = normalizeRad(a2);
     if (ccw) {
         const span = ((a2 - a1) + Math.PI * 2) % (Math.PI * 2);
         const rel = ((theta - a1) + Math.PI * 2) % (Math.PI * 2);
-        return rel <= span + 1e-9;
+        return rel <= span + eps;
     }
     const span = ((a1 - a2) + Math.PI * 2) % (Math.PI * 2);
     const rel = ((a1 - theta) + Math.PI * 2) % (Math.PI * 2);
-    return rel <= span + 1e-9;
+    return rel <= span + eps;
 }
 
-export function arcParamAlong(theta, a1, a2, ccw) {
+export function arcParamAlong(theta, a1, a2, ccw, eps = ARC_ANGLE_EPS) {
     theta = normalizeRad(theta); a1 = normalizeRad(a1); a2 = normalizeRad(a2);
     if (ccw) {
         const span = ((a2 - a1) + Math.PI * 2) % (Math.PI * 2);
         const rel = ((theta - a1) + Math.PI * 2) % (Math.PI * 2);
-        if (rel <= span + 1e-9) return rel;
+        if (rel <= span + eps) return rel;
         return null;
     }
     const span = ((a1 - a2) + Math.PI * 2) % (Math.PI * 2);
     const rel = ((a1 - theta) + Math.PI * 2) % (Math.PI * 2);
-    if (rel <= span + 1e-9) return rel;
+    if (rel <= span + eps) return rel;
     return null;
 }
 
@@ -103,16 +106,26 @@ export function segmentCircleIntersectionPoints(a1, a2, circle) {
     const disc = b * b - 4 * a * c;
     if (disc < -1e-9) return [];
     const out = [];
+    const pushParam = (tRaw) => {
+        if (!Number.isFinite(tRaw)) return;
+        if (tRaw < -SEGMENT_PARAM_EPS || tRaw > 1 + SEGMENT_PARAM_EPS) return;
+        const t = Math.max(0, Math.min(1, tRaw));
+        const x = x1 + dx * t;
+        const y = y1 + dy * t;
+        for (const p of out) {
+            if (Math.hypot(Number(p.x) - x, Number(p.y) - y) <= 1e-7) return;
+        }
+        out.push({ x, y, t });
+    };
     if (Math.abs(disc) <= 1e-9) {
-        const t = -b / (2 * a);
-        if (t >= -1e-9 && t <= 1 + 1e-9) out.push({ x: x1 + dx * t, y: y1 + dy * t, t });
+        pushParam(-b / (2 * a));
         return out;
     }
     const sdisc = Math.sqrt(Math.max(0, disc));
     const t1 = (-b - sdisc) / (2 * a);
     const t2 = (-b + sdisc) / (2 * a);
-    if (t1 >= -1e-9 && t1 <= 1 + 1e-9) out.push({ x: x1 + dx * t1, y: y1 + dy * t1, t: t1 });
-    if (t2 >= -1e-9 && t2 <= 1 + 1e-9 && Math.abs(t2 - t1) > 1e-9) out.push({ x: x1 + dx * t2, y: y1 + dy * t2, t: t2 });
+    pushParam(t1);
+    pushParam(t2);
     return out;
 }
 
@@ -249,6 +262,12 @@ export function createArcFromFillet(center, radius, t1, t2) {
     const v1 = { x: t1.x - center.x, y: t1.y - center.y };
     const v2 = { x: t2.x - center.x, y: t2.y - center.y };
     const cross = v1.x * v2.y - v1.y * v2.x;
+    const tau = Math.PI * 2;
+    const ccwSpan = ((a2 - a1) + tau) % tau;
+    const cwSpan = ((a1 - a2) + tau) % tau;
+    let ccw = cross >= 0;
+    // Fillet arc should always be the shorter arc between tangent points.
+    if ((ccw ? ccwSpan : cwSpan) > Math.PI) ccw = !ccw;
     return {
         type: "arc",
         cx: center.x,
@@ -256,7 +275,7 @@ export function createArcFromFillet(center, radius, t1, t2) {
         r: radius,
         a1,
         a2,
-        ccw: cross >= 0,
+        ccw,
     };
 }
 
@@ -334,6 +353,18 @@ export function solveLineCircleFilletWithEnds(line, circle, radiusInput, keepEnd
     const u = { x: d.x / dLen, y: d.y / dLen };
     const n0 = { x: -u.y, y: u.x };
     const e = chooseEndsForLineByKeepEnd(line, { x: 0, y: 0 }, keepEnd); // keep/trim labels only
+    const p1 = { x: Number(line.x1), y: Number(line.y1) };
+    const p2 = { x: Number(line.x2), y: Number(line.y2) };
+    const allIntersections = (() => {
+        const raw = lineCircleInfiniteIntersectionPoints(a1, a2, circle, Math.abs(Number(circle.r || 0)));
+        const filtered = raw.filter((ip) => {
+            if (circle.type !== "arc") return true;
+            const th = normalizeRad(Math.atan2(ip.y - Number(circle.cy), ip.x - Number(circle.cx)));
+            return isAngleOnArc(th, Number(circle.a1) || 0, Number(circle.a2) || 0, circle.ccw !== false);
+        });
+        const onSeg = filtered.filter((ip) => Number(ip.t) >= -1e-9 && Number(ip.t) <= 1 + 1e-9);
+        return (onSeg.length ? onSeg : filtered).map((ip) => ({ x: Number(ip.x), y: Number(ip.y) }));
+    })();
     const candidates = [];
     for (const lineSide of [1, -1]) {
         const n = { x: n0.x * lineSide, y: n0.y * lineSide };
@@ -362,18 +393,74 @@ export function solveLineCircleFilletWithEnds(line, circle, radiusInput, keepEnd
                     if (!isAngleOnArc(th, Number(circle.a1) || 0, Number(circle.a2) || 0, circle.ccw !== false)) continue;
                 }
                 const arc = createArcFromFillet({ x: c.x, y: c.y }, radius, pLine, pCirc);
+                const tangentGap = Math.hypot(Number(pLine.x) - Number(pCirc.x), Number(pLine.y) - Number(pCirc.y));
+                if (!(tangentGap > 1e-6)) continue;
                 const midAng = (() => {
                     const aa1 = Number(arc.a1) || 0, aa2 = Number(arc.a2) || 0, ccw = arc.ccw !== false;
                     const span = ccw ? (((aa2 - aa1) + Math.PI * 2) % (Math.PI * 2)) : (((aa1 - aa2) + Math.PI * 2) % (Math.PI * 2));
                     return ccw ? normalizeRad(aa1 + span * 0.5) : normalizeRad(aa1 - span * 0.5);
                 })();
+                {
+                    const aa1 = Number(arc.a1) || 0, aa2 = Number(arc.a2) || 0, ccw = arc.ccw !== false;
+                    const span = ccw ? (((aa2 - aa1) + Math.PI * 2) % (Math.PI * 2)) : (((aa1 - aa2) + Math.PI * 2) % (Math.PI * 2));
+                    if (!(span > 1e-5 && span < Math.PI * 2 - 1e-5)) continue;
+                }
                 const arcMid = { x: c.x + Math.cos(midAng) * radius, y: c.y + Math.sin(midAng) * radius };
-                let score = 0;
+                let sharedIntersection = null;
+                let sharedD = 0;
+                if (allIntersections.length) {
+                    let bestI = allIntersections[0];
+                    let bestD = Math.hypot(arcMid.x - bestI.x, arcMid.y - bestI.y);
+                    for (let ii = 1; ii < allIntersections.length; ii++) {
+                        const ip = allIntersections[ii];
+                        const dI = Math.hypot(arcMid.x - ip.x, arcMid.y - ip.y);
+                        if (dI < bestD) {
+                            bestD = dI;
+                            bestI = ip;
+                        }
+                    }
+                    sharedIntersection = bestI;
+                    sharedD = bestD;
+                }
+                const desiredKeepEnd = sharedIntersection
+                    ? ((Math.hypot(sharedIntersection.x - p1.x, sharedIntersection.y - p1.y) <= Math.hypot(sharedIntersection.x - p2.x, sharedIntersection.y - p2.y)) ? "p2" : "p1")
+                    : keepEnd;
+                let arcCutKey = null;
+                if (circle.type === "arc") {
+                    const cxArc = Number(circle.cx), cyArc = Number(circle.cy), rArc = Math.abs(Number(circle.r || 0));
+                    if (rArc > 1e-9) {
+                        const aArc1 = Number(circle.a1) || 0;
+                        const aArc2 = Number(circle.a2) || 0;
+                        const ep1 = { x: cxArc + Math.cos(aArc1) * rArc, y: cyArc + Math.sin(aArc1) * rArc };
+                        const ep2 = { x: cxArc + Math.cos(aArc2) * rArc, y: cyArc + Math.sin(aArc2) * rArc };
+                        const epsConn = Math.max(1e-4, dLen * 1e-5);
+                        const d11 = Math.hypot(ep1.x - p1.x, ep1.y - p1.y);
+                        const d12 = Math.hypot(ep1.x - p2.x, ep1.y - p2.y);
+                        const d21 = Math.hypot(ep2.x - p1.x, ep2.y - p1.y);
+                        const d22 = Math.hypot(ep2.x - p2.x, ep2.y - p2.y);
+                        const c1 = Math.min(d11, d12) <= epsConn;
+                        const c2 = Math.min(d21, d22) <= epsConn;
+                        if (c1 && !c2) arcCutKey = "a1";
+                        else if (c2 && !c1) arcCutKey = "a2";
+                        else if (sharedIntersection) {
+                            const sd1 = Math.hypot(sharedIntersection.x - ep1.x, sharedIntersection.y - ep1.y);
+                            const sd2 = Math.hypot(sharedIntersection.x - ep2.x, sharedIntersection.y - ep2.y);
+                            arcCutKey = (sd1 <= sd2) ? "a1" : "a2";
+                        } else {
+                            const th = Math.atan2(Number(pCirc.y) - cyArc, Number(pCirc.x) - cxArc);
+                            const ad1 = Math.abs(Math.atan2(Math.sin(th - aArc1), Math.cos(th - aArc1)));
+                            const ad2 = Math.abs(Math.atan2(Math.sin(th - aArc2), Math.cos(th - aArc2)));
+                            arcCutKey = (ad1 <= ad2) ? "a1" : "a2";
+                        }
+                    }
+                }
+                let score = sharedD;
+                if (desiredKeepEnd !== keepEnd) score += 1e6;
                 if (worldHint) {
                     const trimSegD = distancePointToSegment(worldHint, e.trimPoint, pLine);
                     const dMid = Math.hypot(worldHint.x - arcMid.x, worldHint.y - arcMid.y);
                     const dCenter = Math.hypot(worldHint.x - c.x, worldHint.y - c.y) * 0.2;
-                    score = trimSegD * 4 + dMid + dCenter;
+                    score += trimSegD * 4 + dMid + dCenter;
                 }
                 candidates.push({
                     ok: true,
@@ -386,6 +473,9 @@ export function solveLineCircleFilletWithEnds(line, circle, radiusInput, keepEnd
                     tCircle: pCirc,
                     arc,
                     arcMid,
+                    sharedIntersection,
+                    desiredKeepEnd,
+                    arcCutKey,
                     e,
                     keepEnd,
                     score,
@@ -406,7 +496,6 @@ export function solveLineCircleFillet(line, circle, radiusInput, worldHint = nul
         if (sol.ok) candidates.push(sol);
     }
     if (!candidates.length) return { ok: false, reason: "Fillet failed" };
-    if (!worldHint) return candidates[0];
     candidates.sort((a, b) => a.score - b.score);
     return candidates[0];
 }
@@ -455,7 +544,6 @@ export function solveArcArcFillet(arc1, arc2, radiusInput, worldHint = null) {
 
 export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, excludeShapeIds) {
     if (shouldUseObjectSnap && !shouldUseObjectSnap()) return null;
-    if (state.objectSnap?.enabled === false) return null;
     const tol = 12 / Math.max(1e-9, state.view.scale);
     const excludeSet = excludeShapeIds ? new Set([...excludeShapeIds].map(Number)) : null;
 
@@ -463,11 +551,11 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
     // These always win over nearest-on-line fallback
     let highBest = null;
     let highBestD = Infinity;
-    const consider = (x, y, kind) => {
+    const consider = (x, y, kind, meta = null) => {
         const d = Math.hypot(worldRaw.x - x, worldRaw.y - y);
         if (d <= tol && d < highBestD) {
             highBestD = d;
-            highBest = { x, y, kind };
+            highBest = { x, y, kind, ...(meta || {}) };
         }
     };
 
@@ -476,30 +564,42 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
         if (excludeSet && excludeSet.has(Number(s.id))) continue;
         if (s.type === "line") {
             if (state.objectSnap?.endpoint !== false) {
-                consider(Number(s.x1), Number(s.y1), "endpoint");
-                consider(Number(s.x2), Number(s.y2), "endpoint");
+                consider(Number(s.x1), Number(s.y1), "endpoint", { shapeId: Number(s.id), refType: "line_endpoint", refKey: "p1" });
+                consider(Number(s.x2), Number(s.y2), "endpoint", { shapeId: Number(s.id), refType: "line_endpoint", refKey: "p2" });
+            }
+            if (state.objectSnap?.midpoint) {
+                consider((Number(s.x1) + Number(s.x2)) * 0.5, (Number(s.y1) + Number(s.y2)) * 0.5, "midpoint", { shapeId: Number(s.id), refType: "line_midpoint", refKey: "mid" });
             }
         } else if (s.type === "rect") {
             const x1 = Number(s.x1), y1 = Number(s.y1), x2 = Number(s.x2), y2 = Number(s.y2);
             if (state.objectSnap?.endpoint !== false) {
-                consider(x1, y1, "endpoint"); consider(x2, y1, "endpoint"); consider(x2, y2, "endpoint"); consider(x1, y2, "endpoint");
+                consider(x1, y1, "endpoint", { shapeId: Number(s.id), refType: "rect_corner", refKey: "c1" });
+                consider(x2, y1, "endpoint", { shapeId: Number(s.id), refType: "rect_corner", refKey: "c2" });
+                consider(x2, y2, "endpoint", { shapeId: Number(s.id), refType: "rect_corner", refKey: "c3" });
+                consider(x1, y2, "endpoint", { shapeId: Number(s.id), refType: "rect_corner", refKey: "c4" });
+            }
+            if (state.objectSnap?.midpoint) {
+                consider((x1 + x2) * 0.5, y1, "midpoint", { shapeId: Number(s.id), refType: "rect_midpoint", refKey: "m1" });
+                consider(x2, (y1 + y2) * 0.5, "midpoint", { shapeId: Number(s.id), refType: "rect_midpoint", refKey: "m2" });
+                consider((x1 + x2) * 0.5, y2, "midpoint", { shapeId: Number(s.id), refType: "rect_midpoint", refKey: "m3" });
+                consider(x1, (y1 + y2) * 0.5, "midpoint", { shapeId: Number(s.id), refType: "rect_midpoint", refKey: "m4" });
             }
         } else if (s.type === "circle") {
-            if (state.objectSnap?.center !== false) consider(Number(s.cx), Number(s.cy), "center");
+            if (state.objectSnap?.center !== false) consider(Number(s.cx), Number(s.cy), "center", { shapeId: Number(s.id), refType: "circle_center", refKey: "center" });
         } else if (s.type === "arc") {
             const cx = Number(s.cx), cy = Number(s.cy), r = Math.abs(Number(s.r) || 0);
-            if (state.objectSnap?.center !== false) consider(cx, cy, "center");
+            if (state.objectSnap?.center !== false) consider(cx, cy, "center", { shapeId: Number(s.id), refType: "arc_center", refKey: "center" });
             if (state.objectSnap?.endpoint !== false && r > 1e-9) {
                 const a1 = Number(s.a1) || 0, a2 = Number(s.a2) || 0;
-                consider(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r, "endpoint");
-                consider(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r, "endpoint");
+                consider(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r, "endpoint", { shapeId: Number(s.id), refType: "arc_endpoint", refKey: "a1" });
+                consider(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r, "endpoint", { shapeId: Number(s.id), refType: "arc_endpoint", refKey: "a2" });
             }
         } else if (s.type === "position") {
-            if (state.objectSnap?.center !== false) consider(Number(s.x), Number(s.y), "center");
+            if (state.objectSnap?.center !== false) consider(Number(s.x), Number(s.y), "center", { shapeId: Number(s.id), refType: "position_center", refKey: "center" });
         } else if (s.type === "dim") {
             if (state.objectSnap?.endpoint !== false) {
-                consider(Number(s.x1), Number(s.y1), "endpoint");
-                consider(Number(s.x2), Number(s.y2), "endpoint");
+                consider(Number(s.x1), Number(s.y1), "endpoint", { shapeId: Number(s.id), refType: "dim_endpoint", refKey: "p1" });
+                consider(Number(s.x2), Number(s.y2), "endpoint", { shapeId: Number(s.id), refType: "dim_endpoint", refKey: "p2" });
             }
         }
     }
@@ -529,7 +629,14 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
         for (let i = 0; i < lines.length; i++) {
             for (let j = i + 1; j < lines.length; j++) {
                 const ip = segmentIntersectionPoint(lines[i].p1, lines[i].p2, lines[j].p1, lines[j].p2);
-                if (ip) consider(ip.x, ip.y, "intersection");
+                if (ip) {
+                    const idA = Number(lines[i].id);
+                    const idB = Number(lines[j].id);
+                    const meta = (Number.isFinite(idA) && Number.isFinite(idB))
+                        ? { lineAId: idA, lineBId: idB }
+                        : null;
+                    consider(ip.x, ip.y, "intersection", meta);
+                }
             }
         }
         // Line-Circle/Arc

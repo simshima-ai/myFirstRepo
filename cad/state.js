@@ -9,14 +9,19 @@
     dimSettings: {
       precision: 1,
       linearMode: "single", // "single" | "chain"
-      snapMode: "object", // "object" | "grid" | "both"
-      circleMode: "radius", // "radius" | "diameter"
-      textRotate: 0,
-      extOffset: 4,
-      extOver: 4,
-      arrowType: "default",
-      arrowSize: 10,
+      snapMode: "endpoint",
+      ignoreGridSnap: false,
+      circleArrowSide: "outside", // "outside" | "inside"
+      textRotate: "auto",
+      extOffset: 2,
+      extOver: 2,
+      fontSize: 12,
+      dimArrowType: 'open',
+      dimArrowSize: 10,
+      dimArrowDirection: "normal",
       rOvershoot: 5,
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
     previewSettings: {
       precision: 2,
@@ -24,24 +29,41 @@
     lineSettings: {
       length: 100,
       angleDeg: 0,
+      continuous: false,
+      sizeLocked: false,
+      anchor: "endpoint_a", // "endpoint_a" | "endpoint_b" | "center"
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
     rectSettings: {
       width: 100,
       height: 100,
+      sizeLocked: false,
+      anchor: "c",
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
     circleSettings: {
       radius: 50,
+      radiusLocked: false,
       showCenterMark: false,
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
     filletSettings: {
       radius: 20,
-      lineMode: "trim",
+      lineMode: "split",
+      noTrim: false,
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
     trimSettings: {
       noDelete: false,
     },
     positionSettings: {
       size: 20,
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
     textSettings: {
       content: "Text",
@@ -51,7 +73,10 @@
       fontFamily: "Yu Gothic UI",
       bold: false,
       italic: false,
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
+    lineWidthMm: 0.25,
     hatchSettings: {
       pitchMm: 5,
       angleDeg: 45,
@@ -64,6 +89,7 @@
       lineDashMm: 5,
       lineGapMm: 2,
       repetitionPaddingMm: 2,
+      lineWidthMm: 0.25,
     },
     hatchDraft: {
       boundaryIds: [],
@@ -71,6 +97,8 @@
     dlineSettings: {
       offset: 10,
       mode: 'both', // 'single' | 'both'
+      lineWidthMm: 0.25,
+      lineType: "solid",
     },
     dlinePreview: null, // [{x1,y1,x2,y2}]
     groups: [],
@@ -83,6 +111,7 @@
     activeLayerId: 1,
     selection: {
       ids: [],
+      groupIds: [],
       box: {
         active: false,
         additive: false,
@@ -114,6 +143,8 @@
         modelSnapshotBeforeMove: null,
         moved: false,
         lastTangentSnap: null, // { x, y, circleId } if last snap was tangent
+        lastIntersectionSnap: null, // { x, y, lineAId, lineBId } if last snap was line-line intersection
+        lastObjectSnap: null,
       },
     },
     history: {
@@ -126,17 +157,23 @@
       offsetX: 0,
       offsetY: 0,
       minScale: 0.02,
-      maxScale: 16,
+      maxScale: 192,
+      viewportWidth: 1,
+      viewportHeight: 1,
     },
     grid: {
-      size: 100,
+      size: 10,
       snap: true,
       show: true,
       auto: true,
-      // Auto-grid pixel thresholds (HTML版寄せ):
-      // base/effective grid px がこれを超えたら finer、下回ったら coarser を段階判定
-      autoThreshold50: 30,
-      autoThreshold10: 60,
+      // Auto-grid thresholds based on "% of reset-view grid pixel size"
+      autoThreshold50: 130,
+      autoThreshold10: 180,
+      autoThreshold5: 240,
+      autoThreshold1: 320,
+      autoTiming: 35,
+      autoBasePxAtReset: null,
+      autoLevel: 100,
     },
     pageSetup: {
       size: "A4",
@@ -147,11 +184,13 @@
       innerMarginMm: 10,
     },
     objectSnap: {
-      enabled: true,
+      enabled: false,
       endpoint: false,
+      midpoint: false,
       center: false,
       intersection: false,
       tangent: false,
+      keepAttributes: false,
       tangentKeep: false, // save tangent relationship as vertex attribute
       vector: false,
     },
@@ -173,8 +212,11 @@
         active: false,
         startWorldRaw: null,
         groupId: null,
+        groupIds: null,
         groupOrigin: null,
         shapeSnapshots: null,
+        anchorGroupId: null,
+        anchorGroupOrigin: null,
         modelSnapshotBeforeMove: null,
         moved: false,
       },
@@ -202,7 +244,12 @@
         active: false,
         dimId: null,
         part: null,
+        lastWorld: null,
         modelSnapshotBeforeMove: null,
+        moved: false,
+      },
+      dimLineDrag: {
+        active: false,
         moved: false,
       },
       dragStartWorld: null,
@@ -214,6 +261,7 @@
       filletFlow: null,
       hatchHover: null,
       dimHoveredShapeId: null,
+      dimSessionGroupId: null,
       patternCopyFlow: {
         centerPositionId: null,
         axisLineId: null,
@@ -248,8 +296,18 @@
         colorize: false,
         editOnlyActive: false,
       },
+      groupView: {
+        colorize: false,
+      },
+      selectPickMode: "object", // "object" | "group"
+      language: "ja",
+      menuScalePct: 100,
+      showFps: false,
+      showObjectCount: false,
+      autoBackupEnabled: true,
+      autoBackupIntervalSec: 60,
       panelLayout: {
-        rightPanelWidth: 250,
+        rightPanelWidth: 188,
         groupPanelHeight: 420,
         layerPanelHeight: 300,
       },
@@ -262,6 +320,7 @@ export function snapshotModel(state) {
     shapes: JSON.parse(JSON.stringify(state.shapes)),
     nextShapeId: state.nextShapeId,
     selectionIds: state.selection.ids.slice(),
+    selectionGroupIds: Array.isArray(state.selection.groupIds) ? state.selection.groupIds.slice() : [],
     groups: JSON.parse(JSON.stringify(state.groups || [])),
     nextGroupId: state.nextGroupId,
     activeGroupId: state.activeGroupId,
@@ -276,6 +335,7 @@ export function restoreModel(state, snap) {
   state.shapes = JSON.parse(JSON.stringify(snap.shapes || []));
   state.nextShapeId = Number(snap.nextShapeId) || 1;
   state.selection.ids = Array.isArray(snap.selectionIds) ? snap.selectionIds.map(Number) : [];
+  state.selection.groupIds = Array.isArray(snap.selectionGroupIds) ? snap.selectionGroupIds.map(Number) : [];
   state.groups = Array.isArray(snap.groups)
     ? JSON.parse(JSON.stringify(snap.groups.map((g, i) => ({
       id: Number(g.id) || (i + 1),
@@ -313,6 +373,10 @@ export function restoreModel(state, snap) {
   state.pageSetup.unit = String(ps.unit || state.pageSetup.unit || "mm");
   state.pageSetup.showFrame = ps.showFrame !== false;
   state.pageSetup.innerMarginMm = Math.max(0, Number(ps.innerMarginMm ?? state.pageSetup.innerMarginMm ?? 10) || 0);
+  state.lineWidthMm = Math.max(0.01, Number(snap.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+  for (const s of (state.shapes || [])) {
+    if (!Number.isFinite(Number(s?.lineWidthMm))) s.lineWidthMm = state.lineWidthMm;
+  }
 }
 
 export function pushHistory(state) {
@@ -361,16 +425,25 @@ export function nextShapeId(state) {
 }
 
 export function setTool(state, tool) {
+  const prevTool = state.tool;
   state.tool = tool;
+  if (tool === "fillet" && prevTool !== "fillet") {
+    clearSelection(state);
+  }
+  if (tool !== "dim") {
+    state.input.dimSessionGroupId = null;
+  }
 }
 
 export function clearSelection(state) {
   state.selection.ids = [];
+  state.selection.groupIds = [];
   state.activeGroupId = null;
 }
 
 export function setSelection(state, ids) {
   state.selection.ids = Array.from(new Set(ids.map(Number)));
+  state.selection.groupIds = [];
 }
 
 export function isSelected(state, id) {
@@ -379,9 +452,16 @@ export function isSelected(state, id) {
 
 export function addShape(state, shape) {
   if (shape && (shape.layerId == null)) shape.layerId = state.activeLayerId;
+  if (shape && !Number.isFinite(Number(shape.lineWidthMm))) {
+    shape.lineWidthMm = Math.max(0.01, Number(state.lineWidthMm ?? 0.25) || 0.25);
+  }
+  if (shape && typeof shape.lineType !== "string") {
+    shape.lineType = "solid";
+  }
 
   // 自動グループ作成: groupId が指定されていない新規オブジェクトの場合
-  if (shape && shape.groupId == null) {
+  // ただし position は常に未グループで作成する。
+  if (shape && shape.groupId == null && shape.type !== "position") {
     const id = state.nextGroupId++;
     let ox = 0, oy = 0;
 
@@ -402,14 +482,17 @@ export function addShape(state, shape) {
 
     if (!Number.isFinite(ox)) ox = 0;
     if (!Number.isFinite(oy)) oy = 0;
+    const gridStep = Math.max(1e-9, Number(state.grid?.size) || 10);
+    const sox = Math.round(ox / gridStep) * gridStep;
+    const soy = Math.round(oy / gridStep) * gridStep;
 
     const group = {
       id,
       name: `Group ${id}`,
       shapeIds: [Number(shape.id)],
       parentId: null,
-      originX: ox,
-      originY: oy,
+      originX: sox,
+      originY: soy,
       rotationDeg: 0,
     };
     state.groups.unshift(group);
@@ -439,14 +522,17 @@ export function addShapesAsGroup(state, shapes) {
 
   const ox = Number.isFinite(minX) ? (minX + maxX) * 0.5 : 0;
   const oy = Number.isFinite(minY) ? (minY + maxY) * 0.5 : 0;
+  const gridStep = Math.max(1e-9, Number(state.grid?.size) || 10);
+  const sox = Math.round(ox / gridStep) * gridStep;
+  const soy = Math.round(oy / gridStep) * gridStep;
 
   const group = {
     id: gid,
     name: `Group ${gid}`,
     shapeIds: shapes.map(s => Number(s.id)),
     parentId: null,
-    originX: ox,
-    originY: oy,
+    originX: sox,
+    originY: soy,
     rotationDeg: 0,
   };
 
@@ -492,6 +578,32 @@ export function translateShape(shape, dx, dy) {
     shape.x1 += dx; shape.y1 += dy;
     shape.x2 += dx; shape.y2 += dy;
     shape.px += dx; shape.py += dy;
+    if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
+      shape.tx += dx; shape.ty += dy;
+    }
+    return;
+  }
+  if (shape.type === "dimchain") {
+    if (Array.isArray(shape.points)) {
+      for (const pt of shape.points) {
+        if (!pt) continue;
+        pt.x = Number(pt.x) + dx;
+        pt.y = Number(pt.y) + dy;
+      }
+    }
+    if (Number.isFinite(Number(shape.px)) && Number.isFinite(Number(shape.py))) {
+      shape.px += dx; shape.py += dy;
+    }
+    if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
+      shape.tx += dx; shape.ty += dy;
+    }
+    return;
+  }
+  if (shape.type === "circleDim") {
+    if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
+      shape.tx += dx; shape.ty += dy;
+    }
+    return;
   }
 }
 
@@ -555,6 +667,7 @@ export function pruneEmptyGroups(state) {
 export function createGroupFromSelection(state, name) {
   const ids = Array.from(new Set((state.selection.ids || []).map(Number)));
   if (!ids.length) return null;
+  const idSet = new Set(ids);
   for (const g of (state.groups || [])) {
     g.shapeIds = (g.shapeIds || []).filter((sid) => !ids.includes(Number(sid)));
   }
@@ -576,20 +689,61 @@ export function createGroupFromSelection(state, name) {
     } else if (s.type === "dim") {
       minX = Math.min(minX, s.x1, s.x2, s.px); minY = Math.min(minY, s.y1, s.y2, s.py);
       maxX = Math.max(maxX, s.x1, s.x2, s.px); maxY = Math.max(maxY, s.y1, s.y2, s.py);
+    } else if (s.type === "dimchain") {
+      if (Array.isArray(s.points) && s.points.length) {
+        for (const pt of s.points) {
+          if (!pt) continue;
+          const x = Number(pt.x), y = Number(pt.y);
+          minX = Math.min(minX, x); minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        }
+      }
+      if (Number.isFinite(Number(s.px)) && Number.isFinite(Number(s.py))) {
+        minX = Math.min(minX, Number(s.px)); minY = Math.min(minY, Number(s.py));
+        maxX = Math.max(maxX, Number(s.px)); maxY = Math.max(maxY, Number(s.py));
+      }
+      if (Number.isFinite(Number(s.tx)) && Number.isFinite(Number(s.ty))) {
+        minX = Math.min(minX, Number(s.tx)); minY = Math.min(minY, Number(s.ty));
+        maxX = Math.max(maxX, Number(s.tx)); maxY = Math.max(maxY, Number(s.ty));
+      }
+    } else if (s.type === "circleDim") {
+      // circleDim geometry anchors to referenced shape; use known text anchor as fallback.
+      if (Number.isFinite(Number(s.tx)) && Number.isFinite(Number(s.ty))) {
+        minX = Math.min(minX, Number(s.tx)); minY = Math.min(minY, Number(s.ty));
+        maxX = Math.max(maxX, Number(s.tx)); maxY = Math.max(maxY, Number(s.ty));
+      }
+    } else if (s.type === "dimangle") {
+      const cx = Number(s.cx), cy = Number(s.cy), r = Math.abs(Number(s.r) || 0);
+      if (Number.isFinite(cx) && Number.isFinite(cy) && Number.isFinite(r)) {
+        minX = Math.min(minX, cx - r); minY = Math.min(minY, cy - r);
+        maxX = Math.max(maxX, cx + r); maxY = Math.max(maxY, cy + r);
+      }
+      if (Number.isFinite(Number(s.tx)) && Number.isFinite(Number(s.ty))) {
+        minX = Math.min(minX, Number(s.tx)); minY = Math.min(minY, Number(s.ty));
+        maxX = Math.max(maxX, Number(s.tx)); maxY = Math.max(maxY, Number(s.ty));
+      }
     }
   }
   const originX = Number.isFinite(minX) ? (minX + maxX) * 0.5 : 0;
   const originY = Number.isFinite(minY) ? (minY + maxY) * 0.5 : 0;
+  const gridStep = Math.max(1e-9, Number(state.grid?.size) || 10);
+  const snapOriginX = Math.round(originX / gridStep) * gridStep;
+  const snapOriginY = Math.round(originY / gridStep) * gridStep;
   const group = {
     id,
     name: String(name || `Group ${id}`),
     shapeIds: ids.slice(),
     parentId: null,
-    originX,
-    originY,
+    originX: snapOriginX,
+    originY: snapOriginY,
     rotationDeg: 0,
   };
   state.groups.unshift(group);
+  // Keep shape.groupId consistent with groups[].shapeIds so group-pick hit tests work.
+  for (const s of (state.shapes || [])) {
+    if (!idSet.has(Number(s.id))) continue;
+    s.groupId = id;
+  }
   state.activeGroupId = id;
   return group;
 }

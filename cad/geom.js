@@ -16,6 +16,7 @@ export function mmPerUnit(unit) {
   switch (String(unit).toLowerCase()) {
     case "m": return 1000;
     case "cm": return 10;
+    case "inch":
     case "in": return 25.4;
     case "ft": return 304.8;
     case "mm":
@@ -103,52 +104,45 @@ export function snapPoint(p, step) {
   };
 }
 
-export function getEffectiveGridSize(grid, view) {
+export function getEffectiveGridSize(grid, view, pageSetup = null) {
   const base = Math.max(1e-9, Number(grid?.size) || 100);
   if (!grid?.auto) return base;
   const scale = Math.max(1e-9, Number(view?.scale) || 1);
-  const px = base * scale;
-  // しきい値は「画面上1グリッドが何pxになったら切り替えるか」で指定する
-  // th50Px: 100 -> 50 へ切り替えるpx目安
-  // th10Px: 50 -> 10 へ切り替えるpx目安
-  let th50Px = Math.max(1, Math.min(1000, Number(grid?.autoThreshold50) || 30));
-  let th10Px = Math.max(1, Math.min(1000, Number(grid?.autoThreshold10) || 60));
-  // 段階的に判定して、100 -> 50 -> 10 のような遷移になるようにする
-  let ratio = 1;
-  let effPx = px;
+  const currentPx = base * scale;
+  const basePx = Math.max(1e-9, Number(grid?.autoBasePxAtReset) || currentPx);
+  const z = currentPx / basePx;
 
-  // Zoom out (coarser grid): 100 -> 200 -> 500
-  // 境界は "<=" / ">=" を避けてヒステリシス的に片側へ寄せる（HTML版寄せ）
-  if (effPx < th50Px) {
-    ratio *= 2;
-    effPx = px * ratio;
-    if (effPx < th10Px) {
-      ratio *= 2.5; // 2 -> 5
-      effPx = px * ratio;
-    }
+  let e50 = Math.max(1.01, Number(grid?.autoThreshold50 || 130) / 100);
+  let e10 = Math.max(e50, Number(grid?.autoThreshold10 || 180) / 100);
+  // Tune only deep-zoom stages to avoid becoming too fine too early.
+  let e5 = Math.max(e10, (Number(grid?.autoThreshold5 || 240) / 100) * 1.2);
+  let e1 = Math.max(e5, (Number(grid?.autoThreshold1 || 320) / 100) * 2.5);
+  const h = 0.85; // hysteresis return ratio
+  const r50 = e50 * h;
+  const r10 = e10 * h;
+  const r5 = e5 * h;
+  const r1 = e1 * h;
+
+  let level = Number(grid?.autoLevel);
+  if (![100, 50, 10, 5, 1].includes(level)) level = 100;
+
+  if (level === 100) {
+    if (z >= e50) level = 50;
+  } else if (level === 50) {
+    if (z >= e10) level = 10;
+    else if (z <= r50) level = 100;
+  } else if (level === 10) {
+    if (z >= e5) level = 5;
+    else if (z <= r10) level = 50;
+  } else if (level === 5) {
+    if (z >= e1) level = 1;
+    else if (z <= r5) level = 10;
+  } else {
+    if (z <= r1) level = 5;
   }
 
-  // Zoom in (finer grid): 100 -> 50 -> 10
-  if (effPx > th50Px * 2) {
-    ratio *= 0.5;
-    effPx = px * ratio;
-    // 50 -> 10 は「50%切替よりさらに大きい px」に達したら切替（ラベルどおり 10%切替(px) を使用）
-    if (effPx > th10Px) {
-      ratio *= 0.2; // 0.5 -> 0.1
-      effPx = px * ratio;
-    }
-  }
-  // 100系グリッドでは 1,2,5 刻みになる。端数丸めで意図せず 49/51 等にならないよう、
-  // 1-2-5 系へスナップして返す。
-  const raw = Math.max(1e-9, base * ratio);
-  const p10 = Math.pow(10, Math.floor(Math.log10(raw)));
-  const n = raw / p10;
-  let snapped;
-  if (n < 1.5) snapped = 1;
-  else if (n < 3.5) snapped = 2;
-  else if (n < 7.5) snapped = 5;
-  else snapped = 10;
-  return Math.max(1e-9, snapped * p10);
+  grid.autoLevel = level;
+  return Math.max(1e-9, base * (level / 100));
 }
 
 export function nearestPointOnSegment(p, a, b) {
@@ -169,4 +163,3 @@ export function hitTestLine(world, line, tolWorld) {
   const q = nearestPointOnSegment(world, { x: line.x1, y: line.y1 }, { x: line.x2, y: line.y2 });
   return dist(world, q) <= tolWorld;
 }
-

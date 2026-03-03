@@ -230,64 +230,134 @@ function findAdjacentBaseLinePairs(lines, tol = 1e-4) {
 }
 
 export function buildDoubleLinePreview(state, mousePt = null) {
-    const lines = (state.selection?.ids || []).map(id => state.shapes.find(s => Number(s.id) === Number(id))).filter(s => s && s.type === 'line');
-    if (lines.length === 0) return null;
+    const bases = (state.selection?.ids || [])
+        .map(id => state.shapes.find(s => Number(s.id) === Number(id)))
+        .filter(s => s && (s.type === 'line' || s.type === 'circle' || s.type === 'arc'));
+    if (bases.length === 0) return null;
     // Fix selection order dependency
-    lines.sort((a, b) => Number(a.id) - Number(b.id));
+    bases.sort((a, b) => Number(a.id) - Number(b.id));
     const off = Number(state.dlineSettings?.offset) || 10;
     const mode = state.dlineSettings?.mode || 'both';
-    const signsMap = (mode === 'single' && mousePt) ? computeDoubleLineSideSigns(lines, mousePt) : null;
+    const lineBases = bases.filter(s => s.type === 'line');
+    const signsMap = (mode === 'single' && mousePt) ? computeDoubleLineSideSigns(lineBases, mousePt) : null;
     const offsets = [];
-    for (const ln of lines) {
-        if (mode === 'single') {
-            const sg = (signsMap && signsMap[ln.id]) ? signsMap[ln.id] : 1;
-            const o = buildOffsetLineData(ln, sg, off);
-            if (o) offsets.push(o);
-        } else {
-            const op = buildOffsetLineData(ln, 1, off);
-            const om = buildOffsetLineData(ln, -1, off);
-            if (op) offsets.push(op);
-            if (om) offsets.push(om);
+    for (const s of bases) {
+        if (s.type === 'line') {
+            if (mode === 'single') {
+                const sg = (signsMap && signsMap[s.id]) ? signsMap[s.id] : 1;
+                const o = buildOffsetLineData(s, sg, off);
+                if (o) offsets.push(o);
+            } else {
+                const op = buildOffsetLineData(s, 1, off);
+                const om = buildOffsetLineData(s, -1, off);
+                if (op) offsets.push(op);
+                if (om) offsets.push(om);
+            }
+            continue;
+        }
+        if (s.type === 'circle') {
+            const cx = Number(s.cx), cy = Number(s.cy), r0 = Number(s.r);
+            if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(r0)) continue;
+            const pickSign = () => {
+                if (!mousePt) return 1;
+                const d = Math.hypot(Number(mousePt.x) - cx, Number(mousePt.y) - cy);
+                return d >= r0 ? 1 : -1;
+            };
+            const pushCircle = (sg) => {
+                const r = r0 + sg * off;
+                if (r <= 1e-9) return;
+                offsets.push({ type: 'circle', baseId: Number(s.id), side: sg, cx, cy, r });
+            };
+            if (mode === 'single') pushCircle(pickSign());
+            else { pushCircle(1); pushCircle(-1); }
+            continue;
+        }
+        if (s.type === 'arc') {
+            const cx = Number(s.cx), cy = Number(s.cy), r0 = Number(s.r);
+            const a1 = Number(s.a1), a2 = Number(s.a2);
+            const ccw = !!s.ccw;
+            if (![cx, cy, r0, a1, a2].every(Number.isFinite)) continue;
+            const pickSign = () => {
+                if (!mousePt) return 1;
+                const d = Math.hypot(Number(mousePt.x) - cx, Number(mousePt.y) - cy);
+                return d >= r0 ? 1 : -1;
+            };
+            const pushArc = (sg) => {
+                const r = r0 + sg * off;
+                if (r <= 1e-9) return;
+                offsets.push({ type: 'arc', baseId: Number(s.id), side: sg, cx, cy, r, a1, a2, ccw });
+            };
+            if (mode === 'single') pushArc(pickSign());
+            else { pushArc(1); pushArc(-1); }
+            continue;
         }
     }
-    const pairs = findAdjacentBaseLinePairs(lines);
+    const pairs = findAdjacentBaseLinePairs(lineBases);
     // Sort pairs to ensure deterministic processing order
     pairs.sort((a, b) => (a.aId - b.aId) || (a.bId - b.bId) || (String(a.aEnd).localeCompare(String(b.aEnd))));
-    trimOffsetLineConnections(offsets, pairs);
-    return offsets.map(o => ({ x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2, baseId: o.baseId, side: o.side }));
+    const lineOffsets = offsets.filter(o => o.type !== 'circle' && o.type !== 'arc');
+    trimOffsetLineConnections(lineOffsets, pairs);
+    return offsets.map(o => {
+        if (o.type === 'circle') {
+            return { type: 'circle', cx: o.cx, cy: o.cy, r: o.r, baseId: o.baseId, side: o.side };
+        }
+        if (o.type === 'arc') {
+            return { type: 'arc', cx: o.cx, cy: o.cy, r: o.r, a1: o.a1, a2: o.a2, ccw: !!o.ccw, baseId: o.baseId, side: o.side };
+        }
+        return { type: 'line', x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2, baseId: o.baseId, side: o.side };
+    });
 }
 
 
 export function executeDoubleLine(state) {
-    const lines = (state.selection?.ids || []).map(id => state.shapes.find(s => Number(s.id) === Number(id))).filter(s => s && s.type === 'line');
-    if (lines.length === 0) return false;
+    const bases = (state.selection?.ids || [])
+        .map(id => state.shapes.find(s => Number(s.id) === Number(id)))
+        .filter(s => s && (s.type === 'line' || s.type === 'circle' || s.type === 'arc'));
+    if (bases.length === 0) return false;
     // Consistent with buildDoubleLinePreview
-    lines.sort((a, b) => Number(a.id) - Number(b.id));
+    bases.sort((a, b) => Number(a.id) - Number(b.id));
 
     const preview = state.dlinePreview;
     if (!preview || preview.length === 0) return false;
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const o of preview) {
-        minX = Math.min(minX, o.x1, o.x2); minY = Math.min(minY, o.y1, o.y2);
-        maxX = Math.max(maxX, o.x1, o.x2); maxY = Math.max(maxY, o.y1, o.y2);
+        if (o.type === 'circle' || o.type === 'arc') {
+            minX = Math.min(minX, o.cx - o.r); minY = Math.min(minY, o.cy - o.r);
+            maxX = Math.max(maxX, o.cx + o.r); maxY = Math.max(maxY, o.cy + o.r);
+        } else {
+            minX = Math.min(minX, o.x1, o.x2); minY = Math.min(minY, o.y1, o.y2);
+            maxX = Math.max(maxX, o.x1, o.x2); maxY = Math.max(maxY, o.y1, o.y2);
+        }
     }
 
     const groupId = nextGroupId(state);
     const newShapeIds = [];
 
     for (const o of preview) {
-        const refBase = lines.find(v => Number(v.id) === Number(o.baseId));
+        const refBase = bases.find(v => Number(v.id) === Number(o.baseId));
+        const toolLineWidth = Math.max(0.01, Number(state.dlineSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+        const toolLineType = String(state.dlineSettings?.lineType || "solid");
         const s = {
             id: nextShapeId(state),
-            type: 'line',
-            x1: o.x1, y1: o.y1, x2: o.x2, y2: o.y2,
+            type: o.type || 'line',
             stroke: refBase?.stroke || "#0f172a",
             strokeDash: refBase?.strokeDash || "solid",
             strokeWidth: refBase?.strokeWidth || 1.5,
+            lineWidthMm: toolLineWidth,
+            lineType: toolLineType,
             layerId: state.activeLayerId,
             groupId: groupId,
         };
+        if (s.type === 'circle') {
+            s.cx = o.cx; s.cy = o.cy; s.r = o.r;
+        } else if (s.type === 'arc') {
+            s.cx = o.cx; s.cy = o.cy; s.r = o.r;
+            s.a1 = o.a1; s.a2 = o.a2; s.ccw = !!o.ccw;
+        } else {
+            s.type = 'line';
+            s.x1 = o.x1; s.y1 = o.y1; s.x2 = o.x2; s.y2 = o.y2;
+        }
         addShape(state, s);
         newShapeIds.push(s.id);
     }

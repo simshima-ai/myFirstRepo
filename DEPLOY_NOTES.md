@@ -1,6 +1,7 @@
 ﻿# Cloudflare Pages Deploy Notes
 
-- Project root directory: `web`
+- GitHub branch for deploy: `web-only-deploy`
+- Project root directory: `/` (branch itself is web-only)
 - Build command: none
 - Build output directory: `.`
 

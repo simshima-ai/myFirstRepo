@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S-CAD マニュアル</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Orbitron:wght@700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+  --accent:    #0082b4;
+  --accent2:   #00b4e0;
+  --accentbg:  #e8f5fb;
+  --text:      #1a2332;
+  --muted:     #6b7f96;
+  --border:    #dde5ee;
+  --bg:        #ffffff;
+  --sidebar:   #f4f7fa;
+  --sidebar-w: 260px;
+  --code-bg:   #f0f4f8;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Noto Sans JP', sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.75;
+  font-size: 15px;
+}
+
+/* ══════════════════════════════
+   TOP NAV
+══════════════════════════════ */
+.topnav {
+  position: fixed; top:0; left:0; right:0; z-index:100;
+  height: 52px;
+  background: rgba(255,255,255,0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  gap: 16px;
+}
+.topnav-logo {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 15px;
+  font-weight: 900;
+  color: var(--text);
+  text-decoration: none;
+  letter-spacing: 0.04em;
+}
+.topnav-logo span { color: var(--accent); }
+.topnav-sep { color: var(--border); font-size: 18px; }
+.topnav-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.topnav-right {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.topnav-badge {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 3px 10px;
+  background: var(--accentbg);
+  color: var(--accent);
+  border: 1px solid var(--accent2);
+}
+.topnav-link {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+.topnav-link:hover { color: var(--accent); }
+
+/* ══════════════════════════════
+   LAYOUT
+══════════════════════════════ */
+.layout {
+  display: flex;
+  margin-top: 52px;
+  min-height: calc(100vh - 52px);
+}
+
+/* ══════════════════════════════
+   SIDEBAR
+══════════════════════════════ */
+.sidebar {
+  width: var(--sidebar-w);
+  flex-shrink: 0;
+  background: var(--sidebar);
+  border-right: 1px solid var(--border);
+  position: sticky;
+  top: 52px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
+  padding: 24px 0 40px;
+}
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+.sidebar-section {
+  margin-bottom: 8px;
+}
+.sidebar-heading {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 12px 20px 6px;
+}
+.sidebar-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 20px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+  transition: background 0.15s, color 0.15s;
+  border-left: 2px solid transparent;
+}
+.sidebar-link:hover { background: #eaf1f7; color: var(--text); }
+.sidebar-link.active {
+  background: var(--accentbg);
+  color: var(--accent);
+  border-left-color: var(--accent);
+  font-weight: 500;
+}
+.sidebar-link .num {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent2);
+  min-width: 22px;
+}
+.sidebar-sub {
+  padding: 5px 20px 5px 50px;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  display: block;
+  transition: color 0.15s;
+}
+.sidebar-sub:hover { color: var(--accent); }
+
+/* ══════════════════════════════
+   MAIN CONTENT
+══════════════════════════════ */
+.main {
+  flex: 1;
+  max-width: 860px;
+  padding: 48px 56px 80px;
+  min-width: 0;
+}
+
+/* ── Section ── */
+.section {
+  margin-bottom: 64px;
+  scroll-margin-top: 72px;
+}
+
+.section-header {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  margin-bottom: 24px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+.section-num {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--accent2);
+  letter-spacing: 0.15em;
+  flex-shrink: 0;
+}
+.section-title {
+  font-family: 'Noto Sans JP', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -0.01em;
+}
+
+/* ── Subsection ── */
+.subsection {
+  margin-bottom: 36px;
+  scroll-margin-top: 72px;
+}
+.subsection-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.subsection-title::before {
+  content: '';
+  width: 3px; height: 16px;
+  background: var(--accent);
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+p { margin-bottom: 12px; color: #3a4a5c; }
+p:last-child { margin-bottom: 0; }
+
+/* ── Lists ── */
+ul, ol {
+  padding-left: 20px;
+  margin-bottom: 14px;
+  color: #3a4a5c;
+}
+li { margin-bottom: 5px; line-height: 1.7; }
+li strong { color: var(--text); }
+
+/* ── Table ── */
+.table-wrap { overflow-x: auto; margin: 16px 0; }
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+th {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: left;
+  padding: 10px 14px;
+  background: var(--sidebar);
+  border-bottom: 2px solid var(--border);
+}
+td {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #fafcfe; }
+td:first-child { font-weight: 500; color: var(--text); white-space: nowrap; }
+
+/* ── Code / kbd ── */
+code {
+  font-family: 'DM Mono', monospace;
+  font-size: 12.5px;
+  background: var(--code-bg);
+  color: var(--accent);
+  padding: 1px 7px;
+  border-radius: 3px;
+  border: 1px solid #d0dcea;
+}
+kbd {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  background: #fff;
+  color: var(--text);
+  border: 1px solid #c5d0de;
+  border-bottom: 3px solid #c5d0de;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+/* ── Callouts ── */
+.callout {
+  display: flex;
+  gap: 14px;
+  padding: 14px 18px;
+  margin: 16px 0;
+  border-radius: 0;
+  border-left: 3px solid;
+  font-size: 14px;
+  line-height: 1.65;
+}
+.callout-icon { font-size: 16px; flex-shrink:0; margin-top:1px; }
+.callout.tip    { background:#eef8ff; border-color: var(--accent); }
+.callout.warn   { background:#fff8e6; border-color:#f0a500; }
+.callout.note   { background:#f4f7fa; border-color:#8aa0bc; }
+.callout.tip  .callout-icon  { color: var(--accent); }
+.callout.warn .callout-icon  { color: #f0a500; }
+.callout.note .callout-icon  { color: #8aa0bc; }
+
+/* ── Step list ── */
+.steps { list-style: none; padding: 0; counter-reset: step; margin: 16px 0; }
+.steps li {
+  counter-increment: step;
+  display: flex;
+  gap: 14px;
+  margin-bottom: 12px;
+  align-items: flex-start;
+}
+.steps li::before {
+  content: counter(step);
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  font-weight: 500;
+  min-width: 26px; height: 26px;
+  background: var(--accent);
+  color: #fff;
+  display: flex; align-items:center; justify-content:center;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.steps li p { margin-bottom: 0; }
+
+/* ── Screenshot placeholder ── */
+.capture {
+  background: var(--sidebar);
+  border: 1px dashed var(--border);
+  border-radius: 0;
+  padding: 28px;
+  text-align: center;
+  margin: 14px 0;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.1em;
+}
+.capture span { display:block; font-size:9px; margin-top:4px; opacity:0.7; }
+
+/* ── Tag chips ── */
+.tags { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
+.tag {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  padding: 3px 10px;
+  background: var(--accentbg);
+  color: var(--accent);
+  border: 1px solid rgba(0,130,180,0.2);
+}
+
+/* ── Shortcut grid ── */
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0;
+  border: 1px solid var(--border);
+  font-size: 13.5px;
+  margin: 16px 0;
+}
+.shortcut-grid .sk {
+  padding: 10px 16px;
+  background: var(--sidebar);
+  border-bottom: 1px solid var(--border);
+  font-family: 'DM Mono', monospace;
+  white-space: nowrap;
+}
+.shortcut-grid .sd {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  color: #3a4a5c;
+}
+.shortcut-grid .sk:last-of-type,
+.shortcut-grid .sd:last-of-type { border-bottom: none; }
+
+/* ── TOC hero ── */
+.toc-hero {
+  background: var(--accentbg);
+  border: 1px solid rgba(0,130,180,0.15);
+  border-left: 4px solid var(--accent);
+  padding: 24px 28px;
+  margin-bottom: 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 32px;
+}
+.toc-hero a {
+  font-size: 13px;
+  color: var(--accent);
+  text-decoration: none;
+  padding: 3px 0;
+  border-bottom: 1px dashed rgba(0,130,180,0.2);
+  display: flex;
+  gap: 8px;
+}
+.toc-hero a:hover { border-bottom-style: solid; }
+.toc-hero a .tn {
+  font-family: 'DM Mono', monospace;
+  font-size: 10px;
+  color: var(--accent2);
+  min-width: 30px;
+}
+
+/* page break hint */
+.page-header {
+  margin-bottom: 32px;
+}
+.page-header h1 {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: 0.03em;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+.page-header h1 span { color: var(--accent); }
+.page-header .ph-sub {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* ── Right TOC ── */
+.toc-right {
+  width: 200px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 72px;
+  height: fit-content;
+  padding: 24px 0 0 20px;
+  display: none;
+  border-left: 1px solid var(--border);
+}
+@media (min-width: 1280px) { .toc-right { display:block; } }
+.toc-right-title {
+  font-family: 'DM Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 12px;
+}
+.toc-right a {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: none;
+  padding: 4px 0;
+  border-left: 2px solid transparent;
+  padding-left: 10px;
+  transition: color 0.15s;
+}
+.toc-right a:hover { color: var(--accent); border-left-color: var(--accent2); }
+</style>
+</head>
+<body>
+
+<!-- ── Top Nav ── -->
+<nav class="topnav">
+  <a class="topnav-logo" href="#"><span>S-</span>CAD</a>
+  <span class="topnav-sep">/</span>
+  <span class="topnav-title">User Manual</span>
+  <div class="topnav-right">
+    <span class="topnav-badge">v2.4.1</span>
+    <a class="topnav-link" href="#">← ホームへ戻る</a>
+  </div>
+</nav>
+
+<div class="layout">
+
+  <!-- ── Sidebar ── -->
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-heading">はじめに</div>
+      <a class="sidebar-link active" href="#sec1"><span class="num">1</span>概要</a>
+      <a class="sidebar-link" href="#sec2"><span class="num">2</span>基本画面</a>
+      <a class="sidebar-link" href="#sec3"><span class="num">3</span>クイックスタート</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">操作</div>
+      <a class="sidebar-link" href="#sec4"><span class="num">4</span>主な操作</a>
+      <a class="sidebar-sub" href="#sec4-1">4.1 ナビゲーション</a>
+      <a class="sidebar-sub" href="#sec4-2">4.2 選択</a>
+      <a class="sidebar-sub" href="#sec4-3">4.3 削除</a>
+      <a class="sidebar-sub" href="#sec4-4">4.4 ショートカット</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">作成ツール</div>
+      <a class="sidebar-link" href="#sec5"><span class="num">5</span>作成ツール</a>
+      <a class="sidebar-sub" href="#sec5-1">5.1 線</a>
+      <a class="sidebar-sub" href="#sec5-2">5.2 四角</a>
+      <a class="sidebar-sub" href="#sec5-3">5.3 円</a>
+      <a class="sidebar-sub" href="#sec5-4">5.4 円弧</a>
+      <a class="sidebar-sub" href="#sec5-5">5.5 位置マーカー</a>
+      <a class="sidebar-sub" href="#sec5-6">5.6 テキスト</a>
+      <a class="sidebar-sub" href="#sec5-7">5.7 寸法</a>
+      <a class="sidebar-sub" href="#sec5-8">5.8 ハッチング</a>
+      <a class="sidebar-sub" href="#sec5-9">5.9 二重線</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">編集ツール</div>
+      <a class="sidebar-link" href="#sec6"><span class="num">6</span>編集ツール</a>
+      <a class="sidebar-sub" href="#sec6-1">6.1 トリム</a>
+      <a class="sidebar-sub" href="#sec6-2">6.2 フィレット</a>
+      <a class="sidebar-sub" href="#sec6-3">6.3 頂点編集</a>
+      <a class="sidebar-sub" href="#sec6-4">6.4 パターンコピー</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">管理・設定</div>
+      <a class="sidebar-link" href="#sec7"><span class="num">7</span>レイヤー管理</a>
+      <a class="sidebar-link" href="#sec8"><span class="num">8</span>グループ管理</a>
+      <a class="sidebar-link" href="#sec9"><span class="num">9</span>設定</a>
+      <a class="sidebar-link" href="#sec10"><span class="num">10</span>保存・読込・出力</a>
+    </div>
+    <div class="sidebar-section">
+      <div class="sidebar-heading">サポート</div>
+      <a class="sidebar-link" href="#sec11"><span class="num">11</span>トラブルシューティング</a>
+    </div>
+  </aside>
+
+  <!-- ── Main ── -->
+  <main class="main">
+
+    <!-- Page header -->
+    <div class="page-header">
+      <h1><span>S-</span>CAD ユーザーマニュアル</h1>
+      <div class="ph-sub">Simple &amp; Smart 2D CAD — v2.4.1</div>
+    </div>
+
+    <!-- TOC -->
+    <div class="toc-hero">
+      <a href="#sec1"><span class="tn">1</span>概要</a>
+      <a href="#sec7"><span class="tn">7</span>レイヤー管理</a>
+      <a href="#sec2"><span class="tn">2</span>基本画面</a>
+      <a href="#sec8"><span class="tn">8</span>グループ管理</a>
+      <a href="#sec3"><span class="tn">3</span>クイックスタート</a>
+      <a href="#sec9"><span class="tn">9</span>設定</a>
+      <a href="#sec4"><span class="tn">4</span>主な操作</a>
+      <a href="#sec10"><span class="tn">10</span>保存・読込・出力</a>
+      <a href="#sec5"><span class="tn">5</span>作成ツール</a>
+      <a href="#sec11"><span class="tn">11</span>トラブルシューティング</a>
+      <a href="#sec6"><span class="tn">6</span>編集ツール</a>
+      <a href="#"><span class="tn"></span></a>
+    </div>
+
+    <!-- ══════════════════════════════
+         1. 概要
+    ══════════════════════════════ -->
+    <section class="section" id="sec1">
+      <div class="section-header">
+        <span class="section-num">01</span>
+        <h2 class="section-title">概要</h2>
+      </div>
+      <p>S-CAD はブラウザで動作する 2D CAD です。インストール不要・登録不要で、無料ですべての機能を利用できます。</p>
+      <div class="tags">
+        <span class="tag">ブラウザ動作</span>
+        <span class="tag">インストール不要</span>
+        <span class="tag">完全無料</span>
+        <span class="tag">JSON / PDF / SVG 入出力</span>
+      </div>
+      <p>以下の機能に対応しています。</p>
+      <ul>
+        <li>図形作成（線・四角・円・円弧・テキスト・寸法・ハッチング・二重線）</li>
+        <li>図形編集（トリム・フィレット・頂点編集・パターンコピー）</li>
+        <li>レイヤー管理・グループ管理</li>
+        <li>入出力（JSON 保存/読込・PDF/SVG 出力）</li>
+      </ul>
+      <div class="callout note">
+        <span class="callout-icon">ℹ</span>
+        <div>左パネルに作成・編集・ファイル操作、右パネルにグループ・レイヤー管理を配置しています。</div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         2. 基本画面
+    ══════════════════════════════ -->
+    <section class="section" id="sec2">
+      <div class="section-header">
+        <span class="section-num">02</span>
+        <h2 class="section-title">基本画面</h2>
+      </div>
+      <div class="capture">[ sec01_home.png ] 初期画面（左右パネル展開）<span>解像度: 1920×1080 / 背景・ズーム統一</span></div>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>エリア</th><th>内容</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>作業キャンバス</td><td>図形の作成・編集を行うメイン領域</td></tr>
+            <tr><td>左パネル — スナップ</td><td>スナップの種類・強度の設定</td></tr>
+            <tr><td>左パネル — 作成</td><td>各種作成ツールのアクセス</td></tr>
+            <tr><td>左パネル — 編集</td><td>トリム・フィレット・頂点編集・パターンコピー</td></tr>
+            <tr><td>左パネル — ファイル</td><td>保存・読込・出力・設定</td></tr>
+            <tr><td>右パネル — グループ</td><td>グループの作成・管理・並び替え</td></tr>
+            <tr><td>右パネル — レイヤー</td><td>レイヤーの作成・ON/OFF/LOCK・カラー</td></tr>
+            <tr><td>下部ステータス</td><td>ズーム・グリッド情報・FPS・オブジェクト数（設定次第）</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         3. クイックスタート
+    ══════════════════════════════ -->
+    <section class="section" id="sec3">
+      <div class="section-header">
+        <span class="section-num">03</span>
+        <h2 class="section-title">クイックスタート</h2>
+      </div>
+      <p>初めて使う方は、以下の手順で基本的な図面作成の流れを確認できます。</p>
+      <ol class="steps">
+        <li><p><strong>新規作成</strong> — ファイルパネルから「新規作成」を選択し、用紙サイズと縮尺を設定します。</p></li>
+        <li><p><strong>外形を描く</strong> — 線ツールで外形を描きます。連続線モードを使うと頂点を連続して打てます。</p></li>
+        <li><p><strong>整形する</strong> — フィレット（R付け）やトリム（不要部分削除）で形状を仕上げます。</p></li>
+        <li><p><strong>寸法線を追加</strong> — 寸法ツールで単一・直列・角度・円寸法を入れます。</p></li>
+        <li><p><strong>ハッチング</strong> — 閉領域の境界をクリックで選択し、ハッチングを作成します。</p></li>
+        <li><p><strong>レイヤー・グループ整理</strong> — 要素をレイヤーやグループに整理して管理します。</p></li>
+        <li><p><strong>保存・出力</strong> — JSON 形式で保存、または PDF / SVG で出力します。</p></li>
+      </ol>
+    </section>
+
+    <!-- ══════════════════════════════
+         4. 主な操作
+    ══════════════════════════════ -->
+    <section class="section" id="sec4">
+      <div class="section-header">
+        <span class="section-num">04</span>
+        <h2 class="section-title">主な操作</h2>
+      </div>
+
+      <div class="subsection" id="sec4-1">
+        <div class="subsection-title">4.1 ナビゲーション</div>
+        <div class="capture">[ sec02_nav_zoom_pan.png ] ズームとパン操作中</div>
+        <div class="shortcut-grid">
+          <div class="sk">マウスホイール</div><div class="sd">ズームイン / ズームアウト</div>
+          <div class="sk">中ボタンドラッグ</div><div class="sd">パン（画面移動）</div>
+          <div class="sk"><kbd>Alt</kbd> + 左ドラッグ</div><div class="sd">パン（代替操作）</div>
+          <div class="sk">表示リセット</div><div class="sd">用紙枠を基準に表示をリセット</div>
+        </div>
+      </div>
+
+      <div class="subsection" id="sec4-2">
+        <div class="subsection-title">4.2 選択</div>
+        <div class="capture">[ sec03_select_object_group.png ] オブジェクト選択モードとグループ選択モード</div>
+        <div class="shortcut-grid">
+          <div class="sk">クリック</div><div class="sd">単体選択</div>
+          <div class="sk"><kbd>Shift</kbd> + クリック</div><div class="sd">追加 / 解除選択</div>
+          <div class="sk">ドラッグ囲み</div><div class="sd">範囲選択（複数）</div>
+          <div class="sk"><kbd>Space</kbd>（未選択時）</div><div class="sd">選択モードトグル（オブジェクト ⇔ グループ）</div>
+          <div class="sk"><kbd>Space</kbd>（選択中）</div><div class="sd">選択解除</div>
+        </div>
+      </div>
+
+      <div class="subsection" id="sec4-3">
+        <div class="subsection-title">4.3 削除</div>
+        <p><kbd>Delete</kbd> キーで、現在選択中のオブジェクトまたはグループを削除します。</p>
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <div>LOCKレイヤー上のオブジェクトは削除できません。削除前にレイヤーのロック状態を確認してください。</div>
+        </div>
+      </div>
+
+      <div class="subsection" id="sec4-4">
+        <div class="subsection-title">4.4 ショートカット一覧</div>
+        <div class="shortcut-grid">
+          <div class="sk"><kbd>Ctrl</kbd>+<kbd>Z</kbd></div><div class="sd">Undo（元に戻す）</div>
+          <div class="sk"><kbd>Ctrl</kbd>+<kbd>Y</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></div><div class="sd">Redo（やり直し）</div>
+          <div class="sk"><kbd>Ctrl</kbd>+<kbd>C</kbd></div><div class="sd">コピー</div>
+          <div class="sk"><kbd>Ctrl</kbd>+<kbd>V</kbd></div><div class="sd">貼り付け</div>
+          <div class="sk"><kbd>Delete</kbd></div><div class="sd">選択オブジェクト / グループ削除</div>
+          <div class="sk"><kbd>Esc</kbd></div><div class="sd">ツール解除 → 選択ツールへ</div>
+          <div class="sk"><kbd>Space</kbd>（作成/編集中）</div><div class="sd">選択ツールへ切り替え</div>
+          <div class="sk"><kbd>Space</kbd>（未選択）</div><div class="sd">選択モードトグル</div>
+          <div class="sk"><kbd>Space</kbd>（選択中）</div><div class="sd">選択解除</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         5. 作成ツール
+    ══════════════════════════════ -->
+    <section class="section" id="sec5">
+      <div class="section-header">
+        <span class="section-num">05</span>
+        <h2 class="section-title">作成ツール</h2>
+      </div>
+
+      <div class="subsection" id="sec5-1">
+        <div class="subsection-title">5.1 線</div>
+        <div class="capture">[ sec04_line_tool.png ] 線ツール（連続線モード含む）</div>
+        <ul>
+          <li><strong>通常作成</strong> — 2点を指定して線を引きます。</li>
+          <li><strong>連続線モード</strong> — クリックで頂点を追加し続け、<kbd>Enter</kbd> で確定します。</li>
+          <li><strong>長さ / 角度指定</strong> — 数値入力で寸法を固定した線を作成できます。</li>
+          <li><strong>サイズ固定</strong> — 前回と同じ長さ・角度で連続作成します。</li>
+        </ul>
+      </div>
+
+      <div class="subsection" id="sec5-2">
+        <div class="subsection-title">5.2 四角</div>
+        <div class="capture">[ sec05_rect_tool.png ] 四角ツール（基準点設定）</div>
+        <ul>
+          <li><strong>幅 / 高さ指定</strong> — 数値入力でサイズを固定して作成します。</li>
+          <li><strong>基準点（9点）</strong> — 左上・中央・右下など9箇所から基準点を選択できます。</li>
+          <li><strong>サイズ固定</strong> — 前回と同じサイズで連続作成します。</li>
+        </ul>
+      </div>
+
+      <div class="subsection" id="sec5-3">
+        <div class="subsection-title">5.3 円</div>
+        <div class="capture">[ sec06_circle_modes.png ] 円ツール 3モード（ドラッグ / 半径固定 / 三点指示）</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>モード</th><th>操作</th></tr></thead>
+            <tbody>
+              <tr><td>マウスドラッグ</td><td>中心点からドラッグして半径を決定</td></tr>
+              <tr><td>半径固定</td><td>数値で半径を指定してクリック配置</td></tr>
+              <tr><td>三点指示</td><td>円周上の 3 点をクリックして確定</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>中心マーカーの表示 / 非表示を切り替えられます。</p>
+      </div>
+
+      <div class="subsection" id="sec5-4">
+        <div class="subsection-title">5.4 円弧</div>
+        <div class="capture">[ sec07_arc_tool.png ] 円弧作成</div>
+        <p>開始角と終了角を持つ円弧を作成します。作成後は頂点編集ツールで角度を調整できます。</p>
+      </div>
+
+      <div class="subsection" id="sec5-5">
+        <div class="subsection-title">5.5 位置マーカー</div>
+        <div class="capture">[ sec08_position_text.png ] 位置マーカーとテキスト</div>
+        <p>基準点や補助目的のマーカーをキャンバス上に配置します。印刷・出力には含まれません（設定次第）。</p>
+      </div>
+
+      <div class="subsection" id="sec5-6">
+        <div class="subsection-title">5.6 テキスト</div>
+        <p>文字列をキャンバスに配置します。以下のプロパティを設定できます。</p>
+        <ul>
+          <li><strong>文字列</strong> — 入力テキスト</li>
+          <li><strong>サイズ</strong> — フォントサイズ</li>
+          <li><strong>回転</strong> — テキストの回転角</li>
+          <li><strong>フォント</strong> — 使用するフォント種類</li>
+          <li><strong>色</strong> — 文字色</li>
+        </ul>
+      </div>
+
+      <div class="subsection" id="sec5-7">
+        <div class="subsection-title">5.7 寸法</div>
+        <div class="capture">[ sec09_dim_tools.png ] 寸法（単一 / 直列 / 角度 / 円）</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>種類</th><th>用途</th></tr></thead>
+            <tbody>
+              <tr><td>単一寸法</td><td>2点間の距離を計測・表示</td></tr>
+              <tr><td>直列寸法</td><td>複数の寸法を連続して配置</td></tr>
+              <tr><td>角度寸法</td><td>2辺のなす角を表示</td></tr>
+              <tr><td>円寸法</td><td>直径 / 半径を表示</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p>矢印の形状・サイズ、文字サイズ、精度（小数点桁数）を設定できます。</p>
+      </div>
+
+      <div class="subsection" id="sec5-8">
+        <div class="subsection-title">5.8 ハッチング</div>
+        <div class="capture">[ sec10_hatch_single_pick.png ] ハッチ境界の単体選択</div>
+        <div class="capture">[ sec11_hatch_double_click_chain.png ] ハッチ境界のダブルクリック連続選択</div>
+        <ul>
+          <li><strong>境界をクリック</strong> — 1本ずつ境界線を選択します。</li>
+          <li><strong>境界をダブルクリック</strong> — 接続する境界を自動的に連続選択します。</li>
+          <li><strong>空クリック</strong> — 境界の選択状態をすべて解除します。</li>
+        </ul>
+        <p>ピッチ・角度・塗りつぶし・線色・塗り色を設定できます。</p>
+        <div class="callout tip">
+          <span class="callout-icon">💡</span>
+          <div>ハッチング境界が選択できない場合は、対象図形が可視レイヤーにあるか、閉領域になっているかを確認してください。</div>
+        </div>
+      </div>
+
+      <div class="subsection" id="sec5-9">
+        <div class="subsection-title">5.9 二重線</div>
+        <div class="capture">[ sec12_doubleline.png ] 二重線生成（トリムあり / なし比較）</div>
+        <p>選択したオブジェクトから二重線（オフセット線）を生成します。</p>
+        <ul>
+          <li>線・円・円弧の組み合わせに対応</li>
+          <li><strong>トリムあり</strong> — 交差部分を自動処理してきれいな二重線を生成</li>
+          <li><strong>トリムなし</strong> — 元の形状をそのままオフセット</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         6. 編集ツール
+    ══════════════════════════════ -->
+    <section class="section" id="sec6">
+      <div class="section-header">
+        <span class="section-num">06</span>
+        <h2 class="section-title">編集ツール</h2>
+      </div>
+
+      <div class="subsection" id="sec6-1">
+        <div class="subsection-title">6.1 トリム</div>
+        <div class="capture">[ sec13_trim_fillet.png ] トリムとフィレット</div>
+        <p>交点付近の不要部分をクリックで削除します。複数の図形が交差している部分に使用してください。</p>
+      </div>
+
+      <div class="subsection" id="sec6-2">
+        <div class="subsection-title">6.2 フィレット</div>
+        <p>2つのオブジェクトを選択後、候補を確定してR（丸み）を付けます。</p>
+        <ul>
+          <li><strong>半径</strong> — フィレット半径を数値入力</li>
+          <li><strong>トリムしない</strong> — 元の線を残してRを追加</li>
+          <li><strong>トリムも行う</strong> — 元の線をRの接点でトリム</li>
+        </ul>
+      </div>
+
+      <div class="subsection" id="sec6-3">
+        <div class="subsection-title">6.3 頂点編集</div>
+        <div class="capture">[ sec14_vertex_edit.png ] 頂点編集（スナップあり）</div>
+        <p>オブジェクトの頂点を個別に移動します。スナップと組み合わせることで精密な編集が可能です。</p>
+      </div>
+
+      <div class="subsection" id="sec6-4">
+        <div class="subsection-title">6.4 パターンコピー</div>
+        <div class="capture">[ sec15_pattern_copy.png ] パターンコピー（配列 / 回転 / 反転）</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>種類</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>配列</td><td>X/Y 方向に指定数・間隔でコピー</td></tr>
+              <tr><td>回転</td><td>基準点を中心に指定角度・数でコピー</td></tr>
+              <tr><td>反転</td><td>指定軸に対して鏡像コピー</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         7. レイヤー管理
+    ══════════════════════════════ -->
+    <section class="section" id="sec7">
+      <div class="section-header">
+        <span class="section-num">07</span>
+        <h2 class="section-title">レイヤー管理</h2>
+      </div>
+      <div class="capture">[ sec16_layers.png ] レイヤー操作（ON/OFF/LOCK、上下）</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>操作</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td>作成 / 名称変更 / 削除</td><td>右パネルのレイヤーパネルから操作</td></tr>
+            <tr><td>ON / OFF</td><td>レイヤーの表示 / 非表示を切り替え</td></tr>
+            <tr><td>LOCK</td><td>レイヤーをロック。オブジェクトの選択・編集・削除が不可になる</td></tr>
+            <tr><td>上下移動</td><td>レイヤーの重なり順を変更</td></tr>
+            <tr><td>カラー分け</td><td>レイヤーごとに表示色を設定</td></tr>
+            <tr><td>選択レイヤーのみ編集</td><td>アクティブでないレイヤーの編集を禁止</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <div>「選択レイヤーのみ編集」を有効にすると、誤って他レイヤーのオブジェクトを操作してしまうミスを防げます。</div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         8. グループ管理
+    ══════════════════════════════ -->
+    <section class="section" id="sec8">
+      <div class="section-header">
+        <span class="section-num">08</span>
+        <h2 class="section-title">グループ管理</h2>
+      </div>
+      <div class="capture">[ sec17_groups.png ] グループ操作（親子・複数選択・並び替え）</div>
+      <ul>
+        <li><strong>グループ作成</strong> — 複数オブジェクトをまとめてグループ化</li>
+        <li><strong>親子構造</strong> — グループをネストして階層管理が可能</li>
+        <li><strong>上下移動</strong> — グループの並び順（表示順）を変更</li>
+        <li><strong>リネーム</strong> — グループに名前を付けて識別しやすくする</li>
+        <li><strong>カラー分け</strong> — グループごとに表示色を設定</li>
+        <li><strong>複数選択</strong> — クリック / <kbd>Shift</kbd>+クリックで複数グループを同時選択</li>
+      </ul>
+    </section>
+
+    <!-- ══════════════════════════════
+         9. 設定
+    ══════════════════════════════ -->
+    <section class="section" id="sec9">
+      <div class="section-header">
+        <span class="section-num">09</span>
+        <h2 class="section-title">設定</h2>
+      </div>
+      <div class="capture">[ sec18_settings_page_grid.png ] 設定（用紙、グリッド、最大ズーム）</div>
+      <div class="capture">[ sec19_settings_ui.png ] 設定（言語、メニュースケール、表示項目）</div>
+
+      <div class="subsection">
+        <div class="subsection-title">用紙設定</div>
+        <ul>
+          <li>用紙サイズ（A0〜A4 など）</li>
+          <li>向き（縦 / 横）</li>
+          <li>縮尺（1:1、1:50 など）</li>
+          <li>単位（mm / inch など）</li>
+        </ul>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">グリッド設定</div>
+        <ul>
+          <li>基本グリッドサイズ</li>
+          <li>グリッド表示 ON/OFF</li>
+          <li>スナップ ON/OFF</li>
+          <li>オートグリッド切り替えタイミング（ズームに連動）</li>
+        </ul>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">UI 設定</div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>項目</th><th>内容</th></tr></thead>
+            <tbody>
+              <tr><td>UI 言語</td><td>日本語 / 英語を切り替え</td></tr>
+              <tr><td>メニュースケール</td><td>UI の拡大率を調整（高解像度モニター対応）</td></tr>
+              <tr><td>左メニュー表示項目</td><td>パネル内の表示項目を選択して非表示にできる</td></tr>
+              <tr><td>FPS 表示</td><td>描画性能の確認用。下部ステータスに表示</td></tr>
+              <tr><td>オブジェクト数表示</td><td>図面内の要素数を確認。下部ステータスに表示</td></tr>
+              <tr><td>自動バックアップ</td><td>一定間隔でローカルに自動保存</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         10. 保存・読込・出力
+    ══════════════════════════════ -->
+    <section class="section" id="sec10">
+      <div class="section-header">
+        <span class="section-num">10</span>
+        <h2 class="section-title">保存・読込・出力</h2>
+      </div>
+      <div class="capture">[ sec20_file_export.png ] ファイル操作（保存 / 読込 / 出力）</div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>操作</th><th>形式</th><th>内容</th></tr></thead>
+          <tbody>
+            <tr><td>新規作成</td><td>—</td><td>キャンバスをクリア。保存確認あり</td></tr>
+            <tr><td>保存</td><td>JSON</td><td>現在のファイル名で上書き保存</td></tr>
+            <tr><td>別名保存</td><td>JSON</td><td>ファイル名を指定して保存</td></tr>
+            <tr><td>読込</td><td>JSON</td><td>JSON ファイルを開く（現在の図面と置換）</td></tr>
+            <tr><td>インポート</td><td>JSON</td><td>現在の図面に追加取り込み</td></tr>
+            <tr><td>出力</td><td>PDF / SVG</td><td>用紙設定に基づいて出力</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="callout tip">
+        <span class="callout-icon">💡</span>
+        <div>自動バックアップを有効にしておくと、ブラウザのクラッシュ時にも一定の作業を復元できます（設定 → 自動バックアップ）。</div>
+      </div>
+    </section>
+
+    <!-- ══════════════════════════════
+         11. トラブルシューティング
+    ══════════════════════════════ -->
+    <section class="section" id="sec11">
+      <div class="section-header">
+        <span class="section-num">11</span>
+        <h2 class="section-title">トラブルシューティング</h2>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">オブジェクトが選択できない</div>
+        <div class="capture">[ sec21_troubleshooting_locked_layer.png ] LOCKレイヤー時の選択不可メッセージ</div>
+        <ul>
+          <li>対象オブジェクトのレイヤーが <strong>LOCK</strong> になっていないか確認してください。</li>
+          <li>「<strong>選択レイヤーのみ編集</strong>」が有効になっていて、対象が非アクティブレイヤーにある可能性があります。</li>
+        </ul>
+        <div class="callout warn">
+          <span class="callout-icon">⚠</span>
+          <div>LOCKレイヤーのオブジェクトはグループ選択でもクリック選択でも選択できません。右パネルでロックを解除してから操作してください。</div>
+        </div>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">ハッチングの境界が選択できない</div>
+        <ul>
+          <li>対象の図形が <strong>可視レイヤー</strong>（ON 状態）にあるか確認してください。</li>
+          <li>ハッチングには <strong>閉領域</strong> が必要です。線の端点がつながっているか確認してください。</li>
+        </ul>
+      </div>
+
+      <div class="subsection">
+        <div class="subsection-title">動作が重い・描画が遅い</div>
+        <ul>
+          <li>設定で <strong>FPS 表示</strong> を有効にして現在のフレームレートを確認します。</li>
+          <li>不要なレイヤーを <strong>OFF</strong> にして描画対象を減らします。</li>
+          <li>左メニューの <strong>表示項目</strong> を必要最小限に絞ります。</li>
+        </ul>
+        <div class="callout note">
+          <span class="callout-icon">ℹ</span>
+          <div>設定の「オブジェクト数表示」を使って図面の規模を把握すると、パフォーマンス改善のヒントになります。</div>
+        </div>
+      </div>
+    </section>
+
+  </main><!-- /main -->
+
+</div><!-- /layout -->
+
+<script>
+// Sidebar active link on scroll
+const links = document.querySelectorAll('.sidebar-link');
+const sections = document.querySelectorAll('.section');
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if(entry.isIntersecting){
+      const id = entry.target.id;
+      links.forEach(l => {
+        l.classList.toggle('active', l.getAttribute('href') === '#'+id);
+      });
+    }
+  });
+}, { rootMargin: '-52px 0px -60% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

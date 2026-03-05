@@ -3,1029 +3,154 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>S-CAD 繝槭ル繝･繧｢繝ｫ</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@300;400;500&family=Orbitron:wght@700;900&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<title>S-CAD マニュアル</title>
 <style>
-*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
-
-:root {
-  --accent:    #0082b4;
-  --accent2:   #00b4e0;
-  --accentbg:  #e8f5fb;
-  --text:      #1a2332;
-  --muted:     #6b7f96;
-  --border:    #dde5ee;
-  --bg:        #ffffff;
-  --sidebar:   #f4f7fa;
-  --sidebar-w: 260px;
-  --code-bg:   #f0f4f8;
+:root{
+  --bg:#f7fafc;
+  --card:#ffffff;
+  --text:#1f2d3d;
+  --muted:#5d7288;
+  --line:#d9e3ee;
+  --accent:#0082b4;
 }
-
-html { scroll-behavior: smooth; }
-
-body {
-  font-family: 'Noto Sans JP', sans-serif;
-  color: var(--text);
-  background: var(--bg);
-  line-height: 1.75;
-  font-size: 15px;
-}
-
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   TOP NAV
-笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
-.topnav {
-  position: fixed; top:0; left:0; right:0; z-index:100;
-  height: 52px;
-  background: rgba(255,255,255,0.95);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  gap: 16px;
-}
-.topnav-logo {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 15px;
-  font-weight: 900;
-  color: var(--text);
-  text-decoration: none;
-  letter-spacing: 0.04em;
-}
-.topnav-logo span { color: var(--accent); }
-.topnav-sep { color: var(--border); font-size: 18px; }
-.topnav-title {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.15em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-.topnav-right {
-  margin-left: auto;
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-.topnav-badge {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  padding: 3px 10px;
-  background: var(--accentbg);
-  color: var(--accent);
-  border: 1px solid var(--accent2);
-}
-.topnav-link {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.topnav-link:hover { color: var(--accent); }
-
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   LAYOUT
-笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
-.layout {
-  display: flex;
-  margin-top: 52px;
-  min-height: calc(100vh - 52px);
-}
-
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   SIDEBAR
-笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
-.sidebar {
-  width: var(--sidebar-w);
-  flex-shrink: 0;
-  background: var(--sidebar);
-  border-right: 1px solid var(--border);
-  position: sticky;
-  top: 52px;
-  height: calc(100vh - 52px);
-  overflow-y: auto;
-  padding: 24px 0 40px;
-}
-.sidebar::-webkit-scrollbar { width: 3px; }
-.sidebar::-webkit-scrollbar-thumb { background: var(--border); }
-
-.sidebar-section {
-  margin-bottom: 8px;
-}
-.sidebar-heading {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  color: var(--muted);
-  padding: 12px 20px 6px;
-}
-.sidebar-link {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 20px;
-  font-size: 13px;
-  color: var(--muted);
-  text-decoration: none;
-  transition: background 0.15s, color 0.15s;
-  border-left: 2px solid transparent;
-}
-.sidebar-link:hover { background: #eaf1f7; color: var(--text); }
-.sidebar-link.active {
-  background: var(--accentbg);
-  color: var(--accent);
-  border-left-color: var(--accent);
-  font-weight: 500;
-}
-.sidebar-link .num {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  color: var(--accent2);
-  min-width: 22px;
-}
-.sidebar-sub {
-  padding: 5px 20px 5px 50px;
-  font-size: 12px;
-  color: var(--muted);
-  text-decoration: none;
-  display: block;
-  transition: color 0.15s;
-}
-.sidebar-sub:hover { color: var(--accent); }
-
-/* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-   MAIN CONTENT
-笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
-.main {
-  flex: 1;
-  max-width: 860px;
-  padding: 48px 56px 80px;
-  min-width: 0;
-}
-
-/* 笏笏 Section 笏笏 */
-.section {
-  margin-bottom: 64px;
-  scroll-margin-top: 72px;
-}
-
-.section-header {
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-  margin-bottom: 24px;
-  padding-bottom: 14px;
-  border-bottom: 1px solid var(--border);
-}
-.section-num {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  color: var(--accent2);
-  letter-spacing: 0.15em;
-  flex-shrink: 0;
-}
-.section-title {
-  font-family: 'Noto Sans JP', sans-serif;
-  font-size: 22px;
-  font-weight: 700;
-  color: var(--text);
-  letter-spacing: -0.01em;
-}
-
-/* 笏笏 Subsection 笏笏 */
-.subsection {
-  margin-bottom: 36px;
-  scroll-margin-top: 72px;
-}
-.subsection-title {
-  font-size: 16px;
-  font-weight: 700;
-  color: var(--text);
-  margin-bottom: 12px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.subsection-title::before {
-  content: '';
-  width: 3px; height: 16px;
-  background: var(--accent);
-  border-radius: 2px;
-  flex-shrink: 0;
-}
-
-p { margin-bottom: 12px; color: #3a4a5c; }
-p:last-child { margin-bottom: 0; }
-
-/* 笏笏 Lists 笏笏 */
-ul, ol {
-  padding-left: 20px;
-  margin-bottom: 14px;
-  color: #3a4a5c;
-}
-li { margin-bottom: 5px; line-height: 1.7; }
-li strong { color: var(--text); }
-
-/* 笏笏 Table 笏笏 */
-.table-wrap { overflow-x: auto; margin: 16px 0; }
-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13.5px;
-}
-th {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
-  text-align: left;
-  padding: 10px 14px;
-  background: var(--sidebar);
-  border-bottom: 2px solid var(--border);
-}
-td {
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--border);
-  vertical-align: top;
-}
-tr:last-child td { border-bottom: none; }
-tr:hover td { background: #fafcfe; }
-td:first-child { font-weight: 500; color: var(--text); white-space: nowrap; }
-
-/* 笏笏 Code / kbd 笏笏 */
-code {
-  font-family: 'DM Mono', monospace;
-  font-size: 12.5px;
-  background: var(--code-bg);
-  color: var(--accent);
-  padding: 1px 7px;
-  border-radius: 3px;
-  border: 1px solid #d0dcea;
-}
-kbd {
-  font-family: 'DM Mono', monospace;
-  font-size: 12px;
-  background: #fff;
-  color: var(--text);
-  border: 1px solid #c5d0de;
-  border-bottom: 3px solid #c5d0de;
-  padding: 2px 8px;
-  border-radius: 4px;
-  white-space: nowrap;
-}
-
-/* 笏笏 Callouts 笏笏 */
-.callout {
-  display: flex;
-  gap: 14px;
-  padding: 14px 18px;
-  margin: 16px 0;
-  border-radius: 0;
-  border-left: 3px solid;
-  font-size: 14px;
-  line-height: 1.65;
-}
-.callout-icon { font-size: 16px; flex-shrink:0; margin-top:1px; }
-.callout.tip    { background:#eef8ff; border-color: var(--accent); }
-.callout.warn   { background:#fff8e6; border-color:#f0a500; }
-.callout.note   { background:#f4f7fa; border-color:#8aa0bc; }
-.callout.tip  .callout-icon  { color: var(--accent); }
-.callout.warn .callout-icon  { color: #f0a500; }
-.callout.note .callout-icon  { color: #8aa0bc; }
-
-/* 笏笏 Step list 笏笏 */
-.steps { list-style: none; padding: 0; counter-reset: step; margin: 16px 0; }
-.steps li {
-  counter-increment: step;
-  display: flex;
-  gap: 14px;
-  margin-bottom: 12px;
-  align-items: flex-start;
-}
-.steps li::before {
-  content: counter(step);
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  font-weight: 500;
-  min-width: 26px; height: 26px;
-  background: var(--accent);
-  color: #fff;
-  display: flex; align-items:center; justify-content:center;
-  flex-shrink: 0;
-  margin-top: 2px;
-}
-.steps li p { margin-bottom: 0; }
-
-/* 笏笏 Screenshot placeholder 笏笏 */
-.capture {
-  background: var(--sidebar);
-  border: 1px dashed var(--border);
-  border-radius: 0;
-  padding: 28px;
-  text-align: center;
-  margin: 14px 0;
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  color: var(--muted);
-  letter-spacing: 0.1em;
-}
-.capture span { display:block; font-size:9px; margin-top:4px; opacity:0.7; }
-
-/* 笏笏 Tag chips 笏笏 */
-.tags { display:flex; flex-wrap:wrap; gap:6px; margin:10px 0; }
-.tag {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  letter-spacing: 0.1em;
-  padding: 3px 10px;
-  background: var(--accentbg);
-  color: var(--accent);
-  border: 1px solid rgba(0,130,180,0.2);
-}
-
-/* 笏笏 Shortcut grid 笏笏 */
-.shortcut-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 0;
-  border: 1px solid var(--border);
-  font-size: 13.5px;
-  margin: 16px 0;
-}
-.shortcut-grid .sk {
-  padding: 10px 16px;
-  background: var(--sidebar);
-  border-bottom: 1px solid var(--border);
-  font-family: 'DM Mono', monospace;
-  white-space: nowrap;
-}
-.shortcut-grid .sd {
-  padding: 10px 16px;
-  border-bottom: 1px solid var(--border);
-  color: #3a4a5c;
-}
-.shortcut-grid .sk:last-of-type,
-.shortcut-grid .sd:last-of-type { border-bottom: none; }
-
-/* 笏笏 TOC hero 笏笏 */
-.toc-hero {
-  background: var(--accentbg);
-  border: 1px solid rgba(0,130,180,0.15);
-  border-left: 4px solid var(--accent);
-  padding: 24px 28px;
-  margin-bottom: 40px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 6px 32px;
-}
-.toc-hero a {
-  font-size: 13px;
-  color: var(--accent);
-  text-decoration: none;
-  padding: 3px 0;
-  border-bottom: 1px dashed rgba(0,130,180,0.2);
-  display: flex;
-  gap: 8px;
-}
-.toc-hero a:hover { border-bottom-style: solid; }
-.toc-hero a .tn {
-  font-family: 'DM Mono', monospace;
-  font-size: 10px;
-  color: var(--accent2);
-  min-width: 30px;
-}
-
-/* page break hint */
-.page-header {
-  margin-bottom: 32px;
-}
-.page-header h1 {
-  font-family: 'Orbitron', sans-serif;
-  font-size: 28px;
-  font-weight: 900;
-  letter-spacing: 0.03em;
-  color: var(--text);
-  margin-bottom: 8px;
-}
-.page-header h1 span { color: var(--accent); }
-.page-header .ph-sub {
-  font-family: 'DM Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
-
-/* 笏笏 Right TOC 笏笏 */
-.toc-right {
-  width: 200px;
-  flex-shrink: 0;
-  position: sticky;
-  top: 72px;
-  height: fit-content;
-  padding: 24px 0 0 20px;
-  display: none;
-  border-left: 1px solid var(--border);
-}
-@media (min-width: 1280px) { .toc-right { display:block; } }
-.toc-right-title {
-  font-family: 'DM Mono', monospace;
-  font-size: 9px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 12px;
-}
-.toc-right a {
-  display: block;
-  font-size: 12px;
-  color: var(--muted);
-  text-decoration: none;
-  padding: 4px 0;
-  border-left: 2px solid transparent;
-  padding-left: 10px;
-  transition: color 0.15s;
-}
-.toc-right a:hover { color: var(--accent); border-left-color: var(--accent2); }
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans JP","Yu Gothic UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+header{position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:10}
+.top{max-width:1100px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{font-weight:800;color:var(--accent);text-decoration:none}
+.links{display:flex;gap:10px}
+.links a{font-size:13px;color:var(--muted);text-decoration:none;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:#fff}
+main{max-width:1100px;margin:20px auto;padding:0 16px 40px;display:grid;grid-template-columns:260px 1fr;gap:16px}
+nav{position:sticky;top:72px;align-self:start;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px}
+nav a{display:block;color:var(--muted);text-decoration:none;font-size:14px;padding:6px 8px;border-radius:8px}
+nav a:hover{background:#f2f8fc;color:var(--accent)}
+article{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:20px}
+h1{margin:0 0 8px;font-size:28px}
+.sub{margin:0 0 18px;color:var(--muted);font-size:14px}
+section{padding-top:8px;margin-top:18px;border-top:1px solid var(--line)}
+section:first-of-type{border-top:none;margin-top:0}
+h2{margin:0 0 8px;font-size:20px;color:#16324a}
+ul{margin:8px 0 0 20px}
+code{background:#eef5fb;padding:1px 6px;border-radius:6px}
+@media (max-width:900px){main{grid-template-columns:1fr}nav{position:static}}
 </style>
 </head>
 <body>
-
-<!-- 笏笏 Top Nav 笏笏 -->
-<nav class="topnav">
-  <a class="topnav-logo" href="./index.html"><span>S-</span>CAD</a>
-  <span class="topnav-sep">/</span>
-  <span class="topnav-title">User Manual</span>
-  <div class="topnav-right">
-    <span class="topnav-badge">v2.4.1</span>
-    <a class="topnav-link" href="./cad.html">CADを開く</a>
-    <a class="topnav-link" href="./index.html">ホームへ戻る</a>
+<header>
+  <div class="top">
+    <a class="brand" href="./index.html">S-CAD / User Manual</a>
+    <div class="links">
+      <a href="./cad.html">CADを開く</a>
+      <a href="./index.html">ホームへ戻る</a>
+    </div>
   </div>
-</nav>
+</header>
+<main>
+  <nav>
+    <a href="#sec1">1. 概要</a>
+    <a href="#sec2">2. 基本画面</a>
+    <a href="#sec3">3. クイックスタート</a>
+    <a href="#sec4">4. 主な操作</a>
+    <a href="#sec5">5. 作成ツール</a>
+    <a href="#sec6">6. 編集ツール</a>
+    <a href="#sec7">7. レイヤー管理</a>
+    <a href="#sec8">8. グループ管理</a>
+    <a href="#sec9">9. 設定</a>
+    <a href="#sec10">10. 保存・読込・出力</a>
+    <a href="#sec11">11. トラブルシューティング</a>
+  </nav>
+  <article>
+    <h1>S-CAD ユーザーマニュアル</h1>
+    <p class="sub">Simple &amp; Smart 2D CAD / v2.4.1</p>
 
-<div class="layout">
-
-  <!-- 笏笏 Sidebar 笏笏 -->
-  <aside class="sidebar">
-    <div class="sidebar-section">
-      <div class="sidebar-heading">縺ｯ縺倥ａ縺ｫ</div>
-      <a class="sidebar-link active" href="#sec1"><span class="num">1</span>讎りｦ・/a>
-      <a class="sidebar-link" href="#sec2"><span class="num">2</span>蝓ｺ譛ｬ逕ｻ髱｢</a>
-      <a class="sidebar-link" href="#sec3"><span class="num">3</span>繧ｯ繧､繝・け繧ｹ繧ｿ繝ｼ繝・/a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-heading">謫堺ｽ・/div>
-      <a class="sidebar-link" href="#sec4"><span class="num">4</span>荳ｻ縺ｪ謫堺ｽ・/a>
-      <a class="sidebar-sub" href="#sec4-1">4.1 繝翫ン繧ｲ繝ｼ繧ｷ繝ｧ繝ｳ</a>
-      <a class="sidebar-sub" href="#sec4-2">4.2 驕ｸ謚・/a>
-      <a class="sidebar-sub" href="#sec4-3">4.3 蜑企勁</a>
-      <a class="sidebar-sub" href="#sec4-4">4.4 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ</a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-heading">菴懈・繝・・繝ｫ</div>
-      <a class="sidebar-link" href="#sec5"><span class="num">5</span>菴懈・繝・・繝ｫ</a>
-      <a class="sidebar-sub" href="#sec5-1">5.1 邱・/a>
-      <a class="sidebar-sub" href="#sec5-2">5.2 蝗幄ｧ・/a>
-      <a class="sidebar-sub" href="#sec5-3">5.3 蜀・/a>
-      <a class="sidebar-sub" href="#sec5-4">5.4 蜀・ｼｧ</a>
-      <a class="sidebar-sub" href="#sec5-5">5.5 菴咲ｽｮ繝槭・繧ｫ繝ｼ</a>
-      <a class="sidebar-sub" href="#sec5-6">5.6 繝・く繧ｹ繝・/a>
-      <a class="sidebar-sub" href="#sec5-7">5.7 蟇ｸ豕・/a>
-      <a class="sidebar-sub" href="#sec5-8">5.8 繝上ャ繝√Φ繧ｰ</a>
-      <a class="sidebar-sub" href="#sec5-9">5.9 莠碁㍾邱・/a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-heading">邱ｨ髮・ヤ繝ｼ繝ｫ</div>
-      <a class="sidebar-link" href="#sec6"><span class="num">6</span>邱ｨ髮・ヤ繝ｼ繝ｫ</a>
-      <a class="sidebar-sub" href="#sec6-1">6.1 繝医Μ繝</a>
-      <a class="sidebar-sub" href="#sec6-2">6.2 繝輔ぅ繝ｬ繝・ヨ</a>
-      <a class="sidebar-sub" href="#sec6-3">6.3 鬆らせ邱ｨ髮・/a>
-      <a class="sidebar-sub" href="#sec6-4">6.4 繝代ち繝ｼ繝ｳ繧ｳ繝斐・</a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-heading">邂｡逅・・險ｭ螳・/div>
-      <a class="sidebar-link" href="#sec7"><span class="num">7</span>繝ｬ繧､繝､繝ｼ邂｡逅・/a>
-      <a class="sidebar-link" href="#sec8"><span class="num">8</span>繧ｰ繝ｫ繝ｼ繝礼ｮ｡逅・/a>
-      <a class="sidebar-link" href="#sec9"><span class="num">9</span>險ｭ螳・/a>
-      <a class="sidebar-link" href="#sec10"><span class="num">10</span>菫晏ｭ倥・隱ｭ霎ｼ繝ｻ蜃ｺ蜉・/a>
-    </div>
-    <div class="sidebar-section">
-      <div class="sidebar-heading">繧ｵ繝昴・繝・/div>
-      <a class="sidebar-link" href="#sec11"><span class="num">11</span>繝医Λ繝悶Ν繧ｷ繝･繝ｼ繝・ぅ繝ｳ繧ｰ</a>
-    </div>
-  </aside>
-
-  <!-- 笏笏 Main 笏笏 -->
-  <main class="main">
-
-    <!-- Page header -->
-    <div class="page-header">
-      <h1><span>S-</span>CAD 繝ｦ繝ｼ繧ｶ繝ｼ繝槭ル繝･繧｢繝ｫ</h1>
-      <div class="ph-sub">Simple &amp; Smart 2D CAD 窶・v2.4.1</div>
-    </div>
-
-    <!-- TOC -->
-    <div class="toc-hero">
-      <a href="#sec1"><span class="tn">1</span>讎りｦ・/a>
-      <a href="#sec7"><span class="tn">7</span>繝ｬ繧､繝､繝ｼ邂｡逅・/a>
-      <a href="#sec2"><span class="tn">2</span>蝓ｺ譛ｬ逕ｻ髱｢</a>
-      <a href="#sec8"><span class="tn">8</span>繧ｰ繝ｫ繝ｼ繝礼ｮ｡逅・/a>
-      <a href="#sec3"><span class="tn">3</span>繧ｯ繧､繝・け繧ｹ繧ｿ繝ｼ繝・/a>
-      <a href="#sec9"><span class="tn">9</span>險ｭ螳・/a>
-      <a href="#sec4"><span class="tn">4</span>荳ｻ縺ｪ謫堺ｽ・/a>
-      <a href="#sec10"><span class="tn">10</span>菫晏ｭ倥・隱ｭ霎ｼ繝ｻ蜃ｺ蜉・/a>
-      <a href="#sec5"><span class="tn">5</span>菴懈・繝・・繝ｫ</a>
-      <a href="#sec11"><span class="tn">11</span>繝医Λ繝悶Ν繧ｷ繝･繝ｼ繝・ぅ繝ｳ繧ｰ</a>
-      <a href="#sec6"><span class="tn">6</span>邱ｨ髮・ヤ繝ｼ繝ｫ</a>
-      <a href="#"><span class="tn"></span></a>
-    </div>
-
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         1. 讎りｦ・    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec1">
-      <div class="section-header">
-        <span class="section-num">01</span>
-        <h2 class="section-title">讎りｦ・/h2>
-      </div>
-      <p>S-CAD 縺ｯ繝悶Λ繧ｦ繧ｶ縺ｧ蜍穂ｽ懊☆繧・2D CAD 縺ｧ縺吶ゅう繝ｳ繧ｹ繝医・繝ｫ荳崎ｦ√・逋ｻ骭ｲ荳崎ｦ√〒縲∫┌譁吶〒縺吶∋縺ｦ縺ｮ讖溯・繧貞茜逕ｨ縺ｧ縺阪∪縺吶・/p>
-      <div class="tags">
-        <span class="tag">繝悶Λ繧ｦ繧ｶ蜍穂ｽ・/span>
-        <span class="tag">繧､繝ｳ繧ｹ繝医・繝ｫ荳崎ｦ・/span>
-        <span class="tag">螳悟・辟｡譁・/span>
-        <span class="tag">JSON / PDF / SVG 蜈･蜃ｺ蜉・/span>
-      </div>
-      <p>莉･荳九・讖溯・縺ｫ蟇ｾ蠢懊＠縺ｦ縺・∪縺吶・/p>
+    <section id="sec1"><h2>1. 概要</h2>
       <ul>
-        <li>蝗ｳ蠖｢菴懈・・育ｷ壹・蝗幄ｧ偵・蜀・・蜀・ｼｧ繝ｻ繝・く繧ｹ繝医・蟇ｸ豕輔・繝上ャ繝√Φ繧ｰ繝ｻ莠碁㍾邱夲ｼ・/li>
-        <li>蝗ｳ蠖｢邱ｨ髮・ｼ医ヨ繝ｪ繝繝ｻ繝輔ぅ繝ｬ繝・ヨ繝ｻ鬆らせ邱ｨ髮・・繝代ち繝ｼ繝ｳ繧ｳ繝斐・・・/li>
-        <li>繝ｬ繧､繝､繝ｼ邂｡逅・・繧ｰ繝ｫ繝ｼ繝礼ｮ｡逅・/li>
-        <li>蜈･蜃ｺ蜉幢ｼ・SON 菫晏ｭ・隱ｭ霎ｼ繝ｻPDF/SVG 蜃ｺ蜉幢ｼ・/li>
+        <li>S-CAD はブラウザで動作する2D CADです。</li>
+        <li>インストール不要・登録不要で、すぐに使い始められます。</li>
+        <li>図面データの保存・読込、PDF/SVG出力に対応しています。</li>
       </ul>
-      <div class="callout note">
-        <span class="callout-icon">邃ｹ</span>
-        <div>蟾ｦ繝代ロ繝ｫ縺ｫ菴懈・繝ｻ邱ｨ髮・・繝輔ぃ繧､繝ｫ謫堺ｽ懊∝承繝代ロ繝ｫ縺ｫ繧ｰ繝ｫ繝ｼ繝励・繝ｬ繧､繝､繝ｼ邂｡逅・ｒ驟咲ｽｮ縺励※縺・∪縺吶・/div>
-      </div>
     </section>
 
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         2. 蝓ｺ譛ｬ逕ｻ髱｢
-    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec2">
-      <div class="section-header">
-        <span class="section-num">02</span>
-        <h2 class="section-title">蝓ｺ譛ｬ逕ｻ髱｢</h2>
-      </div>
-      <div class="capture">[ sec01_home.png ] 蛻晄悄逕ｻ髱｢・亥ｷｦ蜿ｳ繝代ロ繝ｫ螻暮幕・・span>隗｣蜒丞ｺｦ: 1920ﾃ・080 / 閭梧勹繝ｻ繧ｺ繝ｼ繝邨ｱ荳</span></div>
-
-      <div class="table-wrap">
-        <table>
-          <thead>
-            <tr><th>繧ｨ繝ｪ繧｢</th><th>蜀・ｮｹ</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>菴懈･ｭ繧ｭ繝｣繝ｳ繝舌せ</td><td>蝗ｳ蠖｢縺ｮ菴懈・繝ｻ邱ｨ髮・ｒ陦後≧繝｡繧､繝ｳ鬆伜沺</td></tr>
-            <tr><td>蟾ｦ繝代ロ繝ｫ 窶・繧ｹ繝翫ャ繝・/td><td>繧ｹ繝翫ャ繝励・遞ｮ鬘槭・蠑ｷ蠎ｦ縺ｮ險ｭ螳・/td></tr>
-            <tr><td>蟾ｦ繝代ロ繝ｫ 窶・菴懈・</td><td>蜷・ｨｮ菴懈・繝・・繝ｫ縺ｮ繧｢繧ｯ繧ｻ繧ｹ</td></tr>
-            <tr><td>蟾ｦ繝代ロ繝ｫ 窶・邱ｨ髮・/td><td>繝医Μ繝繝ｻ繝輔ぅ繝ｬ繝・ヨ繝ｻ鬆らせ邱ｨ髮・・繝代ち繝ｼ繝ｳ繧ｳ繝斐・</td></tr>
-            <tr><td>蟾ｦ繝代ロ繝ｫ 窶・繝輔ぃ繧､繝ｫ</td><td>菫晏ｭ倥・隱ｭ霎ｼ繝ｻ蜃ｺ蜉帙・險ｭ螳・/td></tr>
-            <tr><td>蜿ｳ繝代ロ繝ｫ 窶・繧ｰ繝ｫ繝ｼ繝・/td><td>繧ｰ繝ｫ繝ｼ繝励・菴懈・繝ｻ邂｡逅・・荳ｦ縺ｳ譖ｿ縺・/td></tr>
-            <tr><td>蜿ｳ繝代ロ繝ｫ 窶・繝ｬ繧､繝､繝ｼ</td><td>繝ｬ繧､繝､繝ｼ縺ｮ菴懈・繝ｻON/OFF/LOCK繝ｻ繧ｫ繝ｩ繝ｼ</td></tr>
-            <tr><td>荳矩Κ繧ｹ繝・・繧ｿ繧ｹ</td><td>繧ｺ繝ｼ繝繝ｻ繧ｰ繝ｪ繝・ラ諠・ｱ繝ｻFPS繝ｻ繧ｪ繝悶ず繧ｧ繧ｯ繝域焚・郁ｨｭ螳壽ｬ｡隨ｬ・・/td></tr>
-          </tbody>
-        </table>
-      </div>
+    <section id="sec2"><h2>2. 基本画面</h2>
+      <ul>
+        <li>中央: 作図キャンバス</li>
+        <li>左: 作成/編集ツール</li>
+        <li>右: スナップ・属性・設定</li>
+      </ul>
     </section>
 
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         3. 繧ｯ繧､繝・け繧ｹ繧ｿ繝ｼ繝・    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec3">
-      <div class="section-header">
-        <span class="section-num">03</span>
-        <h2 class="section-title">繧ｯ繧､繝・け繧ｹ繧ｿ繝ｼ繝・/h2>
-      </div>
-      <p>蛻昴ａ縺ｦ菴ｿ縺・婿縺ｯ縲∽ｻ･荳九・謇矩・〒蝓ｺ譛ｬ逧・↑蝗ｳ髱｢菴懈・縺ｮ豬√ｌ繧堤｢ｺ隱阪〒縺阪∪縺吶・/p>
-      <ol class="steps">
-        <li><p><strong>譁ｰ隕丈ｽ懈・</strong> 窶・繝輔ぃ繧､繝ｫ繝代ロ繝ｫ縺九ｉ縲梧眠隕丈ｽ懈・縲阪ｒ驕ｸ謚槭＠縲∫畑邏吶し繧､繧ｺ縺ｨ邵ｮ蟆ｺ繧定ｨｭ螳壹＠縺ｾ縺吶・/p></li>
-        <li><p><strong>螟門ｽ｢繧呈緒縺・/strong> 窶・邱壹ヤ繝ｼ繝ｫ縺ｧ螟門ｽ｢繧呈緒縺阪∪縺吶る｣邯夂ｷ壹Δ繝ｼ繝峨ｒ菴ｿ縺・→鬆らせ繧帝｣邯壹＠縺ｦ謇薙※縺ｾ縺吶・/p></li>
-        <li><p><strong>謨ｴ蠖｢縺吶ｋ</strong> 窶・繝輔ぅ繝ｬ繝・ヨ・・莉倥￠・峨ｄ繝医Μ繝・井ｸ崎ｦ・Κ蛻・炎髯､・峨〒蠖｢迥ｶ繧剃ｻ穂ｸ翫￡縺ｾ縺吶・/p></li>
-        <li><p><strong>蟇ｸ豕慕ｷ壹ｒ霑ｽ蜉</strong> 窶・蟇ｸ豕輔ヤ繝ｼ繝ｫ縺ｧ蜊倅ｸ繝ｻ逶ｴ蛻励・隗貞ｺｦ繝ｻ蜀・ｯｸ豕輔ｒ蜈･繧後∪縺吶・/p></li>
-        <li><p><strong>繝上ャ繝√Φ繧ｰ</strong> 窶・髢蛾伜沺縺ｮ蠅・阜繧偵け繝ｪ繝・け縺ｧ驕ｸ謚槭＠縲√ワ繝・メ繝ｳ繧ｰ繧剃ｽ懈・縺励∪縺吶・/p></li>
-        <li><p><strong>繝ｬ繧､繝､繝ｼ繝ｻ繧ｰ繝ｫ繝ｼ繝玲紛逅・/strong> 窶・隕∫ｴ繧偵Ξ繧､繝､繝ｼ繧・げ繝ｫ繝ｼ繝励↓謨ｴ逅・＠縺ｦ邂｡逅・＠縺ｾ縺吶・/p></li>
-        <li><p><strong>菫晏ｭ倥・蜃ｺ蜉・/strong> 窶・JSON 蠖｢蠑上〒菫晏ｭ倥√∪縺溘・ PDF / SVG 縺ｧ蜃ｺ蜉帙＠縺ｾ縺吶・/p></li>
+    <section id="sec3"><h2>3. クイックスタート</h2>
+      <ol>
+        <li>新規作成</li>
+        <li>線ツールで図形を作成</li>
+        <li>寸法を追加</li>
+        <li>ハッチングを追加</li>
+        <li>保存またはPDF/SVGで出力</li>
       </ol>
     </section>
 
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         4. 荳ｻ縺ｪ謫堺ｽ・    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec4">
-      <div class="section-header">
-        <span class="section-num">04</span>
-        <h2 class="section-title">荳ｻ縺ｪ謫堺ｽ・/h2>
-      </div>
-
-      <div class="subsection" id="sec4-1">
-        <div class="subsection-title">4.1 繝翫ン繧ｲ繝ｼ繧ｷ繝ｧ繝ｳ</div>
-        <div class="capture">[ sec02_nav_zoom_pan.png ] 繧ｺ繝ｼ繝縺ｨ繝代Φ謫堺ｽ應ｸｭ</div>
-        <div class="shortcut-grid">
-          <div class="sk">繝槭え繧ｹ繝帙う繝ｼ繝ｫ</div><div class="sd">繧ｺ繝ｼ繝繧､繝ｳ / 繧ｺ繝ｼ繝繧｢繧ｦ繝・/div>
-          <div class="sk">荳ｭ繝懊ち繝ｳ繝峨Λ繝・げ</div><div class="sd">繝代Φ・育判髱｢遘ｻ蜍包ｼ・/div>
-          <div class="sk"><kbd>Alt</kbd> + 蟾ｦ繝峨Λ繝・げ</div><div class="sd">繝代Φ・井ｻ｣譖ｿ謫堺ｽ懶ｼ・/div>
-          <div class="sk">陦ｨ遉ｺ繝ｪ繧ｻ繝・ヨ</div><div class="sd">逕ｨ邏呎棧繧貞渕貅悶↓陦ｨ遉ｺ繧偵Μ繧ｻ繝・ヨ</div>
-        </div>
-      </div>
-
-      <div class="subsection" id="sec4-2">
-        <div class="subsection-title">4.2 驕ｸ謚・/div>
-        <div class="capture">[ sec03_select_object_group.png ] 繧ｪ繝悶ず繧ｧ繧ｯ繝磯∈謚槭Δ繝ｼ繝峨→繧ｰ繝ｫ繝ｼ繝鈴∈謚槭Δ繝ｼ繝・/div>
-        <div class="shortcut-grid">
-          <div class="sk">繧ｯ繝ｪ繝・け</div><div class="sd">蜊倅ｽ馴∈謚・/div>
-          <div class="sk"><kbd>Shift</kbd> + 繧ｯ繝ｪ繝・け</div><div class="sd">霑ｽ蜉 / 隗｣髯､驕ｸ謚・/div>
-          <div class="sk">繝峨Λ繝・げ蝗ｲ縺ｿ</div><div class="sd">遽・峇驕ｸ謚橸ｼ郁､・焚・・/div>
-          <div class="sk"><kbd>Space</kbd>・域悴驕ｸ謚樊凾・・/div><div class="sd">驕ｸ謚槭Δ繝ｼ繝峨ヨ繧ｰ繝ｫ・医が繝悶ず繧ｧ繧ｯ繝・竍・繧ｰ繝ｫ繝ｼ繝暦ｼ・/div>
-          <div class="sk"><kbd>Space</kbd>・磯∈謚樔ｸｭ・・/div><div class="sd">驕ｸ謚櫁ｧ｣髯､</div>
-        </div>
-      </div>
-
-      <div class="subsection" id="sec4-3">
-        <div class="subsection-title">4.3 蜑企勁</div>
-        <p><kbd>Delete</kbd> 繧ｭ繝ｼ縺ｧ縲∫樟蝨ｨ驕ｸ謚樔ｸｭ縺ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝医∪縺溘・繧ｰ繝ｫ繝ｼ繝励ｒ蜑企勁縺励∪縺吶・/p>
-        <div class="callout warn">
-          <span class="callout-icon">笞</span>
-          <div>LOCK繝ｬ繧､繝､繝ｼ荳翫・繧ｪ繝悶ず繧ｧ繧ｯ繝医・蜑企勁縺ｧ縺阪∪縺帙ｓ縲ょ炎髯､蜑阪↓繝ｬ繧､繝､繝ｼ縺ｮ繝ｭ繝・け迥ｶ諷九ｒ遒ｺ隱阪＠縺ｦ縺上□縺輔＞縲・/div>
-        </div>
-      </div>
-
-      <div class="subsection" id="sec4-4">
-        <div class="subsection-title">4.4 繧ｷ繝ｧ繝ｼ繝医き繝・ヨ荳隕ｧ</div>
-        <div class="shortcut-grid">
-          <div class="sk"><kbd>Ctrl</kbd>+<kbd>Z</kbd></div><div class="sd">Undo・亥・縺ｫ謌ｻ縺呻ｼ・/div>
-          <div class="sk"><kbd>Ctrl</kbd>+<kbd>Y</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></div><div class="sd">Redo・医ｄ繧顔峩縺暦ｼ・/div>
-          <div class="sk"><kbd>Ctrl</kbd>+<kbd>C</kbd></div><div class="sd">繧ｳ繝斐・</div>
-          <div class="sk"><kbd>Ctrl</kbd>+<kbd>V</kbd></div><div class="sd">雋ｼ繧贋ｻ倥￠</div>
-          <div class="sk"><kbd>Delete</kbd></div><div class="sd">驕ｸ謚槭が繝悶ず繧ｧ繧ｯ繝・/ 繧ｰ繝ｫ繝ｼ繝怜炎髯､</div>
-          <div class="sk"><kbd>Esc</kbd></div><div class="sd">繝・・繝ｫ隗｣髯､ 竊・驕ｸ謚槭ヤ繝ｼ繝ｫ縺ｸ</div>
-          <div class="sk"><kbd>Space</kbd>・井ｽ懈・/邱ｨ髮・ｸｭ・・/div><div class="sd">驕ｸ謚槭ヤ繝ｼ繝ｫ縺ｸ蛻・ｊ譖ｿ縺・/div>
-          <div class="sk"><kbd>Space</kbd>・域悴驕ｸ謚橸ｼ・/div><div class="sd">驕ｸ謚槭Δ繝ｼ繝峨ヨ繧ｰ繝ｫ</div>
-          <div class="sk"><kbd>Space</kbd>・磯∈謚樔ｸｭ・・/div><div class="sd">驕ｸ謚櫁ｧ｣髯､</div>
-        </div>
-      </div>
-    </section>
-
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         5. 菴懈・繝・・繝ｫ
-    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec5">
-      <div class="section-header">
-        <span class="section-num">05</span>
-        <h2 class="section-title">菴懈・繝・・繝ｫ</h2>
-      </div>
-
-      <div class="subsection" id="sec5-1">
-        <div class="subsection-title">5.1 邱・/div>
-        <div class="capture">[ sec04_line_tool.png ] 邱壹ヤ繝ｼ繝ｫ・磯｣邯夂ｷ壹Δ繝ｼ繝牙性繧・・/div>
-        <ul>
-          <li><strong>騾壼ｸｸ菴懈・</strong> 窶・2轤ｹ繧呈欠螳壹＠縺ｦ邱壹ｒ蠑輔″縺ｾ縺吶・/li>
-          <li><strong>騾｣邯夂ｷ壹Δ繝ｼ繝・/strong> 窶・繧ｯ繝ｪ繝・け縺ｧ鬆らせ繧定ｿｽ蜉縺礼ｶ壹￠縲・kbd>Enter</kbd> 縺ｧ遒ｺ螳壹＠縺ｾ縺吶・/li>
-          <li><strong>髟ｷ縺・/ 隗貞ｺｦ謖・ｮ・/strong> 窶・謨ｰ蛟､蜈･蜉帙〒蟇ｸ豕輔ｒ蝗ｺ螳壹＠縺溽ｷ壹ｒ菴懈・縺ｧ縺阪∪縺吶・/li>
-          <li><strong>繧ｵ繧､繧ｺ蝗ｺ螳・/strong> 窶・蜑榊屓縺ｨ蜷後§髟ｷ縺輔・隗貞ｺｦ縺ｧ騾｣邯壻ｽ懈・縺励∪縺吶・/li>
-        </ul>
-      </div>
-
-      <div class="subsection" id="sec5-2">
-        <div class="subsection-title">5.2 蝗幄ｧ・/div>
-        <div class="capture">[ sec05_rect_tool.png ] 蝗幄ｧ偵ヤ繝ｼ繝ｫ・亥渕貅也せ險ｭ螳夲ｼ・/div>
-        <ul>
-          <li><strong>蟷・/ 鬮倥＆謖・ｮ・/strong> 窶・謨ｰ蛟､蜈･蜉帙〒繧ｵ繧､繧ｺ繧貞崋螳壹＠縺ｦ菴懈・縺励∪縺吶・/li>
-          <li><strong>蝓ｺ貅也せ・・轤ｹ・・/strong> 窶・蟾ｦ荳翫・荳ｭ螟ｮ繝ｻ蜿ｳ荳九↑縺ｩ9邂・園縺九ｉ蝓ｺ貅也せ繧帝∈謚槭〒縺阪∪縺吶・/li>
-          <li><strong>繧ｵ繧､繧ｺ蝗ｺ螳・/strong> 窶・蜑榊屓縺ｨ蜷後§繧ｵ繧､繧ｺ縺ｧ騾｣邯壻ｽ懈・縺励∪縺吶・/li>
-        </ul>
-      </div>
-
-      <div class="subsection" id="sec5-3">
-        <div class="subsection-title">5.3 蜀・/div>
-        <div class="capture">[ sec06_circle_modes.png ] 蜀・ヤ繝ｼ繝ｫ 3繝｢繝ｼ繝会ｼ医ラ繝ｩ繝・げ / 蜊雁ｾ・崋螳・/ 荳臥せ謖・､ｺ・・/div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>繝｢繝ｼ繝・/th><th>謫堺ｽ・/th></tr></thead>
-            <tbody>
-              <tr><td>繝槭え繧ｹ繝峨Λ繝・げ</td><td>荳ｭ蠢・せ縺九ｉ繝峨Λ繝・げ縺励※蜊雁ｾ・ｒ豎ｺ螳・/td></tr>
-              <tr><td>蜊雁ｾ・崋螳・/td><td>謨ｰ蛟､縺ｧ蜊雁ｾ・ｒ謖・ｮ壹＠縺ｦ繧ｯ繝ｪ繝・け驟咲ｽｮ</td></tr>
-              <tr><td>荳臥せ謖・､ｺ</td><td>蜀・捉荳翫・ 3 轤ｹ繧偵け繝ｪ繝・け縺励※遒ｺ螳・/td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p>荳ｭ蠢・・繝ｼ繧ｫ繝ｼ縺ｮ陦ｨ遉ｺ / 髱櫁｡ｨ遉ｺ繧貞・繧頑崛縺医ｉ繧後∪縺吶・/p>
-      </div>
-
-      <div class="subsection" id="sec5-4">
-        <div class="subsection-title">5.4 蜀・ｼｧ</div>
-        <div class="capture">[ sec07_arc_tool.png ] 蜀・ｼｧ菴懈・</div>
-        <p>髢句ｧ玖ｧ偵→邨ゆｺ・ｧ偵ｒ謖√▽蜀・ｼｧ繧剃ｽ懈・縺励∪縺吶ゆｽ懈・蠕後・鬆らせ邱ｨ髮・ヤ繝ｼ繝ｫ縺ｧ隗貞ｺｦ繧定ｪｿ謨ｴ縺ｧ縺阪∪縺吶・/p>
-      </div>
-
-      <div class="subsection" id="sec5-5">
-        <div class="subsection-title">5.5 菴咲ｽｮ繝槭・繧ｫ繝ｼ</div>
-        <div class="capture">[ sec08_position_text.png ] 菴咲ｽｮ繝槭・繧ｫ繝ｼ縺ｨ繝・く繧ｹ繝・/div>
-        <p>蝓ｺ貅也せ繧・｣懷勧逶ｮ逧・・繝槭・繧ｫ繝ｼ繧偵く繝｣繝ｳ繝舌せ荳翫↓驟咲ｽｮ縺励∪縺吶ょ魂蛻ｷ繝ｻ蜃ｺ蜉帙↓縺ｯ蜷ｫ縺ｾ繧後∪縺帙ｓ・郁ｨｭ螳壽ｬ｡隨ｬ・峨・/p>
-      </div>
-
-      <div class="subsection" id="sec5-6">
-        <div class="subsection-title">5.6 繝・く繧ｹ繝・/div>
-        <p>譁・ｭ怜・繧偵く繝｣繝ｳ繝舌せ縺ｫ驟咲ｽｮ縺励∪縺吶ゆｻ･荳九・繝励Ο繝代ユ繧｣繧定ｨｭ螳壹〒縺阪∪縺吶・/p>
-        <ul>
-          <li><strong>譁・ｭ怜・</strong> 窶・蜈･蜉帙ユ繧ｭ繧ｹ繝・/li>
-          <li><strong>繧ｵ繧､繧ｺ</strong> 窶・繝輔か繝ｳ繝医し繧､繧ｺ</li>
-          <li><strong>蝗櫁ｻ｢</strong> 窶・繝・く繧ｹ繝医・蝗櫁ｻ｢隗・/li>
-          <li><strong>繝輔か繝ｳ繝・/strong> 窶・菴ｿ逕ｨ縺吶ｋ繝輔か繝ｳ繝育ｨｮ鬘・/li>
-          <li><strong>濶ｲ</strong> 窶・譁・ｭ苓牡</li>
-        </ul>
-      </div>
-
-      <div class="subsection" id="sec5-7">
-        <div class="subsection-title">5.7 蟇ｸ豕・/div>
-        <div class="capture">[ sec09_dim_tools.png ] 蟇ｸ豕包ｼ亥腰荳 / 逶ｴ蛻・/ 隗貞ｺｦ / 蜀・ｼ・/div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>遞ｮ鬘・/th><th>逕ｨ騾・/th></tr></thead>
-            <tbody>
-              <tr><td>蜊倅ｸ蟇ｸ豕・/td><td>2轤ｹ髢薙・霍晞屬繧定ｨ域ｸｬ繝ｻ陦ｨ遉ｺ</td></tr>
-              <tr><td>逶ｴ蛻怜ｯｸ豕・/td><td>隍・焚縺ｮ蟇ｸ豕輔ｒ騾｣邯壹＠縺ｦ驟咲ｽｮ</td></tr>
-              <tr><td>隗貞ｺｦ蟇ｸ豕・/td><td>2霎ｺ縺ｮ縺ｪ縺呵ｧ偵ｒ陦ｨ遉ｺ</td></tr>
-              <tr><td>蜀・ｯｸ豕・/td><td>逶ｴ蠕・/ 蜊雁ｾ・ｒ陦ｨ遉ｺ</td></tr>
-            </tbody>
-          </table>
-        </div>
-        <p>遏｢蜊ｰ縺ｮ蠖｢迥ｶ繝ｻ繧ｵ繧､繧ｺ縲∵枚蟄励し繧､繧ｺ縲∫ｲｾ蠎ｦ・亥ｰ乗焚轤ｹ譯∵焚・峨ｒ險ｭ螳壹〒縺阪∪縺吶・/p>
-      </div>
-
-      <div class="subsection" id="sec5-8">
-        <div class="subsection-title">5.8 繝上ャ繝√Φ繧ｰ</div>
-        <div class="capture">[ sec10_hatch_single_pick.png ] 繝上ャ繝∝｢・阜縺ｮ蜊倅ｽ馴∈謚・/div>
-        <div class="capture">[ sec11_hatch_double_click_chain.png ] 繝上ャ繝∝｢・阜縺ｮ繝繝悶Ν繧ｯ繝ｪ繝・け騾｣邯夐∈謚・/div>
-        <ul>
-          <li><strong>蠅・阜繧偵け繝ｪ繝・け</strong> 窶・1譛ｬ縺壹▽蠅・阜邱壹ｒ驕ｸ謚槭＠縺ｾ縺吶・/li>
-          <li><strong>蠅・阜繧偵ム繝悶Ν繧ｯ繝ｪ繝・け</strong> 窶・謗･邯壹☆繧句｢・阜繧定・蜍慕噪縺ｫ騾｣邯夐∈謚槭＠縺ｾ縺吶・/li>
-          <li><strong>遨ｺ繧ｯ繝ｪ繝・け</strong> 窶・蠅・阜縺ｮ驕ｸ謚樒憾諷九ｒ縺吶∋縺ｦ隗｣髯､縺励∪縺吶・/li>
-        </ul>
-        <p>繝斐ャ繝√・隗貞ｺｦ繝ｻ蝪励ｊ縺､縺ｶ縺励・邱夊牡繝ｻ蝪励ｊ濶ｲ繧定ｨｭ螳壹〒縺阪∪縺吶・/p>
-        <div class="callout tip">
-          <span class="callout-icon">庁</span>
-          <div>繝上ャ繝√Φ繧ｰ蠅・阜縺碁∈謚槭〒縺阪↑縺・ｴ蜷医・縲∝ｯｾ雎｡蝗ｳ蠖｢縺悟庄隕悶Ξ繧､繝､繝ｼ縺ｫ縺ゅｋ縺九・哩鬆伜沺縺ｫ縺ｪ縺｣縺ｦ縺・ｋ縺九ｒ遒ｺ隱阪＠縺ｦ縺上□縺輔＞縲・/div>
-        </div>
-      </div>
-
-      <div class="subsection" id="sec5-9">
-        <div class="subsection-title">5.9 莠碁㍾邱・/div>
-        <div class="capture">[ sec12_doubleline.png ] 莠碁㍾邱夂函謌撰ｼ医ヨ繝ｪ繝縺ゅｊ / 縺ｪ縺玲ｯ碑ｼ・ｼ・/div>
-        <p>驕ｸ謚槭＠縺溘が繝悶ず繧ｧ繧ｯ繝医°繧我ｺ碁㍾邱夲ｼ医が繝輔そ繝・ヨ邱夲ｼ峨ｒ逕滓・縺励∪縺吶・/p>
-        <ul>
-          <li>邱壹・蜀・・蜀・ｼｧ縺ｮ邨・∩蜷医ｏ縺帙↓蟇ｾ蠢・/li>
-          <li><strong>繝医Μ繝縺ゅｊ</strong> 窶・莠､蟾ｮ驛ｨ蛻・ｒ閾ｪ蜍募・逅・＠縺ｦ縺阪ｌ縺・↑莠碁㍾邱壹ｒ逕滓・</li>
-          <li><strong>繝医Μ繝縺ｪ縺・/strong> 窶・蜈・・蠖｢迥ｶ繧偵◎縺ｮ縺ｾ縺ｾ繧ｪ繝輔そ繝・ヨ</li>
-        </ul>
-      </div>
-    </section>
-
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         6. 邱ｨ髮・ヤ繝ｼ繝ｫ
-    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec6">
-      <div class="section-header">
-        <span class="section-num">06</span>
-        <h2 class="section-title">邱ｨ髮・ヤ繝ｼ繝ｫ</h2>
-      </div>
-
-      <div class="subsection" id="sec6-1">
-        <div class="subsection-title">6.1 繝医Μ繝</div>
-        <div class="capture">[ sec13_trim_fillet.png ] 繝医Μ繝縺ｨ繝輔ぅ繝ｬ繝・ヨ</div>
-        <p>莠､轤ｹ莉倩ｿ代・荳崎ｦ・Κ蛻・ｒ繧ｯ繝ｪ繝・け縺ｧ蜑企勁縺励∪縺吶り､・焚縺ｮ蝗ｳ蠖｢縺御ｺ､蟾ｮ縺励※縺・ｋ驛ｨ蛻・↓菴ｿ逕ｨ縺励※縺上□縺輔＞縲・/p>
-      </div>
-
-      <div class="subsection" id="sec6-2">
-        <div class="subsection-title">6.2 繝輔ぅ繝ｬ繝・ヨ</div>
-        <p>2縺､縺ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝医ｒ驕ｸ謚槫ｾ後∝呵｣懊ｒ遒ｺ螳壹＠縺ｦR・井ｸｸ縺ｿ・峨ｒ莉倥￠縺ｾ縺吶・/p>
-        <ul>
-          <li><strong>蜊雁ｾ・/strong> 窶・繝輔ぅ繝ｬ繝・ヨ蜊雁ｾ・ｒ謨ｰ蛟､蜈･蜉・/li>
-          <li><strong>繝医Μ繝縺励↑縺・/strong> 窶・蜈・・邱壹ｒ谿九＠縺ｦR繧定ｿｽ蜉</li>
-          <li><strong>繝医Μ繝繧り｡後≧</strong> 窶・蜈・・邱壹ｒR縺ｮ謗･轤ｹ縺ｧ繝医Μ繝</li>
-        </ul>
-      </div>
-
-      <div class="subsection" id="sec6-3">
-        <div class="subsection-title">6.3 鬆らせ邱ｨ髮・/div>
-        <div class="capture">[ sec14_vertex_edit.png ] 鬆らせ邱ｨ髮・ｼ医せ繝翫ャ繝励≠繧奇ｼ・/div>
-        <p>繧ｪ繝悶ず繧ｧ繧ｯ繝医・鬆らせ繧貞句挨縺ｫ遘ｻ蜍輔＠縺ｾ縺吶ゅせ繝翫ャ繝励→邨・∩蜷医ｏ縺帙ｋ縺薙→縺ｧ邊ｾ蟇・↑邱ｨ髮・′蜿ｯ閭ｽ縺ｧ縺吶・/p>
-      </div>
-
-      <div class="subsection" id="sec6-4">
-        <div class="subsection-title">6.4 繝代ち繝ｼ繝ｳ繧ｳ繝斐・</div>
-        <div class="capture">[ sec15_pattern_copy.png ] 繝代ち繝ｼ繝ｳ繧ｳ繝斐・・磯・蛻・/ 蝗櫁ｻ｢ / 蜿崎ｻ｢・・/div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>遞ｮ鬘・/th><th>蜀・ｮｹ</th></tr></thead>
-            <tbody>
-              <tr><td>驟榊・</td><td>X/Y 譁ｹ蜷代↓謖・ｮ壽焚繝ｻ髢馴囈縺ｧ繧ｳ繝斐・</td></tr>
-              <tr><td>蝗櫁ｻ｢</td><td>蝓ｺ貅也せ繧剃ｸｭ蠢・↓謖・ｮ夊ｧ貞ｺｦ繝ｻ謨ｰ縺ｧ繧ｳ繝斐・</td></tr>
-              <tr><td>蜿崎ｻ｢</td><td>謖・ｮ夊ｻｸ縺ｫ蟇ｾ縺励※髀｡蜒上さ繝斐・</td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </section>
-
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         7. 繝ｬ繧､繝､繝ｼ邂｡逅・    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec7">
-      <div class="section-header">
-        <span class="section-num">07</span>
-        <h2 class="section-title">繝ｬ繧､繝､繝ｼ邂｡逅・/h2>
-      </div>
-      <div class="capture">[ sec16_layers.png ] 繝ｬ繧､繝､繝ｼ謫堺ｽ懶ｼ・N/OFF/LOCK縲∽ｸ贋ｸ具ｼ・/div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>謫堺ｽ・/th><th>蜀・ｮｹ</th></tr></thead>
-          <tbody>
-            <tr><td>菴懈・ / 蜷咲ｧｰ螟画峩 / 蜑企勁</td><td>蜿ｳ繝代ロ繝ｫ縺ｮ繝ｬ繧､繝､繝ｼ繝代ロ繝ｫ縺九ｉ謫堺ｽ・/td></tr>
-            <tr><td>ON / OFF</td><td>繝ｬ繧､繝､繝ｼ縺ｮ陦ｨ遉ｺ / 髱櫁｡ｨ遉ｺ繧貞・繧頑崛縺・/td></tr>
-            <tr><td>LOCK</td><td>繝ｬ繧､繝､繝ｼ繧偵Ο繝・け縲ゅが繝悶ず繧ｧ繧ｯ繝医・驕ｸ謚槭・邱ｨ髮・・蜑企勁縺御ｸ榊庄縺ｫ縺ｪ繧・/td></tr>
-            <tr><td>荳贋ｸ狗ｧｻ蜍・/td><td>繝ｬ繧､繝､繝ｼ縺ｮ驥阪↑繧企・ｒ螟画峩</td></tr>
-            <tr><td>繧ｫ繝ｩ繝ｼ蛻・￠</td><td>繝ｬ繧､繝､繝ｼ縺斐→縺ｫ陦ｨ遉ｺ濶ｲ繧定ｨｭ螳・/td></tr>
-            <tr><td>驕ｸ謚槭Ξ繧､繝､繝ｼ縺ｮ縺ｿ邱ｨ髮・/td><td>繧｢繧ｯ繝・ぅ繝悶〒縺ｪ縺・Ξ繧､繝､繝ｼ縺ｮ邱ｨ髮・ｒ遖∵ｭ｢</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="callout tip">
-        <span class="callout-icon">庁</span>
-        <div>縲碁∈謚槭Ξ繧､繝､繝ｼ縺ｮ縺ｿ邱ｨ髮・阪ｒ譛牙柑縺ｫ縺吶ｋ縺ｨ縲∬ｪ､縺｣縺ｦ莉悶Ξ繧､繝､繝ｼ縺ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝医ｒ謫堺ｽ懊＠縺ｦ縺励∪縺・Α繧ｹ繧帝亟縺偵∪縺吶・/div>
-      </div>
-    </section>
-
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         8. 繧ｰ繝ｫ繝ｼ繝礼ｮ｡逅・    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec8">
-      <div class="section-header">
-        <span class="section-num">08</span>
-        <h2 class="section-title">繧ｰ繝ｫ繝ｼ繝礼ｮ｡逅・/h2>
-      </div>
-      <div class="capture">[ sec17_groups.png ] 繧ｰ繝ｫ繝ｼ繝玲桃菴懶ｼ郁ｦｪ蟄舌・隍・焚驕ｸ謚槭・荳ｦ縺ｳ譖ｿ縺茨ｼ・/div>
+    <section id="sec4"><h2>4. 主な操作</h2>
       <ul>
-        <li><strong>繧ｰ繝ｫ繝ｼ繝嶺ｽ懈・</strong> 窶・隍・焚繧ｪ繝悶ず繧ｧ繧ｯ繝医ｒ縺ｾ縺ｨ繧√※繧ｰ繝ｫ繝ｼ繝怜喧</li>
-        <li><strong>隕ｪ蟄先ｧ矩</strong> 窶・繧ｰ繝ｫ繝ｼ繝励ｒ繝阪せ繝医＠縺ｦ髫主ｱ､邂｡逅・′蜿ｯ閭ｽ</li>
-        <li><strong>荳贋ｸ狗ｧｻ蜍・/strong> 窶・繧ｰ繝ｫ繝ｼ繝励・荳ｦ縺ｳ鬆・ｼ郁｡ｨ遉ｺ鬆・ｼ峨ｒ螟画峩</li>
-        <li><strong>繝ｪ繝阪・繝</strong> 窶・繧ｰ繝ｫ繝ｼ繝励↓蜷榊燕繧剃ｻ倥￠縺ｦ隴伜挨縺励ｄ縺吶￥縺吶ｋ</li>
-        <li><strong>繧ｫ繝ｩ繝ｼ蛻・￠</strong> 窶・繧ｰ繝ｫ繝ｼ繝励＃縺ｨ縺ｫ陦ｨ遉ｺ濶ｲ繧定ｨｭ螳・/li>
-        <li><strong>隍・焚驕ｸ謚・/strong> 窶・繧ｯ繝ｪ繝・け / <kbd>Shift</kbd>+繧ｯ繝ｪ繝・け縺ｧ隍・焚繧ｰ繝ｫ繝ｼ繝励ｒ蜷梧凾驕ｸ謚・/li>
+        <li>ホイール: ズーム</li>
+        <li>中ボタン or <code>Alt</code>+ドラッグ: パン</li>
+        <li>クリック: 選択</li>
+        <li><code>Shift</code>+クリック: 複数選択</li>
+        <li><code>Delete</code>: 削除</li>
       </ul>
     </section>
 
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         9. 險ｭ螳・    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec9">
-      <div class="section-header">
-        <span class="section-num">09</span>
-        <h2 class="section-title">險ｭ螳・/h2>
-      </div>
-      <div class="capture">[ sec18_settings_page_grid.png ] 險ｭ螳夲ｼ育畑邏吶√げ繝ｪ繝・ラ縲∵怙螟ｧ繧ｺ繝ｼ繝・・/div>
-      <div class="capture">[ sec19_settings_ui.png ] 險ｭ螳夲ｼ郁ｨ隱槭√Γ繝九Η繝ｼ繧ｹ繧ｱ繝ｼ繝ｫ縲∬｡ｨ遉ｺ鬆・岼・・/div>
-
-      <div class="subsection">
-        <div class="subsection-title">逕ｨ邏呵ｨｭ螳・/div>
-        <ul>
-          <li>逕ｨ邏吶し繧､繧ｺ・・0縲廣4 縺ｪ縺ｩ・・/li>
-          <li>蜷代″・育ｸｦ / 讓ｪ・・/li>
-          <li>邵ｮ蟆ｺ・・:1縲・:50 縺ｪ縺ｩ・・/li>
-          <li>蜊倅ｽ搾ｼ・m / inch 縺ｪ縺ｩ・・/li>
-        </ul>
-      </div>
-
-      <div class="subsection">
-        <div class="subsection-title">繧ｰ繝ｪ繝・ラ險ｭ螳・/div>
-        <ul>
-          <li>蝓ｺ譛ｬ繧ｰ繝ｪ繝・ラ繧ｵ繧､繧ｺ</li>
-          <li>繧ｰ繝ｪ繝・ラ陦ｨ遉ｺ ON/OFF</li>
-          <li>繧ｹ繝翫ャ繝・ON/OFF</li>
-          <li>繧ｪ繝ｼ繝医げ繝ｪ繝・ラ蛻・ｊ譖ｿ縺医ち繧､繝溘Φ繧ｰ・医ぜ繝ｼ繝縺ｫ騾｣蜍包ｼ・/li>
-        </ul>
-      </div>
-
-      <div class="subsection">
-        <div class="subsection-title">UI 險ｭ螳・/div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>鬆・岼</th><th>蜀・ｮｹ</th></tr></thead>
-            <tbody>
-              <tr><td>UI 險隱・/td><td>譌･譛ｬ隱・/ 闍ｱ隱槭ｒ蛻・ｊ譖ｿ縺・/td></tr>
-              <tr><td>繝｡繝九Η繝ｼ繧ｹ繧ｱ繝ｼ繝ｫ</td><td>UI 縺ｮ諡｡螟ｧ邇・ｒ隱ｿ謨ｴ・磯ｫ倩ｧ｣蜒丞ｺｦ繝｢繝九ち繝ｼ蟇ｾ蠢懶ｼ・/td></tr>
-              <tr><td>蟾ｦ繝｡繝九Η繝ｼ陦ｨ遉ｺ鬆・岼</td><td>繝代ロ繝ｫ蜀・・陦ｨ遉ｺ鬆・岼繧帝∈謚槭＠縺ｦ髱櫁｡ｨ遉ｺ縺ｫ縺ｧ縺阪ｋ</td></tr>
-              <tr><td>FPS 陦ｨ遉ｺ</td><td>謠冗判諤ｧ閭ｽ縺ｮ遒ｺ隱咲畑縲ゆｸ矩Κ繧ｹ繝・・繧ｿ繧ｹ縺ｫ陦ｨ遉ｺ</td></tr>
-              <tr><td>繧ｪ繝悶ず繧ｧ繧ｯ繝域焚陦ｨ遉ｺ</td><td>蝗ｳ髱｢蜀・・隕∫ｴ謨ｰ繧堤｢ｺ隱阪ゆｸ矩Κ繧ｹ繝・・繧ｿ繧ｹ縺ｫ陦ｨ遉ｺ</td></tr>
-              <tr><td>閾ｪ蜍輔ヰ繝・け繧｢繝・・</td><td>荳螳夐俣髫斐〒繝ｭ繝ｼ繧ｫ繝ｫ縺ｫ閾ｪ蜍穂ｿ晏ｭ・/td></tr>
-            </tbody>
-          </table>
-        </div>
-      </div>
+    <section id="sec5"><h2>5. 作成ツール</h2>
+      <ul>
+        <li>線 / 四角 / 円 / 円弧</li>
+        <li>位置マーカー / テキスト / 寸法</li>
+        <li>ハッチング / 二重線</li>
+      </ul>
     </section>
 
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         10. 菫晏ｭ倥・隱ｭ霎ｼ繝ｻ蜃ｺ蜉・    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec10">
-      <div class="section-header">
-        <span class="section-num">10</span>
-        <h2 class="section-title">菫晏ｭ倥・隱ｭ霎ｼ繝ｻ蜃ｺ蜉・/h2>
-      </div>
-      <div class="capture">[ sec20_file_export.png ] 繝輔ぃ繧､繝ｫ謫堺ｽ懶ｼ井ｿ晏ｭ・/ 隱ｭ霎ｼ / 蜃ｺ蜉幢ｼ・/div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>謫堺ｽ・/th><th>蠖｢蠑・/th><th>蜀・ｮｹ</th></tr></thead>
-          <tbody>
-            <tr><td>譁ｰ隕丈ｽ懈・</td><td>窶・/td><td>繧ｭ繝｣繝ｳ繝舌せ繧偵け繝ｪ繧｢縲ゆｿ晏ｭ倡｢ｺ隱阪≠繧・/td></tr>
-            <tr><td>菫晏ｭ・/td><td>JSON</td><td>迴ｾ蝨ｨ縺ｮ繝輔ぃ繧､繝ｫ蜷阪〒荳頑嶌縺堺ｿ晏ｭ・/td></tr>
-            <tr><td>蛻･蜷堺ｿ晏ｭ・/td><td>JSON</td><td>繝輔ぃ繧､繝ｫ蜷阪ｒ謖・ｮ壹＠縺ｦ菫晏ｭ・/td></tr>
-            <tr><td>隱ｭ霎ｼ</td><td>JSON</td><td>JSON 繝輔ぃ繧､繝ｫ繧帝幕縺擾ｼ育樟蝨ｨ縺ｮ蝗ｳ髱｢縺ｨ鄂ｮ謠幢ｼ・/td></tr>
-            <tr><td>繧､繝ｳ繝昴・繝・/td><td>JSON</td><td>迴ｾ蝨ｨ縺ｮ蝗ｳ髱｢縺ｫ霑ｽ蜉蜿悶ｊ霎ｼ縺ｿ</td></tr>
-            <tr><td>蜃ｺ蜉・/td><td>PDF / SVG</td><td>逕ｨ邏呵ｨｭ螳壹↓蝓ｺ縺･縺・※蜃ｺ蜉・/td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="callout tip">
-        <span class="callout-icon">庁</span>
-        <div>閾ｪ蜍輔ヰ繝・け繧｢繝・・繧呈怏蜉ｹ縺ｫ縺励※縺翫￥縺ｨ縲√ヶ繝ｩ繧ｦ繧ｶ縺ｮ繧ｯ繝ｩ繝・す繝･譎ゅ↓繧ゆｸ螳壹・菴懈･ｭ繧貞ｾｩ蜈・〒縺阪∪縺呻ｼ郁ｨｭ螳・竊・閾ｪ蜍輔ヰ繝・け繧｢繝・・・峨・/div>
-      </div>
+    <section id="sec6"><h2>6. 編集ツール</h2>
+      <ul>
+        <li>トリム</li>
+        <li>フィレット</li>
+        <li>頂点編集</li>
+        <li>パターンコピー</li>
+      </ul>
     </section>
 
-    <!-- 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
-         11. 繝医Λ繝悶Ν繧ｷ繝･繝ｼ繝・ぅ繝ｳ繧ｰ
-    笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 -->
-    <section class="section" id="sec11">
-      <div class="section-header">
-        <span class="section-num">11</span>
-        <h2 class="section-title">繝医Λ繝悶Ν繧ｷ繝･繝ｼ繝・ぅ繝ｳ繧ｰ</h2>
-      </div>
-
-      <div class="subsection">
-        <div class="subsection-title">繧ｪ繝悶ず繧ｧ繧ｯ繝医′驕ｸ謚槭〒縺阪↑縺・/div>
-        <div class="capture">[ sec21_troubleshooting_locked_layer.png ] LOCK繝ｬ繧､繝､繝ｼ譎ゅ・驕ｸ謚樔ｸ榊庄繝｡繝・そ繝ｼ繧ｸ</div>
-        <ul>
-          <li>蟇ｾ雎｡繧ｪ繝悶ず繧ｧ繧ｯ繝医・繝ｬ繧､繝､繝ｼ縺・<strong>LOCK</strong> 縺ｫ縺ｪ縺｣縺ｦ縺・↑縺・°遒ｺ隱阪＠縺ｦ縺上□縺輔＞縲・/li>
-          <li>縲・strong>驕ｸ謚槭Ξ繧､繝､繝ｼ縺ｮ縺ｿ邱ｨ髮・/strong>縲阪′譛牙柑縺ｫ縺ｪ縺｣縺ｦ縺・※縲∝ｯｾ雎｡縺碁撼繧｢繧ｯ繝・ぅ繝悶Ξ繧､繝､繝ｼ縺ｫ縺ゅｋ蜿ｯ閭ｽ諤ｧ縺後≠繧翫∪縺吶・/li>
-        </ul>
-        <div class="callout warn">
-          <span class="callout-icon">笞</span>
-          <div>LOCK繝ｬ繧､繝､繝ｼ縺ｮ繧ｪ繝悶ず繧ｧ繧ｯ繝医・繧ｰ繝ｫ繝ｼ繝鈴∈謚槭〒繧ゅけ繝ｪ繝・け驕ｸ謚槭〒繧る∈謚槭〒縺阪∪縺帙ｓ縲ょ承繝代ロ繝ｫ縺ｧ繝ｭ繝・け繧定ｧ｣髯､縺励※縺九ｉ謫堺ｽ懊＠縺ｦ縺上□縺輔＞縲・/div>
-        </div>
-      </div>
-
-      <div class="subsection">
-        <div class="subsection-title">繝上ャ繝√Φ繧ｰ縺ｮ蠅・阜縺碁∈謚槭〒縺阪↑縺・/div>
-        <ul>
-          <li>蟇ｾ雎｡縺ｮ蝗ｳ蠖｢縺・<strong>蜿ｯ隕悶Ξ繧､繝､繝ｼ</strong>・・N 迥ｶ諷具ｼ峨↓縺ゅｋ縺狗｢ｺ隱阪＠縺ｦ縺上□縺輔＞縲・/li>
-          <li>繝上ャ繝√Φ繧ｰ縺ｫ縺ｯ <strong>髢蛾伜沺</strong> 縺悟ｿ・ｦ√〒縺吶らｷ壹・遶ｯ轤ｹ縺後▽縺ｪ縺後▲縺ｦ縺・ｋ縺狗｢ｺ隱阪＠縺ｦ縺上□縺輔＞縲・/li>
-        </ul>
-      </div>
-
-      <div class="subsection">
-        <div class="subsection-title">蜍穂ｽ懊′驥阪＞繝ｻ謠冗判縺碁≦縺・/div>
-        <ul>
-          <li>險ｭ螳壹〒 <strong>FPS 陦ｨ遉ｺ</strong> 繧呈怏蜉ｹ縺ｫ縺励※迴ｾ蝨ｨ縺ｮ繝輔Ξ繝ｼ繝繝ｬ繝ｼ繝医ｒ遒ｺ隱阪＠縺ｾ縺吶・/li>
-          <li>荳崎ｦ√↑繝ｬ繧､繝､繝ｼ繧・<strong>OFF</strong> 縺ｫ縺励※謠冗判蟇ｾ雎｡繧呈ｸ帙ｉ縺励∪縺吶・/li>
-          <li>蟾ｦ繝｡繝九Η繝ｼ縺ｮ <strong>陦ｨ遉ｺ鬆・岼</strong> 繧貞ｿ・ｦ∵怙蟆城剞縺ｫ邨槭ｊ縺ｾ縺吶・/li>
-        </ul>
-        <div class="callout note">
-          <span class="callout-icon">邃ｹ</span>
-          <div>險ｭ螳壹・縲後が繝悶ず繧ｧ繧ｯ繝域焚陦ｨ遉ｺ縲阪ｒ菴ｿ縺｣縺ｦ蝗ｳ髱｢縺ｮ隕乗ｨ｡繧呈滑謠｡縺吶ｋ縺ｨ縲√ヱ繝輔か繝ｼ繝槭Φ繧ｹ謾ｹ蝟・・繝偵Φ繝医↓縺ｪ繧翫∪縺吶・/div>
-        </div>
-      </div>
+    <section id="sec7"><h2>7. レイヤー管理</h2>
+      <ul>
+        <li>レイヤーの追加/削除/名称変更</li>
+        <li>表示/非表示、ロック切替</li>
+      </ul>
     </section>
 
-  </main><!-- /main -->
+    <section id="sec8"><h2>8. グループ管理</h2>
+      <ul>
+        <li>複数図形のグループ化・解除</li>
+        <li>グループ単位での選択・移動</li>
+      </ul>
+    </section>
 
-</div><!-- /layout -->
+    <section id="sec9"><h2>9. 設定</h2>
+      <ul>
+        <li>グリッド表示・スナップ設定</li>
+        <li>表示品質、UI表示、補助表示</li>
+      </ul>
+    </section>
 
-<script>
-// Sidebar active link on scroll
-const links = document.querySelectorAll('.sidebar-link');
-const sections = document.querySelectorAll('.section');
+    <section id="sec10"><h2>10. 保存・読込・出力</h2>
+      <ul>
+        <li>JSON保存/読込</li>
+        <li>SVG/PDF出力</li>
+      </ul>
+    </section>
 
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(entry => {
-    if(entry.isIntersecting){
-      const id = entry.target.id;
-      links.forEach(l => {
-        l.classList.toggle('active', l.getAttribute('href') === '#'+id);
-      });
-    }
-  });
-}, { rootMargin: '-52px 0px -60% 0px' });
-
-sections.forEach(s => observer.observe(s));
-</script>
+    <section id="sec11"><h2>11. トラブルシューティング</h2>
+      <ul>
+        <li>選択できない: レイヤーロックを確認</li>
+        <li>重い: 表示品質を下げる、補助表示をオフ</li>
+      </ul>
+    </section>
+  </article>
+</main>
 </body>
 </html>
-

@@ -202,7 +202,7 @@ function normalizeLineTypePreset(v) {
 }
 
 function getUiLanguage(state) {
-  return String(state?.ui?.language || "ja").toLowerCase() === "en" ? "en" : "ja";
+  return String(state?.ui?.language || "ja").toLowerCase().startsWith("en") ? "en" : "ja";
 }
 
 function localizeGridAutoTimingLabelText(timing, lang) {

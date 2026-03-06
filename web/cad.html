@@ -2067,7 +2067,8 @@
     (function () {
       const a = document.getElementById("openManualBtn");
       if (!a) return;
-      a.href = "/manual.html";
+      const l = String(localStorage.getItem("scad-lang") || "ja").toLowerCase();
+      a.href = l.startsWith("en") ? "/manual_en.html" : "/manual.html";
     })();
   </script>
   <script type="module" src="./cad/app.js"></script>

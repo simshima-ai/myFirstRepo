@@ -3840,20 +3840,24 @@ document.addEventListener('mousemove', e=>{
     }
   };
 
-  let lang = localStorage.getItem('scad-lang') || 'ja';
+  function normalizeLang(v) {
+    return String(v || 'ja').toLowerCase().startsWith('en') ? 'en' : 'ja';
+  }
+
+  let lang = normalizeLang(localStorage.getItem('scad-lang'));
 
   function applyLang(l) {
-    lang = l;
-    localStorage.setItem('scad-lang', l);
+    lang = normalizeLang(l);
+    localStorage.setItem('scad-lang', lang);
     document.querySelectorAll('[data-i18n]').forEach(function (el) {
       var key = el.dataset.i18n;
-      if (LABELS[l][key] !== undefined) el.innerHTML = LABELS[l][key];
+      if (LABELS[lang][key] !== undefined) el.innerHTML = LABELS[lang][key];
     });
     var guide = document.getElementById('navGuideLink');
-    if (guide) guide.href = (l === 'en') ? '/manual_en.html' : '/manual.html';
+    if (guide) guide.href = (lang === 'en') ? '/manual_en.html' : '/manual.html';
     var btn = document.getElementById('lang-toggle');
-    if (btn) btn.textContent = l === 'ja' ? 'EN' : 'JP';
-    document.documentElement.lang = l;
+    if (btn) btn.textContent = lang === 'ja' ? 'EN' : 'JP';
+    document.documentElement.lang = lang;
   }
 
   document.getElementById('lang-toggle').addEventListener('click', function () {

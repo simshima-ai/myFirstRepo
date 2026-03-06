@@ -125,20 +125,25 @@ export function getEffectiveGridSize(grid, view, pageSetup = null) {
 
   let level = Number(grid?.autoLevel);
   if (![100, 50, 10, 5, 1].includes(level)) level = 100;
-
-  if (level === 100) {
-    if (z >= e50) level = 50;
-  } else if (level === 50) {
-    if (z >= e10) level = 10;
-    else if (z <= r50) level = 100;
-  } else if (level === 10) {
-    if (z >= e5) level = 5;
-    else if (z <= r10) level = 50;
-  } else if (level === 5) {
-    if (z >= e1) level = 1;
-    else if (z <= r5) level = 10;
-  } else {
-    if (z <= r1) level = 5;
+  // Catch up multiple stages in one frame when zoom delta is large (wheel/pinch burst).
+  // Single-step transition causes visible lag/flicker around threshold crossings.
+  for (let i = 0; i < 8; i++) {
+    const prev = level;
+    if (level === 100) {
+      if (z >= e50) level = 50;
+    } else if (level === 50) {
+      if (z >= e10) level = 10;
+      else if (z <= r50) level = 100;
+    } else if (level === 10) {
+      if (z >= e5) level = 5;
+      else if (z <= r10) level = 50;
+    } else if (level === 5) {
+      if (z >= e1) level = 1;
+      else if (z <= r5) level = 10;
+    } else {
+      if (z <= r1) level = 5;
+    }
+    if (level === prev) break;
   }
 
   grid.autoLevel = level;

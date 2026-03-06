@@ -113,7 +113,7 @@
     .tool-buttons {
       display: grid;
       grid-template-columns: 1fr;
-      gap: 6px;
+      gap: 2px;
     }
 
     .tool-buttons .left-sep {
@@ -175,59 +175,31 @@
       color: var(--ink);
     }
 
-    .sidebar .tool-buttons button[data-menu-group="select"] {
-      background: #f3e8ff;
+    .sidebar .tool-buttons button,
+    .sidebar .tool-buttons .left-flyout>.left-flyout-main {
+      border-color: #cbd5e1;
+      border-radius: 7px;
+      background: #f8fafc;
+      color: #334155;
+      font-size: 11px;
+      font-weight: 700;
+      min-height: 24px;
+      padding: 0 8px;
+      box-shadow: none;
     }
 
-    .sidebar .tool-buttons button[data-menu-group="select"]:hover {
-      background: #ead5ff;
+    .sidebar .tool-buttons button:hover,
+    .sidebar .tool-buttons .left-flyout:hover>.left-flyout-main {
+      background: #f1f5f9;
+      border-color: #b9c7da;
     }
 
-    .sidebar .tool-buttons button.active {
-      border-color: #16a34a;
-      box-shadow: 0 0 0 2px rgba(34, 197, 94, 0.32) inset;
+    .sidebar .tool-buttons button.active,
+    .sidebar .tool-buttons .left-flyout>.left-flyout-main.active {
+      border-color: #86efac;
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(22, 101, 52, 0.12);
       background: #dcfce7;
-      color: var(--ink);
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="create"] {
-      background: #f5fbff;
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="edit"] {
-      background: #f6fff4;
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="view"] {
-      background: #fffaf0;
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="file"] {
-      background: #fff7fb;
-    }
-
-    .sidebar .tool-buttons .left-flyout[data-menu-group="file"]>.left-flyout-main {
-      background: #fff7fb;
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="create"]:hover {
-      background: #eaf7ff;
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="edit"]:hover {
-      background: #eefce8;
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="view"]:hover {
-      background: #fff4da;
-    }
-
-    .sidebar .tool-buttons button[data-menu-group="file"]:hover {
-      background: #ffedf7;
-    }
-
-    .sidebar .tool-buttons .left-flyout[data-menu-group="file"]:hover>.left-flyout-main {
-      background: #ffedf7;
+      color: #166534;
     }
 
     .tool-buttons .left-flyout {
@@ -285,7 +257,7 @@
 
     .sidebar .tool-buttons button[data-tool="patterncopy"] {
       white-space: nowrap;
-      font-size: 12px;
+      font-size: 11px;
       padding-left: 8px;
       padding-right: 8px;
       letter-spacing: -0.01em;
@@ -314,6 +286,7 @@
       height: 100%;
       display: block;
       background: #fff;
+      touch-action: none;
     }
 
     .overlay {
@@ -653,11 +626,11 @@
     }
 
     .left-aux-stack .section[data-panel-id="snap"] .snap-grid {
-      display: grid;
+      display: flex;
+      flex-direction: column;
       width: 100%;
-      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-      gap: 1px 2px;
-      align-items: center;
+      gap: 2px;
+      align-items: stretch;
     }
 
     .touch-confirm-overlay {
@@ -691,35 +664,80 @@
       cursor: default;
     }
 
+    .touch-select-back-overlay {
+      position: absolute;
+      left: 14px;
+      bottom: 44px;
+      z-index: 120;
+      pointer-events: auto;
+      display: none;
+    }
+
+    .touch-select-back-btn {
+      min-width: 120px;
+      min-height: 40px;
+      padding: 8px 16px;
+      border-radius: 999px;
+      border: 1px solid #334155;
+      background: rgba(255, 255, 255, 0.94);
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+    }
+
     .left-aux-stack .section[data-panel-id="snap"] .snap-grid label {
-      min-height: 16px;
-      font-size: 10px;
-      justify-content: flex-start;
-      gap: 2px;
+      min-height: 24px;
+      font-size: 11px;
+      width: 100%;
       white-space: nowrap;
       min-width: 0;
-      display: inline-flex !important;
-      align-items: center;
-      line-height: 1.15;
-      letter-spacing: -0.02em;
+      display: block;
+      line-height: 1.2;
+      letter-spacing: 0;
       padding: 0;
       margin: 0;
-      overflow: hidden;
+      overflow: visible;
+      cursor: pointer;
     }
 
     .left-aux-stack .section[data-panel-id="snap"] .snap-grid label span {
-      min-width: 0;
-      max-width: 100%;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
+      display: inline-flex;
+      width: 100%;
+      min-height: 24px;
+      align-items: center;
+      justify-content: center;
+      padding: 0 8px;
+      border: 1px solid #cbd5e1;
+      border-radius: 7px;
+      background: #f8fafc;
+      color: #334155;
+      font-weight: 700;
+      transition: background-color .12s ease, border-color .12s ease, color .12s ease, box-shadow .12s ease;
     }
 
     .left-aux-stack .section[data-panel-id="snap"] .snap-grid input[type="checkbox"] {
-      width: 11px;
-      height: 11px;
-      flex: 0 0 auto;
+      position: absolute;
+      opacity: 0;
+      pointer-events: none;
+      width: 0;
+      height: 0;
       margin: 0;
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .snap-grid label input[type="checkbox"]:checked+span {
+      background: #dbeafe;
+      border-color: #93c5fd;
+      color: #1e3a8a;
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.5), 0 2px 6px rgba(30, 58, 138, 0.12);
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .snap-grid label:active span {
+      transform: translateY(0.5px);
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .snap-grid label.snap-span-2 {
+      width: 100%;
     }
 
     .left-aux-stack .section[data-panel-id="attrs"] {
@@ -1108,7 +1126,7 @@
             <label><input id="objSnapIntersectionToggle" type="checkbox" checked><span>交点</span></label>
             <label><input id="objSnapTangentToggle" type="checkbox"><span>接線</span></label>
             <label><input id="objSnapVectorToggle" type="checkbox"><span>ベクトル</span></label>
-            <label><input id="objSnapTangentKeepToggle" type="checkbox"><span>属性を保持</span></label>
+            <label class="snap-span-2"><input id="objSnapTangentKeepToggle" type="checkbox"><span>属性を保持</span></label>
           </div>
         </div>
         <div class="section" data-panel-id="attrs" id="attrPanel">
@@ -2024,6 +2042,9 @@
       </div>
       <div id="touchConfirmOverlay" class="touch-confirm-overlay">
         <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">決定</button>
+      </div>
+      <div id="touchSelectBackOverlay" class="touch-select-back-overlay">
+        <button id="touchSelectBackBtn" class="touch-select-back-btn" type="button">選択に戻る</button>
       </div>
       <div class="bottom-scale-overlay">
         <div id="gridScaleIndicator" class="grid-scale-indicator">

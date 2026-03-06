@@ -51,6 +51,7 @@ function createHtmlLikeLeftMenuRegistry() {
       options: [
         { id: "pdf", label: "PDF", implemented: true },
         { id: "svg", label: "SVG", implemented: true },
+        { id: "dxf", label: "DXF", implemented: true },
       ],
     },
     { type: "tool", id: "settings", label: "設定", group: "file" },
@@ -750,6 +751,7 @@ function applyLanguageUi(state, dom) {
       else if (id === "export") btn.textContent = t.export;
       else if (id === "pdf") btn.textContent = "PDF";
       else if (id === "svg") btn.textContent = "SVG";
+      else if (id === "dxf") btn.textContent = "DXF";
     }
   }
   setText(".section[data-context='select'] .section-title", t.selectMode);

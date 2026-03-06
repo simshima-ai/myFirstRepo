@@ -3072,6 +3072,194 @@ export function exportSvg(state, helpers) {
     if (setStatus) setStatus(`Exported ${name} (vector SVG)`);
 }
 
+export function exportDxf(state, helpers) {
+    const { setStatus } = helpers;
+    const fmt = (v, digits = 6) => {
+        const n = Number(v);
+        if (!Number.isFinite(n)) return "0";
+        return Number(n.toFixed(digits)).toString();
+    };
+    const normalizeRadLocal = (a) => {
+        let r = Number(a) || 0;
+        while (r < 0) r += Math.PI * 2;
+        while (r >= Math.PI * 2) r -= Math.PI * 2;
+        return r;
+    };
+    const radToDeg = (a) => (normalizeRadLocal(a) * 180 / Math.PI);
+    const cleanText = (s) => String(s ?? "").replace(/\r\n|\r|\n/g, " ").replace(/\s+/g, " ").trim();
+    const layerNameSafe = (name, fallbackId) => {
+        const raw = String(name ?? "").trim();
+        const base = raw || `L${Number(fallbackId) || 0}`;
+        const cleaned = base.replace(/[<>\/\\":;?*|=,]/g, "_");
+        return cleaned.slice(0, 255) || `L${Number(fallbackId) || 0}`;
+    };
+
+    const ps = state.pageSetup || {};
+    const pageScale = Math.max(0.0001, Number(ps.scale ?? 1) || 1);
+    const unitMm = Math.max(1e-9, Number(mmPerUnit(ps.unit || "mm")) || 1);
+    const worldPerMm = pageScale / unitMm;
+    const textPtToWorld = (pt) => Math.max(0.05, (Math.max(0, Number(pt) || 0) * (25.4 / 72)) * worldPerMm);
+
+    const visibleShapes = (state.shapes || []).filter((s) => isLayerVisible(state, s.layerId));
+    const layerById = new Map((state.layers || []).map((l) => [Number(l.id), l]));
+    const usedLayerIds = new Set();
+    for (const s of visibleShapes) {
+        const lid = Number(s.layerId);
+        if (Number.isFinite(lid)) usedLayerIds.add(lid);
+    }
+    const layerNameById = new Map();
+    for (const lid of usedLayerIds) {
+        const layer = layerById.get(Number(lid));
+        layerNameById.set(Number(lid), layerNameSafe(layer?.name, lid));
+    }
+    const layerNames = Array.from(new Set(["0", ...Array.from(layerNameById.values())]));
+    const layerNameFor = (shape) => {
+        const lid = Number(shape?.layerId);
+        if (!Number.isFinite(lid)) return "0";
+        return layerNameById.get(lid) || `L${lid}`;
+    };
+
+    const entities = [];
+    const addEntity = (type, pairs) => {
+        entities.push(["0", type]);
+        for (const [code, value] of pairs) entities.push([String(code), String(value)]);
+    };
+
+    let exportedShapeCount = 0;
+    let skippedShapeCount = 0;
+    for (const s of visibleShapes) {
+        const layerName = layerNameFor(s);
+        if (s.type === "line") {
+            addEntity("LINE", [
+                [8, layerName],
+                [10, fmt(s.x1)], [20, fmt(s.y1)], [30, "0"],
+                [11, fmt(s.x2)], [21, fmt(s.y2)], [31, "0"],
+            ]);
+            exportedShapeCount += 1;
+            continue;
+        }
+        if (s.type === "rect") {
+            const x1 = Number(s.x1), y1 = Number(s.y1), x2 = Number(s.x2), y2 = Number(s.y2);
+            const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
+            const minY = Math.min(y1, y2), maxY = Math.max(y1, y2);
+            const segs = [
+                [minX, minY, maxX, minY],
+                [maxX, minY, maxX, maxY],
+                [maxX, maxY, minX, maxY],
+                [minX, maxY, minX, minY],
+            ];
+            for (const [ax, ay, bx, by] of segs) {
+                addEntity("LINE", [
+                    [8, layerName],
+                    [10, fmt(ax)], [20, fmt(ay)], [30, "0"],
+                    [11, fmt(bx)], [21, fmt(by)], [31, "0"],
+                ]);
+            }
+            exportedShapeCount += 1;
+            continue;
+        }
+        if (s.type === "circle") {
+            const r = Math.abs(Number(s.r) || 0);
+            if (!(r > 1e-9)) { skippedShapeCount += 1; continue; }
+            addEntity("CIRCLE", [
+                [8, layerName],
+                [10, fmt(s.cx)], [20, fmt(s.cy)], [30, "0"],
+                [40, fmt(r)],
+            ]);
+            exportedShapeCount += 1;
+            continue;
+        }
+        if (s.type === "arc") {
+            const r = Math.abs(Number(s.r) || 0);
+            if (!(r > 1e-9)) { skippedShapeCount += 1; continue; }
+            const a1 = Number(s.a1) || 0;
+            const a2 = Number(s.a2) || 0;
+            const ccw = s.ccw !== false;
+            const startDeg = ccw ? radToDeg(a1) : radToDeg(a2);
+            const endDeg = ccw ? radToDeg(a2) : radToDeg(a1);
+            addEntity("ARC", [
+                [8, layerName],
+                [10, fmt(s.cx)], [20, fmt(s.cy)], [30, "0"],
+                [40, fmt(r)],
+                [50, fmt(startDeg)],
+                [51, fmt(endDeg)],
+            ]);
+            exportedShapeCount += 1;
+            continue;
+        }
+        if (s.type === "position") {
+            const x = Number(s.x), y = Number(s.y), size = Math.max(0.1, Number(s.size ?? 20));
+            addEntity("CIRCLE", [
+                [8, layerName],
+                [10, fmt(x)], [20, fmt(y)], [30, "0"],
+                [40, fmt(size * 0.28)],
+            ]);
+            addEntity("LINE", [
+                [8, layerName],
+                [10, fmt(x - size)], [20, fmt(y)], [30, "0"],
+                [11, fmt(x + size)], [21, fmt(y)], [31, "0"],
+            ]);
+            addEntity("LINE", [
+                [8, layerName],
+                [10, fmt(x)], [20, fmt(y - size)], [30, "0"],
+                [11, fmt(x)], [21, fmt(y + size)], [31, "0"],
+            ]);
+            exportedShapeCount += 1;
+            continue;
+        }
+        if (s.type === "text") {
+            const txt = cleanText(s.text);
+            if (!txt) { skippedShapeCount += 1; continue; }
+            addEntity("TEXT", [
+                [8, layerName],
+                [10, fmt(s.x1)], [20, fmt(s.y1)], [30, "0"],
+                [40, fmt(textPtToWorld(Number(s.textSizePt) || 12))],
+                [1, txt],
+                [50, fmt(Number(s.textRotate) || 0)],
+                [7, "STANDARD"],
+            ]);
+            exportedShapeCount += 1;
+            continue;
+        }
+        skippedShapeCount += 1;
+    }
+
+    const lines = [];
+    const emit = (code, value) => { lines.push(String(code)); lines.push(String(value)); };
+    emit(0, "SECTION"); emit(2, "HEADER");
+    emit(9, "$ACADVER"); emit(1, "AC1009");
+    emit(0, "ENDSEC");
+    emit(0, "SECTION"); emit(2, "TABLES");
+    emit(0, "TABLE"); emit(2, "LAYER"); emit(70, layerNames.length);
+    for (const name of layerNames) {
+        emit(0, "LAYER"); emit(2, name); emit(70, 0); emit(62, 7); emit(6, "CONTINUOUS");
+    }
+    emit(0, "ENDTAB");
+    emit(0, "ENDSEC");
+    emit(0, "SECTION"); emit(2, "ENTITIES");
+    for (const [code, value] of entities) emit(code, value);
+    emit(0, "ENDSEC");
+    emit(0, "EOF");
+
+    const dxf = lines.join("\r\n");
+    const blob = new Blob([dxf], { type: "application/dxf;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const ts = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    const name = `s-cad_${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.dxf`;
+    a.href = url;
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+    if (setStatus) {
+        const suffix = skippedShapeCount > 0 ? ` / skipped ${skippedShapeCount} unsupported` : "";
+        setStatus(`Exported ${name} (DXF R12) / shapes ${exportedShapeCount}${suffix}`);
+    }
+}
+
 function patternShiftShapeDeep(node, dx, dy) {
     if (!node || typeof node !== "object") return;
     const shiftXKeys = new Set(["x", "x1", "x2", "cx", "px", "tx", "originX"]);

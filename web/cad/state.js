@@ -383,6 +383,7 @@ export function createState() {
       },
       groupView: {
         colorize: false,
+        currentLayerOnly: false,
       },
       selectPickMode: "object", // "object" | "group"
       language: "en",

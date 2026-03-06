@@ -108,6 +108,7 @@ const dom = {
   renameGroupNameInput: document.getElementById("renameGroupNameInput"),
   renameGroupBtn: document.getElementById("renameGroupBtn"),
   groupColorizeToggle: document.getElementById("groupColorizeToggle"),
+  groupCurrentLayerOnlyToggle: document.getElementById("groupCurrentLayerOnlyToggle"),
   moveLayerUpBtn: document.getElementById("moveLayerUpBtn"),
   moveLayerDownBtn: document.getElementById("moveLayerDownBtn"),
   newGroupNameInput: document.getElementById("newGroupNameInput"),
@@ -448,6 +449,7 @@ function buildSettingsSnapshot() {
       language: String(state.ui?.language || "ja"),
       menuScalePct: Number(state.ui?.menuScalePct ?? 100),
       touchMode: !!state.ui?.touchMode,
+      groupCurrentLayerOnly: !!state.ui?.groupView?.currentLayerOnly,
       leftMenuVisibility: (state.ui?.leftMenuVisibility && typeof state.ui.leftMenuVisibility === "object")
         ? { ...state.ui.leftMenuVisibility }
         : {},
@@ -505,7 +507,9 @@ function loadAppSettingsAtStartup() {
     }
     if (data.ui && typeof data.ui === "object") {
       if (!state.ui) state.ui = {};
+      if (!state.ui.groupView || typeof state.ui.groupView !== "object") state.ui.groupView = {};
       state.ui.language = String(data.ui.language || state.ui.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
+      state.ui.groupView.currentLayerOnly = !!(data.ui.groupCurrentLayerOnly ?? state.ui.groupView.currentLayerOnly);
       state.ui.menuScalePct = Math.max(50, Math.min(200, Math.round(Number(data.ui.menuScalePct ?? state.ui.menuScalePct ?? 100) / 5) * 5));
       state.ui.touchMode = !!(data.ui.touchMode ?? state.ui.touchMode);
       state.ui.leftMenuVisibility = (data.ui.leftMenuVisibility && typeof data.ui.leftMenuVisibility === "object")
@@ -1598,7 +1602,7 @@ const helpers = {
     state.hatchDraft = { boundaryIds: [] };
     if (!state.ui) state.ui = {};
     state.ui.layerView = { colorize: false, editOnlyActive: false };
-    state.ui.groupView = { colorize: false };
+    state.ui.groupView = { colorize: false, currentLayerOnly: false };
     state.history.past = [];
     state.history.future = [];
     setTool(state, "select");
@@ -1743,6 +1747,13 @@ const helpers = {
   moveActiveLayerOrder: (direction) => moveActiveLayerOrder(state, helpers, direction),
   setLayerColorize: (v) => { setLayerColorize(state, helpers, v); draw(); },
   setGroupColorize: (v) => { setGroupColorize(state, helpers, v); draw(); },
+  setGroupCurrentLayerOnly: (v) => {
+    if (!state.ui) state.ui = {};
+    if (!state.ui.groupView || typeof state.ui.groupView !== "object") state.ui.groupView = {};
+    state.ui.groupView.currentLayerOnly = !!v;
+    scheduleSaveAppSettings();
+    draw();
+  },
   setEditOnlyActiveLayer: (v) => { setEditOnlyActiveLayer(state, helpers, v); draw(); },
   renameActiveGroup: (n) => { renameActiveGroup(state, helpers, n); draw(); },
   deleteActiveGroup: () => deleteActiveGroup(state, helpers),

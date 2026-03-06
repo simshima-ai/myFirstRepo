@@ -330,6 +330,7 @@ function applyLanguageUi(state, dom) {
       layerOps: "レイヤー操作",
       rename: "リネーム",
       colorize: "カラー分け表示",
+      currentLayerOnly: "現在レイヤーのみ",
       editOnlyActive: "選択レイヤーのみ編集",
       moveObjectsToLayer: "オブジェクトを移動",
       deleteLayer: "レイヤー削除",
@@ -542,6 +543,7 @@ function applyLanguageUi(state, dom) {
       layerOps: "Layer Ops",
       rename: "Rename",
       colorize: "Colorize",
+      currentLayerOnly: "Active Layer Only",
       editOnlyActive: "Edit Active Layer Only",
       moveObjectsToLayer: "Move Objects",
       deleteLayer: "Delete Layer",
@@ -925,6 +927,7 @@ function applyLanguageUi(state, dom) {
   if (dom.moveSelectionLayerBtn) dom.moveSelectionLayerBtn.textContent = t.moveObjectsToLayer;
   if (dom.deleteLayerBtn) dom.deleteLayerBtn.textContent = t.deleteLayer;
   setLabelByControl("groupColorizeToggle", t.colorize);
+  setLabelByControl("groupCurrentLayerOnlyToggle", t.currentLayerOnly);
   setLabelByControl("layerColorizeToggle", t.colorize);
   setLabelByControl("editOnlyActiveLayerToggle", t.editOnlyActive);
   if (dom.newLayerNameInput) dom.newLayerNameInput.placeholder = t.newLayerName;
@@ -1877,6 +1880,9 @@ export function initUi(state, dom, actions) {
   }
   if (dom.groupColorizeToggle) {
     dom.groupColorizeToggle.addEventListener("change", () => actions.setGroupColorize?.(!!dom.groupColorizeToggle.checked));
+  }
+  if (dom.groupCurrentLayerOnlyToggle) {
+    dom.groupCurrentLayerOnlyToggle.addEventListener("change", () => actions.setGroupCurrentLayerOnly?.(!!dom.groupCurrentLayerOnlyToggle.checked));
   }
   if (dom.layerColorizeToggle) {
     dom.layerColorizeToggle.addEventListener("change", () => actions.setLayerColorize?.(!!dom.layerColorizeToggle.checked));
@@ -4095,6 +4101,9 @@ export function refreshUi(state, dom) {
   if (dom.groupColorizeToggle) {
     dom.groupColorizeToggle.checked = !!state.ui?.groupView?.colorize;
   }
+  if (dom.groupCurrentLayerOnlyToggle) {
+    dom.groupCurrentLayerOnlyToggle.checked = !!state.ui?.groupView?.currentLayerOnly;
+  }
   if (dom.editOnlyActiveLayerToggle) {
     dom.editOnlyActiveLayerToggle.checked = !!state.ui?.layerView?.editOnlyActive;
   }
@@ -4193,6 +4202,15 @@ export function refreshUi(state, dom) {
     const selectedShapeIdSet = new Set((state.selection?.ids || []).map(Number));
     const selectedGroupIdSet = new Set((state.selection?.groupIds || []).map(Number));
     if (!selectedGroupIdSet.size && state.activeGroupId != null) selectedGroupIdSet.add(Number(state.activeGroupId));
+    const showCurrentLayerOnly = !!state.ui?.groupView?.currentLayerOnly;
+    const activeLayerId = Number(state.activeLayerId);
+    const shapeByIdFast = new Map((state.shapes || []).map(s => [Number(s.id), s]));
+    const isShapeInActiveLayer = (shape) => {
+      if (!shape) return false;
+      const lid = Number(shape.layerId ?? activeLayerId);
+      return Number.isFinite(lid) && lid === activeLayerId;
+    };
+    const isShapeInActiveLayerById = (sid) => isShapeInActiveLayer(shapeByIdFast.get(Number(sid)));
     const groups = (state.groups || []).map(g => ({ ...g, parentId: g.parentId == null ? null : Number(g.parentId) }));
     const groupsById = new Map(groups.map(g => [Number(g.id), g]));
     const byParent = new Map();
@@ -4218,18 +4236,47 @@ export function refreshUi(state, dom) {
     }
     // Groups are displayed in state.groups array order (no sorting)
     if (!state.ui.groupTreeExpanded) state.ui.groupTreeExpanded = {};
+    const groupSubtreeLayerMatchMemo = new Map();
+    const hasLayerMatchInGroupSubtree = (groupId) => {
+      const gid = Number(groupId);
+      if (groupSubtreeLayerMatchMemo.has(gid)) return !!groupSubtreeLayerMatchMemo.get(gid);
+      const g = groupsById.get(gid);
+      if (!g) {
+        groupSubtreeLayerMatchMemo.set(gid, false);
+        return false;
+      }
+      const ownMatch = (g.shapeIds || []).some((sid) => isShapeInActiveLayerById(sid));
+      let childMatch = false;
+      for (const ch of (byParent.get(gid) || [])) {
+        if (hasLayerMatchInGroupSubtree(ch.id)) {
+          childMatch = true;
+          break;
+        }
+      }
+      const matched = ownMatch || childMatch;
+      groupSubtreeLayerMatchMemo.set(gid, matched);
+      return matched;
+    };
     const rows = [];
     const visited = new Set();
     const walk = (pid, depth) => {
       const children = byParent.get(pid) || [];
       for (const g of children) {
-        if (visited.has(Number(g.id))) continue;
-        visited.add(Number(g.id));
-        const hasChildGroups = (byParent.get(Number(g.id)) || []).length > 0;
-        const hasShapes = Array.isArray(g.shapeIds) && g.shapeIds.length > 0;
-        rows.push({ group: g, depth, hasChildren: (hasChildGroups || hasShapes) });
+        const gid = Number(g.id);
+        if (visited.has(gid)) continue;
+        visited.add(gid);
+        if (showCurrentLayerOnly && !hasLayerMatchInGroupSubtree(gid)) continue;
+        const childGroups = byParent.get(gid) || [];
+        const visibleShapeIds = showCurrentLayerOnly
+          ? (g.shapeIds || []).filter((sid) => isShapeInActiveLayerById(sid))
+          : (Array.isArray(g.shapeIds) ? g.shapeIds : []);
+        const hasChildGroups = showCurrentLayerOnly
+          ? childGroups.some((ch) => hasLayerMatchInGroupSubtree(ch.id))
+          : childGroups.length > 0;
+        const hasShapes = visibleShapeIds.length > 0;
+        rows.push({ group: g, depth, hasChildren: (hasChildGroups || hasShapes), visibleShapeCount: visibleShapeIds.length });
         const expanded = state.ui.groupTreeExpanded[Number(g.id)] !== false;
-        if (expanded) walk(Number(g.id), depth + 1);
+        if (expanded) walk(gid, depth + 1);
       }
     };
     walk(null, 0);
@@ -4240,9 +4287,17 @@ export function refreshUi(state, dom) {
       const pid = g.parentId == null ? null : Number(g.parentId);
       const parentMissing = pid != null && !allGroupIds.has(pid);
       if (!parentMissing) continue;
-      const hasChildGroups = (byParent.get(Number(g.id)) || []).length > 0;
-      const hasShapes = Array.isArray(g.shapeIds) && g.shapeIds.length > 0;
-      rows.push({ group: g, depth: 0, hasChildren: (hasChildGroups || hasShapes) });
+      const gid = Number(g.id);
+      if (showCurrentLayerOnly && !hasLayerMatchInGroupSubtree(gid)) continue;
+      const childGroups = byParent.get(gid) || [];
+      const visibleShapeIds = showCurrentLayerOnly
+        ? (g.shapeIds || []).filter((sid) => isShapeInActiveLayerById(sid))
+        : (Array.isArray(g.shapeIds) ? g.shapeIds : []);
+      const hasChildGroups = showCurrentLayerOnly
+        ? childGroups.some((ch) => hasLayerMatchInGroupSubtree(ch.id))
+        : childGroups.length > 0;
+      const hasShapes = visibleShapeIds.length > 0;
+      rows.push({ group: g, depth: 0, hasChildren: (hasChildGroups || hasShapes), visibleShapeCount: visibleShapeIds.length });
     }
     // Also account for shapes not in any group.
     // Cache inAnyGroup to avoid O(totalShapeIds) rebuild on every refreshUi when groups haven't changed.
@@ -4261,7 +4316,9 @@ export function refreshUi(state, dom) {
       _unGroupedShapesCacheSig = unGroupedSig;
       _unGroupedShapesCache = (state.shapes || []).filter(s => !inAnyGroup.has(Number(s.id)));
     }
-    const unGroupedShapes = _unGroupedShapesCache;
+    const unGroupedShapes = showCurrentLayerOnly
+      ? _unGroupedShapesCache.filter((s) => isShapeInActiveLayer(s))
+      : _unGroupedShapesCache;
 
     const groupListSig = [
       String(getUiLanguage(state)),
@@ -4271,13 +4328,13 @@ export function refreshUi(state, dom) {
       String(state.ui?.groupDragDrop?.draggingGroupId ?? ""),
       String(state.ui?.groupDragDrop?.draggingShapeId ?? ""),
       String(state.ui?.groupDragDrop?.overGroupId ?? ""),
-      rows.map(({ group, depth }) => {
+      String(showCurrentLayerOnly ? 1 : 0),
+      String(activeLayerId),
+      rows.map(({ group, depth, visibleShapeCount }) => {
         const gid = Number(group.id);
         const expanded = state.ui.groupTreeExpanded[gid] !== false ? 1 : 0;
         const visible = group.visible !== false ? 1 : 0;
-        // Use count + first/last ID instead of full list to avoid O(n) string for large groups
-        const shapeIds = group.shapeIds || [];
-        const sids = `${shapeIds.length}:${Number(shapeIds[0] ?? -1)}:${Number(shapeIds[shapeIds.length - 1] ?? -1)}`;
+        const sids = `${visibleShapeCount}`;
         return `${gid}:${depth}:${expanded}:${visible}:${String(group.name || "")}:${String(group.parentId ?? "")}:${sids}`;
       }).join("|"),
       // Use count + first ID as cheap proxy to avoid O(n) string for large ungrouped sets
@@ -4298,7 +4355,7 @@ export function refreshUi(state, dom) {
       dom.groupList.appendChild(empty);
       }
 
-      for (const { group, depth, hasChildren } of rows) {
+      for (const { group, depth, hasChildren, visibleShapeCount } of rows) {
       const row = document.createElement("div");
       row.dataset.groupRow = String(group.id);
       row.draggable = true;
@@ -4343,7 +4400,7 @@ export function refreshUi(state, dom) {
       const expanded = state.ui.groupTreeExpanded[Number(group.id)] !== false;
       treeBtn.textContent = hasChildren ? (expanded ? "▾" : "▸") : "";
       const name = document.createElement("div");
-      name.textContent = `${group.name} (${(group.shapeIds || []).length})`;
+      name.textContent = `${group.name} (${visibleShapeCount})`;
       const groupHasSelectedObject = (!selectedGroupIdSet.size)
         && (group.shapeIds || []).some(sid => selectedShapeIdSet.has(Number(sid)));
       name.style.color = groupHasSelectedObject ? "#16a34a" : "var(--muted)";
@@ -4381,16 +4438,19 @@ export function refreshUi(state, dom) {
       if (expanded) {
         const MAX_GROUP_ROWS = 200;
         const shapeIds = Array.isArray(group.shapeIds) ? group.shapeIds : [];
-        const limit = Math.min(shapeIds.length, MAX_GROUP_ROWS);
+        const visibleShapeIds = showCurrentLayerOnly
+          ? shapeIds.filter((sid) => isShapeInActiveLayerById(sid))
+          : shapeIds;
+        const limit = Math.min(visibleShapeIds.length, MAX_GROUP_ROWS);
         for (let i = 0; i < limit; i++) {
-          const s = shapeById.get(Number(shapeIds[i]));
+          const s = shapeById.get(Number(visibleShapeIds[i]));
           if (!s) continue;
           renderShapeRow(dom.groupList, s, depth + 1, group.id, activeGroupShapeIdSet, selectedShapeIdSet);
         }
-        if (shapeIds.length > MAX_GROUP_ROWS) {
+        if (visibleShapeIds.length > MAX_GROUP_ROWS) {
           const more = document.createElement("div");
           more.style.cssText = "padding:2px 8px 2px 24px;font-size:10px;color:var(--muted);";
-          more.textContent = `...and ${shapeIds.length - MAX_GROUP_ROWS} more`;
+          more.textContent = `...and ${visibleShapeIds.length - MAX_GROUP_ROWS} more`;
           dom.groupList.appendChild(more);
         }
       }

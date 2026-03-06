@@ -32,6 +32,7 @@ section:first-of-type{border-top:none;margin-top:0}
 h2{margin:0 0 8px;font-size:20px;color:#16324a}
 ul{margin:8px 0 0 20px}
 code{background:#eef5fb;padding:1px 6px;border-radius:6px}
+#sec2 p,#sec7 p,#sec8 p,#sec11 p{margin-left:1em}
 @media (max-width:900px){main{grid-template-columns:1fr}nav{position:static}}
 </style>
 </head>
@@ -48,16 +49,16 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
 <main>
   <nav>
     <a href="#sec1">1. 概要</a>
-    <a href="#sec2">2. 基本画面</a>
+    <a href="#sec2">2. 特徴</a>
     <a href="#sec3">3. クイックスタート</a>
     <a href="#sec4">4. 主な操作</a>
-    <a href="#sec5">5. 作成ツール</a>
+    <a href="#sec5">5. 選択ツール</a>
     <a href="#sec6">6. 編集ツール</a>
-    <a href="#sec7">7. レイヤー管理</a>
-    <a href="#sec8">8. グループ管理</a>
+    <a href="#sec7">7. レイヤーとグループ</a>
+    <a href="#sec8">8. トリムとフィレット</a>
     <a href="#sec9">9. 設定</a>
     <a href="#sec10">10. 保存・読込・出力</a>
-    <a href="#sec11">11. トラブルシューティング</a>
+    <a href="#sec11">11. 属性</a>
   </nav>
   <article>
     <h1>S-CAD ユーザーマニュアル</h1>
@@ -71,21 +72,17 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec2"><h2>2. 基本画面</h2>
-      <ul>
-        <li>中央: 作図キャンバス</li>
-        <li>左: 作成/編集ツール</li>
-        <li>右: スナップ・属性・設定</li>
-      </ul>
+    <section id="sec2"><h2>2. 特徴</h2>
+      <p>S-CADは基本的に操作の簡単なCADですが、「オブジェクト、グループ、レイヤー」という概念について理解しておくと、より操作が楽になります。</p>
+      <p>S-CADでは若干の例外を除き、全て「線分と円弧」で描画すると考えて問題ありません。例えば四角形は4つの線分オブジェクトで構成されたグループです。四角形の4つの角には実際には2つの頂点が存在しますが、一つの頂点であるかのように操作できます。もちろん、別々に扱うこともできます。</p>
     </section>
 
     <section id="sec3"><h2>3. クイックスタート</h2>
       <ol>
         <li>新規作成</li>
-        <li>線ツールで図形を作成</li>
-        <li>寸法を追加</li>
-        <li>ハッチングを追加</li>
-        <li>保存またはPDF/SVGで出力</li>
+        <li>設定から、単位・縮尺・用紙サイズを選ぶ</li>
+        <li>線、円、四角ツールなどを使って作図</li>
+        <li>保存（JSON形式）または PDF/SVG/DXF で出力</li>
       </ol>
     </section>
 
@@ -99,12 +96,8 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec5"><h2>5. 作成ツール</h2>
-      <ul>
-        <li>線 / 四角 / 円 / 円弧</li>
-        <li>位置マーカー / テキスト / 寸法</li>
-        <li>ハッチング / 二重線</li>
-      </ul>
+    <section id="sec5"><h2>5. 選択ツール</h2>
+      <p>選択ツールは、オブジェクト選択モードとグループ選択モードがあり、スペースキーで切り替えられます。今オブジェクトを選択しているのか、グループを選択しているのかは意識しておくべきです。</p>
     </section>
 
     <section id="sec6"><h2>6. 編集ツール</h2>
@@ -116,18 +109,18 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec7"><h2>7. レイヤー管理</h2>
-      <ul>
-        <li>レイヤーの追加/削除/名称変更</li>
-        <li>表示/非表示、ロック切替</li>
-      </ul>
+    <section id="sec7"><h2>7. レイヤーとグループ</h2>
+      <p>レイヤーとグループは似たようなグルーピング機能ですが、これらがあることでオブジェクトの管理が容易になり、編集の自由度が上がります。</p>
+      <p>グループは各オブジェクトをまとめる「親」のようなものです。レイヤーをまたいで持つことができ、移動や回転ができます。階層構造を持つこともでき、構造的に依存関係のあるものを表現できます。これによりロボットアームのような多関節構造も作図できます。</p>
+      <p>オブジェクトとグループは、グループパネル内でドラッグアンドドロップすることで自由に移動させることができます。作業中、定期的に整理しておくとよいでしょう。</p>
     </section>
 
-    <section id="sec8"><h2>8. グループ管理</h2>
-      <ul>
-        <li>複数図形のグループ化・解除</li>
-        <li>グループ単位での選択・移動</li>
-      </ul>
+    <section id="sec8"><h2>8. トリムとフィレット</h2>
+      <p>S-CADはトリム機能が強力です。積極的に交差させたラインを描き、トリムで不要な部分を削っていく描き方も有効です。正確な寸法は後から合わせていく方法でも問題ありません。もちろん、初めから寸法を合わせて描いていくことも可能です。</p>
+      <p>フィレットは2つの接触しているオブジェクトの間に角Rを作り出します。</p>
+      <p>不要な部分を自動で消す「トリムする」モードと、「トリムしない」モードがあります。</p>
+      <p>望まない部分を消してしまう場合は、「トリムしない」モードで角Rを作成し、トリムツールで不要な部分を消してください。</p>
+      <p>作成したフィレットは後から半径を変更することができます。</p>
     </section>
 
     <section id="sec9"><h2>9. 設定</h2>
@@ -144,11 +137,10 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec11"><h2>11. トラブルシューティング</h2>
-      <ul>
-        <li>選択できない: レイヤーロックを確認</li>
-        <li>重い: 表示品質を下げる、補助表示をオフ</li>
-      </ul>
+    <section id="sec11"><h2>11. 属性</h2>
+      <p>スナップパネルに「属性を保持」というボタンがあります。</p>
+      <p>これが入っていると、頂点編集でスナップさせた時に頂点に属性を持たせることができ、スナップ先のオブジェクトが移動しても追従できます。</p>
+      <p>属性を持つオブジェクトが選択された時は属性パネルが表示され、属性を削除できます。</p>
     </section>
   </article>
 </main>

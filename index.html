@@ -3841,7 +3841,7 @@ document.addEventListener('mousemove', e=>{
   };
 
   function normalizeLang(v) {
-    return String(v || 'ja').toLowerCase().startsWith('en') ? 'en' : 'ja';
+    return String(v || 'en').toLowerCase().startsWith('ja') ? 'ja' : 'en';
   }
 
   let lang = normalizeLang(localStorage.getItem('scad-lang'));

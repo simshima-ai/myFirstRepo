@@ -202,7 +202,7 @@ function normalizeLineTypePreset(v) {
 }
 
 function getUiLanguage(state) {
-  return String(state?.ui?.language || "ja").toLowerCase().startsWith("en") ? "en" : "ja";
+  return String(state?.ui?.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
 }
 
 function localizeGridAutoTimingLabelText(timing, lang) {
@@ -1913,7 +1913,7 @@ export function initUi(state, dom, actions) {
   }
   if (dom.groupList) {
     const showLayerRestrictionMessage = (reason) => {
-      const lang = String(state.ui?.language || "ja").toLowerCase();
+      const lang = String(state.ui?.language || "en").toLowerCase();
       if (reason === "locked") {
         actions.setStatus?.(lang === "en" ? "Layer is locked." : "LOCKレイヤーです。");
         return;

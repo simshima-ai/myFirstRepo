@@ -505,7 +505,7 @@ function loadAppSettingsAtStartup() {
     }
     if (data.ui && typeof data.ui === "object") {
       if (!state.ui) state.ui = {};
-      state.ui.language = (String(data.ui.language || state.ui.language || "ja").toLowerCase() === "en") ? "en" : "ja";
+      state.ui.language = String(data.ui.language || state.ui.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
       state.ui.menuScalePct = Math.max(50, Math.min(200, Math.round(Number(data.ui.menuScalePct ?? state.ui.menuScalePct ?? 100) / 5) * 5));
       state.ui.touchMode = !!(data.ui.touchMode ?? state.ui.touchMode);
       state.ui.leftMenuVisibility = (data.ui.leftMenuVisibility && typeof data.ui.leftMenuVisibility === "object")
@@ -525,6 +525,11 @@ function loadAppSettingsAtStartup() {
 
 function detectInitialUiLanguage() {
   try {
+    if (typeof localStorage !== "undefined") {
+      const saved = String(localStorage.getItem("scad-lang") || "").toLowerCase();
+      if (saved.startsWith("ja")) return "ja";
+      if (saved.startsWith("en")) return "en";
+    }
     const cands = [];
     if (typeof navigator !== "undefined") {
       if (Array.isArray(navigator.languages)) cands.push(...navigator.languages);
@@ -539,7 +544,7 @@ function detectInitialUiLanguage() {
   } catch (_) {
     // noop
   }
-  return "ja";
+  return "en";
 }
 
 function saveAutoBackup() {
@@ -1630,8 +1635,8 @@ const helpers = {
   setGridAuto: (v) => { setGridAuto(state, v); scheduleSaveAppSettings(); draw(); },
   setGridAutoThresholds: (t50, t10, t5, t1, timing) => { setGridAutoThresholds(state, t50, t10, t5, t1, timing); scheduleSaveAppSettings(); draw(); },
   setLanguage: (lang) => {
-    const v = String(lang || "ja").toLowerCase();
-    state.ui.language = (v === "en") ? "en" : "ja";
+    const v = String(lang || "en").toLowerCase();
+    state.ui.language = v.startsWith("ja") ? "ja" : "en";
     scheduleSaveAppSettings();
     draw();
   },

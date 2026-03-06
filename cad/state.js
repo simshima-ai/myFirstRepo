@@ -385,7 +385,7 @@ export function createState() {
         colorize: false,
       },
       selectPickMode: "object", // "object" | "group"
-      language: "ja",
+      language: "en",
       menuScalePct: 100,
       touchMode: false,
       showFps: false,

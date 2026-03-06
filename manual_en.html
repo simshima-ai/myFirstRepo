@@ -33,32 +33,33 @@ h2{margin:0 0 8px;font-size:20px;color:#16324a}
 ul{margin:8px 0 0 20px}
 ol{margin:8px 0 0 20px}
 code{background:#eef5fb;padding:1px 6px;border-radius:6px}
+#sec2 p,#sec7 p,#sec8 p,#sec11 p{margin-left:1em}
 @media (max-width:900px){main{grid-template-columns:1fr}nav{position:static}}
 </style>
 </head>
 <body>
 <header>
   <div class="top">
-    <a class="brand" href="/index.html">S-CAD / User Manual</a>
+    <a class="brand" href="./index.html">S-CAD / User Manual</a>
     <div class="links">
-      <a href="/cad.html">Open CAD</a>
-      <a href="/index.html">Back to Home</a>
+      <a href="./cad.html">Open CAD</a>
+      <a href="./index.html">Back to Home</a>
     </div>
   </div>
 </header>
 <main>
   <nav>
     <a href="#sec1">1. Overview</a>
-    <a href="#sec2">2. Interface</a>
+    <a href="#sec2">2. Features</a>
     <a href="#sec3">3. Quick Start</a>
     <a href="#sec4">4. Core Operations</a>
-    <a href="#sec5">5. Create Tools</a>
+    <a href="#sec5">5. Selection Tool</a>
     <a href="#sec6">6. Edit Tools</a>
-    <a href="#sec7">7. Layer Management</a>
-    <a href="#sec8">8. Group Management</a>
+    <a href="#sec7">7. Layers and Groups</a>
+    <a href="#sec8">8. Trim and Fillet</a>
     <a href="#sec9">9. Settings</a>
     <a href="#sec10">10. Save / Load / Export</a>
-    <a href="#sec11">11. Troubleshooting</a>
+    <a href="#sec11">11. Attributes</a>
   </nav>
   <article>
     <h1>S-CAD User Manual</h1>
@@ -72,21 +73,17 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec2"><h2>2. Interface</h2>
-      <ul>
-        <li>Center: drawing canvas</li>
-        <li>Left: create/edit tools</li>
-        <li>Right: snap, attributes, and settings panels</li>
-      </ul>
+    <section id="sec2"><h2>2. Features</h2>
+      <p>S-CAD is easy to operate, but understanding the concepts of objects, groups, and layers will make your workflow much smoother.</p>
+      <p>With a few exceptions, you can think of S-CAD geometry as being built from line segments and arcs. For example, a rectangle is a group made of four line-segment objects. Each corner of the rectangle actually has two vertices, but you can handle them as if they were a single vertex. You can also handle them separately when needed.</p>
     </section>
 
     <section id="sec3"><h2>3. Quick Start</h2>
       <ol>
         <li>Create a new drawing</li>
-        <li>Draw geometry with the Line tool</li>
-        <li>Add dimensions</li>
-        <li>Add hatching as needed</li>
-        <li>Save or export as PDF/SVG</li>
+        <li>In Settings, choose unit, scale, and paper size</li>
+        <li>Draw with tools such as Line, Circle, and Rectangle</li>
+        <li>Save (JSON) or export to PDF/SVG/DXF</li>
       </ol>
     </section>
 
@@ -100,12 +97,8 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec5"><h2>5. Create Tools</h2>
-      <ul>
-        <li>Line / Rectangle / Circle / Arc</li>
-        <li>Position marker / Text / Dimension</li>
-        <li>Hatching / Double line</li>
-      </ul>
+    <section id="sec5"><h2>5. Selection Tool</h2>
+      <p>The selection tool has Object Selection mode and Group Selection mode. You can switch between them with the Space key. Always keep in mind whether you are selecting objects or groups.</p>
     </section>
 
     <section id="sec6"><h2>6. Edit Tools</h2>
@@ -117,18 +110,18 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec7"><h2>7. Layer Management</h2>
-      <ul>
-        <li>Add/delete/rename layers</li>
-        <li>Toggle visibility and lock state</li>
-      </ul>
+    <section id="sec7"><h2>7. Layers and Groups</h2>
+      <p>Layers and groups are similar grouping mechanisms, and they make object management easier while increasing editing flexibility.</p>
+      <p>A group acts like a parent that bundles multiple objects. It can span across layers and can be moved or rotated. Groups can also have a hierarchy, allowing you to represent structural dependencies. This makes it possible to model articulated structures such as robot arms.</p>
+      <p>You can freely move objects and groups by dragging and dropping them in the Group panel. It is recommended to organize them periodically while working.</p>
     </section>
 
-    <section id="sec8"><h2>8. Group Management</h2>
-      <ul>
-        <li>Group or ungroup multiple shapes</li>
-        <li>Select and move by group</li>
-      </ul>
+    <section id="sec8"><h2>8. Trim and Fillet</h2>
+      <p>S-CAD has a powerful Trim function. A practical approach is to draw intentionally intersecting lines first, then remove unnecessary parts with Trim. It is fine to adjust exact dimensions afterward. Of course, you can also draw everything to exact dimensions from the beginning.</p>
+      <p>Fillet creates a corner radius (R) between two touching objects.</p>
+      <p>There are two modes: "Trim" mode, which automatically removes unnecessary parts, and "No Trim" mode.</p>
+      <p>If Fillet removes a part you want to keep, create the corner radius in "No Trim" mode, then remove only the unwanted parts using the Trim tool.</p>
+      <p>You can change the radius of a created fillet later.</p>
     </section>
 
     <section id="sec9"><h2>9. Settings</h2>
@@ -145,11 +138,10 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
       </ul>
     </section>
 
-    <section id="sec11"><h2>11. Troubleshooting</h2>
-      <ul>
-        <li>Cannot select objects: check layer lock state.</li>
-        <li>Slow rendering: reduce display quality and disable helper overlays.</li>
-      </ul>
+    <section id="sec11"><h2>11. Attributes</h2>
+      <p>There is a "Keep Attribute" button in the Snap panel.</p>
+      <p>When this is enabled, snapping a vertex in Vertex Edit mode can assign an attribute to that vertex, so it follows even if the snapped target object moves.</p>
+      <p>When an object with attributes is selected, the Attributes panel appears and you can remove attributes there.</p>
     </section>
   </article>
 </main>

@@ -1637,6 +1637,11 @@ const helpers = {
   setLanguage: (lang) => {
     const v = String(lang || "en").toLowerCase();
     state.ui.language = v.startsWith("ja") ? "ja" : "en";
+    try {
+      if (typeof localStorage !== "undefined") localStorage.setItem("scad-lang", state.ui.language);
+    } catch (_) {
+      // noop
+    }
     scheduleSaveAppSettings();
     draw();
   },

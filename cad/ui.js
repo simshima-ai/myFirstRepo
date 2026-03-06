@@ -1809,6 +1809,18 @@ export function initUi(state, dom, actions) {
   if (dom.redoBtn) dom.redoBtn.addEventListener("click", () => actions.redo());
   if (dom.saveJsonBtn) dom.saveJsonBtn.addEventListener("click", () => actions.saveJson());
   if (dom.loadJsonBtn) dom.loadJsonBtn.addEventListener("click", () => actions.loadJson());
+  {
+    const manualBtn = document.getElementById("openManualBtn");
+    if (manualBtn) {
+      manualBtn.addEventListener("click", (e) => {
+        const lang = getUiLanguage(state);
+        const href = (lang === "ja") ? "/manual.html" : "/manual_en.html";
+        manualBtn.setAttribute("href", href);
+        if (e && typeof e.preventDefault === "function") e.preventDefault();
+        window.location.assign(href);
+      });
+    }
+  }
   if (dom.activeLayerSelect) {
     dom.activeLayerSelect.addEventListener("change", () => actions.setActiveLayer(Number(dom.activeLayerSelect.value)));
   }

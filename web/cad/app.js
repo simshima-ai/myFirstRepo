@@ -2,7 +2,8 @@
   createState, addShape, nextShapeId, setSelection, clearSelection, setTool,
   pushHistory, pushHistorySnapshot, snapshotModel, restoreModel, undo as stateUndo, redo as stateRedo, removeShapeById,
   addLayer, setActiveLayer, setLayerVisible, setLayerLocked, isLayerVisible, isLayerLocked,
-  createGroupFromSelection, getGroup, setActiveGroup, moveGroupOrigin, addGroup, addShapesAsGroup
+  createGroupFromSelection, getGroup, setActiveGroup, moveGroupOrigin, addGroup, addShapesAsGroup,
+  DEFAULT_TOOL_SHORTCUTS, TOOL_SHORTCUT_TOOL_ORDER, sanitizeToolShortcuts, normalizeShortcutKey
 } from "./state.js";
 import { render } from "./render.js";
 import { initUi, refreshUi } from "./ui.js";
@@ -23,7 +24,7 @@ import {
   cycleLayerMode, renameActiveLayer, renameActiveGroup, moveSelectionToLayer, setLayerColorize, setGroupColorize, setEditOnlyActiveLayer,
   moveActiveGroupOrder, moveActiveLayerOrder, deleteActiveLayer,
   deleteActiveGroup, unparentActiveGroup, moveActiveGroup,
-  updateSelectedTextSettings, moveSelectedShapes, moveSelectedVertices,
+  updateSelectedTextSettings, updateSelectedImageSettings, moveSelectedShapes, moveSelectedVertices,
   setGroupRotateSnap, setVertexLinkCoincident, setLineInputs, setLineSizeLocked, setLineAnchor, setRectInputs, setRectSizeLocked, setRectAnchor, setCircleRadiusInput,
   setCircleMode, setCircleRadiusLocked,
   setPositionSize, setSelectionCircleCenterMark, setFilletRadius, setFilletLineMode, setVertexMoveInputs,
@@ -122,6 +123,10 @@ const dom = {
   moveGroupBtn: document.getElementById("moveGroupBtn"),
   copyGroupBtn: document.getElementById("copyGroupBtn"),
   moveGroupOriginOnlyBtn: document.getElementById("moveGroupOriginOnlyBtn"),
+  groupAimEnableToggle: document.getElementById("groupAimEnableToggle"),
+  groupAimPickBtn: document.getElementById("groupAimPickBtn"),
+  groupAimClearBtn: document.getElementById("groupAimClearBtn"),
+  groupAimStatus: document.getElementById("groupAimStatus"),
   selectMoveDxInput: document.getElementById("selectMoveDxInput"),
   selectMoveDyInput: document.getElementById("selectMoveDyInput"),
   moveSelectedShapesBtn: document.getElementById("moveSelectedShapesBtn"),
@@ -155,6 +160,10 @@ const dom = {
   selectionLineTypeInput: document.getElementById("selectionLineTypeInput"),
   selectionColorInput: document.getElementById("selectionColorInput"),
   selectionPositionSizeInput: document.getElementById("selectionPositionSizeInput"),
+  selectionImageWidthInput: document.getElementById("selectionImageWidthInput"),
+  selectionImageHeightInput: document.getElementById("selectionImageHeightInput"),
+  selectionImageLockAspectToggle: document.getElementById("selectionImageLockAspectToggle"),
+  selectionImageLockTransformToggle: document.getElementById("selectionImageLockTransformToggle"),
   selectionCircleRadiusInput: document.getElementById("selectionCircleRadiusInput"),
   selectionApplyCircleRadiusBtn: document.getElementById("selectionApplyCircleRadiusBtn"),
   selectionCircleCenterMarkToggle: document.getElementById("selectionCircleCenterMarkToggle"),
@@ -165,10 +174,11 @@ const dom = {
   lineLengthInput: document.getElementById("lineLengthInput"),
   lineAngleInput: document.getElementById("lineAngleInput"),
   lineAnchorSelect: document.getElementById("lineAnchorSelect"),
-  lineContinuousToggle: document.getElementById("lineContinuousToggle"),
+  lineModeSelect: document.getElementById("lineModeSelect"),
   lineToolLineWidthInput: document.getElementById("lineToolLineWidthInput"),
   lineToolLineTypeInput: document.getElementById("lineToolLineTypeInput"),
   applyLineInputBtn: document.getElementById("applyLineInputBtn"),
+  lineTouchFinalizeBtn: document.getElementById("lineTouchFinalizeBtn"),
   rectWidthInput: document.getElementById("rectWidthInput"),
   rectHeightInput: document.getElementById("rectHeightInput"),
   rectAnchorSelect: document.getElementById("rectAnchorSelect"),
@@ -224,6 +234,8 @@ const dom = {
   dimToolLineWidthInput: document.getElementById("dimToolLineWidthInput"),
   dimToolLineTypeInput: document.getElementById("dimToolLineTypeInput"),
   dimChainPopBtn: document.getElementById("dimChainPopBtn"),
+  dimChainPrepareBtn: document.getElementById("dimChainPrepareBtn"),
+  dimChainFinalizeBtn: document.getElementById("dimChainFinalizeBtn"),
   applyDimSettingsBtn: document.getElementById("applyDimSettingsBtn"),
   previewPrecisionSelect: document.getElementById("previewPrecisionSelect"),
   pageSizeSelect: document.getElementById("pageSizeSelect"),
@@ -232,7 +244,12 @@ const dom = {
   maxZoomInput: document.getElementById("maxZoomInput"),
   uiLanguageSelect: document.getElementById("uiLanguageSelect"),
   menuScaleSelect: document.getElementById("menuScaleSelect"),
+  touchModeToggle: document.getElementById("touchModeToggle"),
   leftMenuVisibilityList: document.getElementById("leftMenuVisibilityList"),
+  shortcutSettingsLabel: document.getElementById("shortcutSettingsLabel"),
+  shortcutSettingsHint: document.getElementById("shortcutSettingsHint"),
+  toolShortcutList: document.getElementById("toolShortcutList"),
+  resetToolShortcutsBtn: document.getElementById("resetToolShortcutsBtn"),
   fpsDisplayToggle: document.getElementById("fpsDisplayToggle"),
   objectCountDisplayToggle: document.getElementById("objectCountDisplayToggle"),
   autoBackupToggle: document.getElementById("autoBackupToggle"),
@@ -265,6 +282,8 @@ const dom = {
   objectCountBadge: document.getElementById("objectCountBadge"),
   autoBackupBadge: document.getElementById("autoBackupBadge"),
   statusText: document.getElementById("statusText"),
+  touchConfirmOverlay: document.getElementById("touchConfirmOverlay"),
+  touchConfirmBtn: document.getElementById("touchConfirmBtn"),
   gridScaleIndicator: document.getElementById("gridScaleIndicator"),
   gridScaleBar: document.getElementById("gridScaleBar"),
   gridScaleText: document.getElementById("gridScaleText"),
@@ -283,6 +302,7 @@ const MM_PER_UNIT = { mm: 1, cm: 10, m: 1000, inch: 25.4, in: 25.4, ft: 304.8 };
 
 const WORLD_NUMERIC_KEYS = new Set([
   "x", "y", "x1", "y1", "x2", "y2",
+  "width", "height",
   "cx", "cy", "r",
   "px", "py",
   "tx", "ty",
@@ -425,6 +445,7 @@ function buildSettingsSnapshot() {
     ui: {
       language: String(state.ui?.language || "ja"),
       menuScalePct: Number(state.ui?.menuScalePct ?? 100),
+      touchMode: !!state.ui?.touchMode,
       leftMenuVisibility: (state.ui?.leftMenuVisibility && typeof state.ui.leftMenuVisibility === "object")
         ? { ...state.ui.leftMenuVisibility }
         : {},
@@ -432,6 +453,7 @@ function buildSettingsSnapshot() {
       showObjectCount: !!state.ui?.showObjectCount,
       autoBackupEnabled: state.ui?.autoBackupEnabled !== false,
       autoBackupIntervalSec: Number(state.ui?.autoBackupIntervalSec ?? 60),
+      toolShortcuts: sanitizeToolShortcuts(state.ui?.toolShortcuts),
     },
   };
 }
@@ -483,6 +505,7 @@ function loadAppSettingsAtStartup() {
       if (!state.ui) state.ui = {};
       state.ui.language = (String(data.ui.language || state.ui.language || "ja").toLowerCase() === "en") ? "en" : "ja";
       state.ui.menuScalePct = Math.max(50, Math.min(200, Math.round(Number(data.ui.menuScalePct ?? state.ui.menuScalePct ?? 100) / 5) * 5));
+      state.ui.touchMode = !!(data.ui.touchMode ?? state.ui.touchMode);
       state.ui.leftMenuVisibility = (data.ui.leftMenuVisibility && typeof data.ui.leftMenuVisibility === "object")
         ? { ...data.ui.leftMenuVisibility }
         : (state.ui.leftMenuVisibility || {});
@@ -490,6 +513,7 @@ function loadAppSettingsAtStartup() {
       state.ui.showObjectCount = !!data.ui.showObjectCount;
       state.ui.autoBackupEnabled = data.ui.autoBackupEnabled !== false;
       state.ui.autoBackupIntervalSec = Math.max(60, Math.min(600, Math.round(Number(data.ui.autoBackupIntervalSec ?? state.ui.autoBackupIntervalSec ?? 60) || 60)));
+      state.ui.toolShortcuts = sanitizeToolShortcuts(data.ui.toolShortcuts ?? state.ui.toolShortcuts);
     }
     return true;
   } catch (_) {
@@ -591,6 +615,326 @@ function restoreAutoBackupAtStartup() {
   }
 }
 
+function isImageLikeFile(file) {
+  if (!file) return false;
+  const type = String(file.type || "").toLowerCase();
+  if (type.startsWith("image/")) return true;
+  const name = String(file.name || "").toLowerCase();
+  return /\.(png|jpe?g|webp|gif|bmp|svg)$/i.test(name);
+}
+
+function readFileAsDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ""));
+    fr.onerror = () => reject(fr.error || new Error("Failed to read file"));
+    fr.readAsDataURL(file);
+  });
+}
+
+function loadImageMeta(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const w = Number(img.naturalWidth || img.width || 0);
+      const h = Number(img.naturalHeight || img.height || 0);
+      if (!(w > 0 && h > 0)) {
+        reject(new Error("Invalid image size"));
+        return;
+      }
+      resolve({ width: w, height: h });
+    };
+    img.onerror = () => reject(new Error("Image decode failed"));
+    img.src = dataUrl;
+  });
+}
+
+async function importImageFile(file) {
+  if (!file) return false;
+  const dataUrl = await readFileAsDataUrl(file);
+  const meta = await loadImageMeta(dataUrl);
+  const frame = getPageFrameWorldSize(state.pageSetup);
+  const maxW = Math.max(10, Number(frame.cadW) * 0.5);
+  const maxH = Math.max(10, Number(frame.cadH) * 0.5);
+  const fitScale = Math.min(1, maxW / Math.max(1, meta.width), maxH / Math.max(1, meta.height));
+  const w = Math.max(1, meta.width * fitScale);
+  const h = Math.max(1, meta.height * fitScale);
+  const viewW = Math.max(1, Number(state.view?.viewportWidth || 1));
+  const viewH = Math.max(1, Number(state.view?.viewportHeight || 1));
+  const centerWorldX = (viewW * 0.5 - Number(state.view.offsetX || 0)) / Math.max(1e-9, Number(state.view.scale || 1));
+  const centerWorldY = (viewH * 0.5 - Number(state.view.offsetY || 0)) / Math.max(1e-9, Number(state.view.scale || 1));
+  const shape = {
+    id: nextShapeId(state),
+    type: "image",
+    x: centerWorldX - w * 0.5,
+    y: centerWorldY - h * 0.5,
+    width: w,
+    height: h,
+    rotationDeg: 0,
+    lockAspect: true,
+    lockTransform: false,
+    naturalWidth: meta.width,
+    naturalHeight: meta.height,
+    imageName: String(file.name || "image"),
+    src: dataUrl,
+    layerId: state.activeLayerId,
+  };
+  pushHistory(state);
+  addShape(state, shape);
+  setSelection(state, [shape.id]);
+  state.activeGroupId = null;
+  setStatus(`画像を読み込みました: ${shape.imageName}`);
+  draw();
+  return true;
+}
+
+function normalizeAimConstraint(raw) {
+  const targetTypeRaw = String(raw?.targetType || "").toLowerCase();
+  const targetType = (targetTypeRaw === "group" || targetTypeRaw === "position") ? targetTypeRaw : null;
+  const targetIdNum = Number(raw?.targetId);
+  return {
+    enabled: !!raw?.enabled,
+    targetType,
+    targetId: Number.isFinite(targetIdNum) ? targetIdNum : null,
+  };
+}
+
+function normalizeRadLocal(a) {
+  let x = Number(a) || 0;
+  while (x < 0) x += Math.PI * 2;
+  while (x >= Math.PI * 2) x -= Math.PI * 2;
+  return x;
+}
+
+function normalizeDeltaDeg(delta) {
+  let d = Number(delta) || 0;
+  while (d > 180) d -= 360;
+  while (d < -180) d += 360;
+  return d;
+}
+
+function rotatePointAroundDeg(x, y, ox, oy, deltaDeg) {
+  const r = (Number(deltaDeg) || 0) * Math.PI / 180;
+  const c = Math.cos(r);
+  const s = Math.sin(r);
+  const dx = (Number(x) || 0) - (Number(ox) || 0);
+  const dy = (Number(y) || 0) - (Number(oy) || 0);
+  return {
+    x: (Number(ox) || 0) + dx * c - dy * s,
+    y: (Number(oy) || 0) + dx * s + dy * c,
+  };
+}
+
+function rotateShapeAroundForAim(shape, ox, oy, deltaDeg) {
+  if (!shape) return;
+  const d = (Number(deltaDeg) || 0) * Math.PI / 180;
+  if (shape.type === "line" || shape.type === "rect") {
+    const p1 = rotatePointAroundDeg(shape.x1, shape.y1, ox, oy, deltaDeg);
+    const p2 = rotatePointAroundDeg(shape.x2, shape.y2, ox, oy, deltaDeg);
+    shape.x1 = p1.x; shape.y1 = p1.y; shape.x2 = p2.x; shape.y2 = p2.y;
+    return;
+  }
+  if (shape.type === "circle") {
+    const c = rotatePointAroundDeg(shape.cx, shape.cy, ox, oy, deltaDeg);
+    shape.cx = c.x; shape.cy = c.y;
+    return;
+  }
+  if (shape.type === "arc") {
+    const c = rotatePointAroundDeg(shape.cx, shape.cy, ox, oy, deltaDeg);
+    shape.cx = c.x; shape.cy = c.y;
+    shape.a1 = normalizeRadLocal((Number(shape.a1) || 0) + d);
+    shape.a2 = normalizeRadLocal((Number(shape.a2) || 0) + d);
+    return;
+  }
+  if (shape.type === "position") {
+    const p = rotatePointAroundDeg(shape.x, shape.y, ox, oy, deltaDeg);
+    shape.x = p.x; shape.y = p.y;
+    return;
+  }
+  if (shape.type === "dim") {
+    const p1 = rotatePointAroundDeg(shape.x1, shape.y1, ox, oy, deltaDeg);
+    const p2 = rotatePointAroundDeg(shape.x2, shape.y2, ox, oy, deltaDeg);
+    const pp = rotatePointAroundDeg(shape.px, shape.py, ox, oy, deltaDeg);
+    shape.x1 = p1.x; shape.y1 = p1.y;
+    shape.x2 = p2.x; shape.y2 = p2.y;
+    shape.px = pp.x; shape.py = pp.y;
+    if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
+      const tp = rotatePointAroundDeg(shape.tx, shape.ty, ox, oy, deltaDeg);
+      shape.tx = tp.x; shape.ty = tp.y;
+    }
+    return;
+  }
+  if (shape.type === "dimchain") {
+    if (Array.isArray(shape.points)) {
+      shape.points = shape.points.map((pt) => rotatePointAroundDeg(Number(pt?.x), Number(pt?.y), ox, oy, deltaDeg));
+    }
+    if (Number.isFinite(Number(shape.px)) && Number.isFinite(Number(shape.py))) {
+      const pp = rotatePointAroundDeg(shape.px, shape.py, ox, oy, deltaDeg);
+      shape.px = pp.x; shape.py = pp.y;
+    }
+    if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
+      const tp = rotatePointAroundDeg(shape.tx, shape.ty, ox, oy, deltaDeg);
+      shape.tx = tp.x; shape.ty = tp.y;
+    }
+    return;
+  }
+  if (shape.type === "circleDim") {
+    if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
+      const tp = rotatePointAroundDeg(shape.tx, shape.ty, ox, oy, deltaDeg);
+      shape.tx = tp.x; shape.ty = tp.y;
+    }
+    return;
+  }
+  if (shape.type === "dimangle") {
+    if (Number.isFinite(Number(shape.cx)) && Number.isFinite(Number(shape.cy))) {
+      const cp = rotatePointAroundDeg(shape.cx, shape.cy, ox, oy, deltaDeg);
+      shape.cx = cp.x; shape.cy = cp.y;
+    }
+    shape.a1 = normalizeRadLocal((Number(shape.a1) || 0) + d);
+    shape.a2 = normalizeRadLocal((Number(shape.a2) || 0) + d);
+    if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
+      const tp = rotatePointAroundDeg(shape.tx, shape.ty, ox, oy, deltaDeg);
+      shape.tx = tp.x; shape.ty = tp.y;
+    }
+    return;
+  }
+  if (shape.type === "text") {
+    const p = rotatePointAroundDeg(shape.x1, shape.y1, ox, oy, deltaDeg);
+    shape.x1 = p.x; shape.y1 = p.y;
+    shape.textRotate = (Number(shape.textRotate) || 0) + Number(deltaDeg || 0);
+    return;
+  }
+  if (shape.type === "image") {
+    const p = rotatePointAroundDeg(shape.x, shape.y, ox, oy, deltaDeg);
+    shape.x = p.x; shape.y = p.y;
+    shape.rotationDeg = (Number(shape.rotationDeg) || 0) + Number(deltaDeg || 0);
+    return;
+  }
+  if (shape.type === "bspline") {
+    if (Array.isArray(shape.controlPoints)) {
+      shape.controlPoints = shape.controlPoints.map((cp) => rotatePointAroundDeg(Number(cp?.x), Number(cp?.y), ox, oy, deltaDeg));
+    }
+  }
+}
+
+function resolveAimCandidateFromSelection(ownerGroupId) {
+  const owner = Number(ownerGroupId);
+  if (!Number.isFinite(owner)) return { type: null, id: null };
+  const selectedGroupIds = Array.isArray(state.selection?.groupIds)
+    ? state.selection.groupIds.map(Number).filter(Number.isFinite)
+    : [];
+  for (let i = selectedGroupIds.length - 1; i >= 0; i--) {
+    const gid = Number(selectedGroupIds[i]);
+    if (gid !== owner) return { type: "group", id: gid };
+  }
+  const selectedShapeIds = Array.isArray(state.selection?.ids)
+    ? state.selection.ids.map(Number).filter(Number.isFinite)
+    : [];
+  const shapeById = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+  const shapeToGroup = new Map();
+  for (const g of (state.groups || [])) {
+    const gid = Number(g?.id);
+    if (!Number.isFinite(gid)) continue;
+    for (const sid of (g?.shapeIds || [])) {
+      const sidNum = Number(sid);
+      if (!Number.isFinite(sidNum)) continue;
+      shapeToGroup.set(sidNum, gid);
+    }
+  }
+  for (let i = selectedShapeIds.length - 1; i >= 0; i--) {
+    const sid = Number(selectedShapeIds[i]);
+    const sh = shapeById.get(sid);
+    if (!sh) continue;
+    if (String(sh.type || "") === "position") return { type: "position", id: sid };
+    const gidFromMap = Number(shapeToGroup.get(sid));
+    const gid = Number.isFinite(gidFromMap) ? gidFromMap : Number(sh.groupId);
+    if (Number.isFinite(gid) && gid !== owner) return { type: "group", id: gid };
+  }
+  return { type: null, id: null };
+}
+
+function syncAimCandidateFromSelection() {
+  const pick = state.input?.groupAimPick;
+  if (!pick?.active) return;
+  const ownerGroupId = Number(pick.groupId);
+  if (!Number.isFinite(ownerGroupId)) return;
+  const ownerGroup = getGroup(state, ownerGroupId);
+  if (!ownerGroup) {
+    pick.active = false;
+    pick.groupId = null;
+    pick.candidateType = null;
+    pick.candidateId = null;
+    return;
+  }
+  const cand = resolveAimCandidateFromSelection(ownerGroupId);
+  pick.candidateType = cand.type;
+  pick.candidateId = Number.isFinite(Number(cand.id)) ? Number(cand.id) : null;
+}
+
+function resolveGroupAimConstraints() {
+  const groups = Array.isArray(state.groups) ? state.groups : [];
+  if (!groups.length) return;
+  const byId = new Map(groups.map((g) => [Number(g.id), g]));
+  const shapeById = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+  for (const g of groups) {
+    if (!g) continue;
+    const aim = normalizeAimConstraint(g.aimConstraint);
+    g.aimConstraint = aim;
+    if (!aim.enabled || !aim.targetType || !Number.isFinite(aim.targetId)) continue;
+    let tx = NaN;
+    let ty = NaN;
+    if (aim.targetType === "group") {
+      const targetGroup = byId.get(Number(aim.targetId));
+      if (!targetGroup || Number(targetGroup.id) === Number(g.id)) continue;
+      tx = Number(targetGroup.originX);
+      ty = Number(targetGroup.originY);
+    } else if (aim.targetType === "position") {
+      const targetShape = shapeById.get(Number(aim.targetId));
+      if (!targetShape || String(targetShape.type || "") !== "position") continue;
+      tx = Number(targetShape.x);
+      ty = Number(targetShape.y);
+    }
+    const ox = Number(g.originX);
+    const oy = Number(g.originY);
+    if (![ox, oy, tx, ty].every(Number.isFinite)) continue;
+    const dx = tx - ox;
+    const dy = ty - oy;
+    if (Math.hypot(dx, dy) < 1e-9) continue;
+    const targetDeg = Math.atan2(dy, dx) * 180 / Math.PI;
+    const currentDeg = Number(g.rotationDeg) || 0;
+    const delta = normalizeDeltaDeg(targetDeg - currentDeg);
+    if (Math.abs(delta) < 1e-7) {
+      g.rotationDeg = targetDeg;
+      continue;
+    }
+    const rotatingByHandle = !!(state.input?.groupRotate?.active)
+      && Number(state.input?.groupRotate?.groupId) === Number(g.id);
+    if (rotatingByHandle) continue;
+    const subGroupIds = collectDescendantGroupIds(state, Number(g.id)).map(Number).filter(Number.isFinite);
+    if (!subGroupIds.length) continue;
+    const subSet = new Set(subGroupIds);
+    for (const gg of groups) {
+      const gid = Number(gg?.id);
+      if (!subSet.has(gid)) continue;
+      if (gid !== Number(g.id)) {
+        const rp = rotatePointAroundDeg(Number(gg.originX), Number(gg.originY), ox, oy, delta);
+        gg.originX = rp.x;
+        gg.originY = rp.y;
+      }
+      gg.rotationDeg = (Number(gg.rotationDeg) || 0) + delta;
+    }
+    g.rotationDeg = targetDeg;
+    for (const gg of groups) {
+      if (!subSet.has(Number(gg?.id))) continue;
+      for (const sidRaw of (gg?.shapeIds || [])) {
+        const sh = shapeById.get(Number(sidRaw));
+        if (!sh) continue;
+        rotateShapeAroundForAim(sh, ox, oy, delta);
+      }
+    }
+  }
+}
+
 function drawNow(opts = null) {
   const skipUi = !!(opts && opts.skipUi);
   const perfNow = (typeof performance !== "undefined" && typeof performance.now === "function")
@@ -609,7 +953,15 @@ function drawNow(opts = null) {
   } else if (needResolveTangent) {
     resolveVertexTangentAttribs(state);
   }
+  if (state.input?.groupAimPick?.active) {
+    const ownerGroupId = Number(state.input.groupAimPick.groupId);
+    if (Number.isFinite(ownerGroupId) && getGroup(state, ownerGroupId)) {
+      state.activeGroupId = ownerGroupId;
+    }
+    syncAimCandidateFromSelection();
+  }
   if (state.ui) state.ui._needsTangentResolve = false;
+  resolveGroupAimConstraints();
   render(ctx, dom.canvas, state);
   if (!state.ui) state.ui = {};
   const now = perfNow();
@@ -925,6 +1277,10 @@ function duplicateGroupsByRootIds(rootGroupIds, dx, dy) {
     const newShapeIds = (Array.isArray(oldG.shapeIds) ? oldG.shapeIds : [])
       .map(id => shapeIdMap.get(Number(id)))
       .filter(id => Number.isFinite(Number(id)));
+    const mappedAim = normalizeAimConstraint(oldG.aimConstraint);
+    if (mappedAim.targetType === "group" && Number.isFinite(mappedAim.targetId) && groupIdMap.has(Number(mappedAim.targetId))) {
+      mappedAim.targetId = Number(groupIdMap.get(Number(mappedAim.targetId)));
+    }
     newGroups.push({
       ...JSON.parse(JSON.stringify(oldG)),
       id: mappedId,
@@ -933,6 +1289,7 @@ function duplicateGroupsByRootIds(rootGroupIds, dx, dy) {
       shapeIds: newShapeIds,
       originX: Number(oldG.originX || 0) + Number(dx || 0),
       originY: Number(oldG.originY || 0) + Number(dy || 0),
+      aimConstraint: mappedAim,
     });
   }
   if (newGroups.length) state.groups = [...newGroups, ...state.groups];
@@ -1150,6 +1507,19 @@ const helpers = {
     if (deleteGroupIds.size > 0) {
       state.groups = (state.groups || []).filter(g => !deleteGroupIds.has(Number(g.id)));
     }
+    const alivePositionIds = new Set((state.shapes || [])
+      .filter((s) => String(s?.type || "") === "position")
+      .map((s) => Number(s.id))
+      .filter(Number.isFinite));
+    const aliveGroupIds = new Set((state.groups || []).map((g) => Number(g.id)).filter(Number.isFinite));
+    for (const g of (state.groups || [])) {
+      const aim = normalizeAimConstraint(g.aimConstraint);
+      const invalidGroupTarget = aim.targetType === "group" && !aliveGroupIds.has(Number(aim.targetId));
+      const invalidPositionTarget = aim.targetType === "position" && !alivePositionIds.has(Number(aim.targetId));
+      if (invalidGroupTarget || invalidPositionTarget) {
+        g.aimConstraint = { enabled: false, targetType: null, targetId: null };
+      }
+    }
     state.selection.ids = [];
     state.selection.groupIds = [];
     state.activeGroupId = null;
@@ -1198,8 +1568,20 @@ const helpers = {
     state.selection.groupIds = [];
     state.selection.box.active = false;
     state.selection.drag.active = false;
+    state.selection.drag.moved = false;
+    state.selection.drag.startWorldRaw = null;
     state.selection.drag.shapeSnapshots = null;
     state.selection.drag.modelSnapshotBeforeMove = null;
+    state.selection.drag.mode = null;
+    state.selection.drag.resizeShapeId = null;
+    state.selection.drag.resizeCorner = null;
+    state.selection.drag.resizeAnchor = null;
+    if (state.input?.groupAimPick) {
+      state.input.groupAimPick.active = false;
+      state.input.groupAimPick.groupId = null;
+      state.input.groupAimPick.candidateType = null;
+      state.input.groupAimPick.candidateId = null;
+    }
     state.vertexEdit.selectedVertices = [];
     state.vertexEdit.activeVertex = null;
     state.vertexEdit.filterShapeId = null;
@@ -1218,7 +1600,7 @@ const helpers = {
   },
   importJson: () => {
     if (!state.ui) state.ui = {};
-    state.ui.jsonFileMode = "append";
+    state.ui.jsonFileMode = "import";
     loadJsonFromFileDialog(state, dom);
   },
   saveJson: () => saveJsonToFile(state, helpers),
@@ -1290,6 +1672,46 @@ const helpers = {
   },
   selectGroup: (id) => { selectGroupById(state, id); draw(); },
   toggleGroupSelection: (id) => { toggleGroupSelectionById(state, id); draw(); },
+  setGroupVisible: (groupId, on) => {
+    const gid = Number(groupId);
+    if (!Number.isFinite(gid)) return;
+    const g = getGroup(state, gid);
+    if (!g) return;
+    const nextVisible = !!on;
+    if ((g.visible !== false) === nextVisible) return;
+    pushHistory(state);
+    g.visible = nextVisible;
+    if (!nextVisible) {
+      const hiddenGroupIds = new Set(collectDescendantGroupIds(state, gid).map(Number));
+      const shapeGroupMap = new Map();
+      for (const gg of (state.groups || [])) {
+        const ggid = Number(gg?.id);
+        if (!Number.isFinite(ggid)) continue;
+        for (const sid of (gg?.shapeIds || [])) {
+          const sidNum = Number(sid);
+          if (!Number.isFinite(sidNum)) continue;
+          shapeGroupMap.set(sidNum, ggid);
+        }
+      }
+      state.selection.groupIds = (state.selection?.groupIds || [])
+        .map(Number)
+        .filter((id) => Number.isFinite(id) && !hiddenGroupIds.has(id));
+      state.selection.ids = (state.selection?.ids || [])
+        .map(Number)
+        .filter((sid) => {
+          if (!Number.isFinite(sid)) return false;
+          const sh = (state.shapes || []).find((s) => Number(s.id) === sid);
+          if (!sh) return false;
+          const sgidFromMap = shapeGroupMap.has(sid) ? Number(shapeGroupMap.get(sid)) : NaN;
+          const sgid = Number.isFinite(sgidFromMap) ? sgidFromMap : Number(sh.groupId);
+          return !(Number.isFinite(sgid) && hiddenGroupIds.has(sgid));
+        });
+      if (hiddenGroupIds.has(Number(state.activeGroupId))) {
+        state.activeGroupId = null;
+      }
+    }
+    draw();
+  },
   selectShapeById: (id) => { setSelection(state, [id]); draw(); },
   toggleShapeSelectionById: (id) => {
     const sid = Number(id);
@@ -1324,6 +1746,93 @@ const helpers = {
       state.selection.groupIds = result.newRootGroupIds.slice();
       state.activeGroupId = Number(result.newRootGroupIds[result.newRootGroupIds.length - 1]);
     }
+    draw();
+  },
+  setActiveGroupAimEnabled: (on) => {
+    const gid = Number(state.activeGroupId);
+    if (!Number.isFinite(gid)) return;
+    const g = getGroup(state, gid);
+    if (!g) return;
+    const nextEnabled = !!on;
+    const prevAim = normalizeAimConstraint(g.aimConstraint);
+    if (prevAim.enabled === nextEnabled) return;
+    pushHistory(state);
+    g.aimConstraint = { ...prevAim, enabled: nextEnabled };
+    if (!nextEnabled && state.input?.groupAimPick?.active && Number(state.input.groupAimPick.groupId) === gid) {
+      state.input.groupAimPick.active = false;
+      state.input.groupAimPick.groupId = null;
+      state.input.groupAimPick.candidateType = null;
+      state.input.groupAimPick.candidateId = null;
+    }
+    setStatus(nextEnabled ? "Aim Constraint: ON" : "Aim Constraint: OFF");
+    draw();
+  },
+  beginPickActiveGroupAimTarget: () => {
+    const gid = Number(state.activeGroupId);
+    if (!Number.isFinite(gid)) return;
+    if (!state.input.groupAimPick) state.input.groupAimPick = { active: false, groupId: null, candidateType: null, candidateId: null };
+    state.input.groupAimPick.active = true;
+    state.input.groupAimPick.groupId = gid;
+    state.input.groupAimPick.candidateType = null;
+    state.input.groupAimPick.candidateId = null;
+    if (state.input.groupOriginPick) {
+      state.input.groupOriginPick.active = false;
+      state.input.groupOriginPick.dragging = false;
+    }
+    setStatus("Aim target: 位置マーカー or オブジェクトをクリック");
+    draw();
+  },
+  confirmActiveGroupAimTarget: () => {
+    const gid = Number(state.input?.groupAimPick?.active ? state.input?.groupAimPick?.groupId : state.activeGroupId);
+    if (!Number.isFinite(gid)) return;
+    const g = getGroup(state, gid);
+    if (!g) return;
+    const pick = state.input?.groupAimPick;
+    if (!pick?.active || Number(pick.groupId) !== gid) return;
+    const candidateType = String(pick.candidateType || "");
+    const candidateId = Number(pick.candidateId);
+    if (!(candidateType === "group" || candidateType === "position") || !Number.isFinite(candidateId)) {
+      setStatus("Aim target: 先に候補をクリックしてください");
+      draw();
+      return;
+    }
+    pushHistory(state);
+    g.aimConstraint = { enabled: true, targetType: candidateType, targetId: candidateId };
+    pick.active = false;
+    pick.groupId = null;
+    pick.candidateType = null;
+    pick.candidateId = null;
+    setStatus(candidateType === "position"
+      ? `Aim target set: Position #${candidateId}`
+      : `Aim target set: Group #${candidateId}`);
+    draw();
+  },
+  pickOrConfirmActiveGroupAimTarget: () => {
+    const gid = Number(state.input?.groupAimPick?.active ? state.input?.groupAimPick?.groupId : state.activeGroupId);
+    if (!Number.isFinite(gid)) return;
+    const pick = state.input?.groupAimPick;
+    if (pick?.active && Number(pick.groupId) === gid) {
+      helpers.confirmActiveGroupAimTarget();
+      return;
+    }
+    helpers.beginPickActiveGroupAimTarget();
+  },
+  clearActiveGroupAimTarget: () => {
+    const gid = Number(state.activeGroupId);
+    if (!Number.isFinite(gid)) return;
+    const g = getGroup(state, gid);
+    if (!g) return;
+    const prevAim = normalizeAimConstraint(g.aimConstraint);
+    if (!prevAim.enabled && !prevAim.targetType && !Number.isFinite(prevAim.targetId)) return;
+    pushHistory(state);
+    g.aimConstraint = { enabled: false, targetType: null, targetId: null };
+    if (state.input?.groupAimPick?.active && Number(state.input.groupAimPick.groupId) === gid) {
+      state.input.groupAimPick.active = false;
+      state.input.groupAimPick.groupId = null;
+      state.input.groupAimPick.candidateType = null;
+      state.input.groupAimPick.candidateId = null;
+    }
+    setStatus("Aim target cleared");
     draw();
   },
   setActiveGroupParent: (pid) => {
@@ -1376,6 +1885,7 @@ const helpers = {
   mergeSelectedShapesToGroup: () => mergeSelectedShapesToGroup(state, helpers),
 
   updateSelectedTextSettings: (s) => updateSelectedTextSettings(state, helpers, s),
+  updateSelectedImageSettings: (s) => updateSelectedImageSettings(state, helpers, s),
   moveSelectedShapes: (dx, dy) => moveSelectedShapes(state, helpers, dx, dy),
   copySelectedShapes: (dx, dy) => {
     pushHistory(state);
@@ -1592,6 +2102,28 @@ const helpers = {
     scheduleSaveAppSettings();
     draw();
   },
+  setTouchMode: (on) => {
+    if (!state.ui) state.ui = {};
+    state.ui.touchMode = !!on;
+    scheduleSaveAppSettings();
+    draw();
+  },
+  setToolShortcut: (tool, key) => {
+    const t = String(tool || "").toLowerCase();
+    if (!TOOL_SHORTCUT_TOOL_ORDER.includes(t)) return;
+    if (!state.ui) state.ui = {};
+    const next = sanitizeToolShortcuts(state.ui.toolShortcuts);
+    next[t] = normalizeShortcutKey(key);
+    state.ui.toolShortcuts = next;
+    scheduleSaveAppSettings();
+    draw();
+  },
+  resetToolShortcuts: () => {
+    if (!state.ui) state.ui = {};
+    state.ui.toolShortcuts = sanitizeToolShortcuts(DEFAULT_TOOL_SHORTCUTS);
+    scheduleSaveAppSettings();
+    draw();
+  },
   setPatternCopyMode: (mode) => {
     setPatternCopyMode(state, mode);
     draw();
@@ -1788,6 +2320,7 @@ state.ui._needsTangentResolve = true;
 draw();
 
 if (typeof state.ui.autoBackupEnabled !== "boolean") state.ui.autoBackupEnabled = true;
+state.ui.toolShortcuts = sanitizeToolShortcuts(state.ui.toolShortcuts);
 if (!Number.isFinite(Number(state.ui.autoBackupIntervalSec))) {
   state.ui.autoBackupIntervalSec = Math.round(AUTO_BACKUP_INTERVAL_MS / 1000);
 }
@@ -1807,11 +2340,20 @@ if (dom.jsonFileInput) {
     const file = dom.jsonFileInput.files && dom.jsonFileInput.files[0];
     if (!file) return;
     try {
-      const text = await file.text();
-      const data = JSON.parse(text);
       const mode = String(state.ui?.jsonFileMode || "replace");
-      if (mode === "append") importJsonObjectAppend(state, data, helpers);
-      else importJsonObject(state, data, helpers);
+      if (isImageLikeFile(file)) {
+        if (mode !== "import" && mode !== "append") {
+          setStatus("画像の読み込みはインポートを使ってください");
+          draw();
+        } else {
+          await importImageFile(file);
+        }
+      } else {
+        const text = await file.text();
+        const data = JSON.parse(text);
+        if (mode === "append" || mode === "import") importJsonObjectAppend(state, data, helpers);
+        else importJsonObject(state, data, helpers);
+      }
       if (!state.ui) state.ui = {};
       state.ui._needsTangentResolve = true;
     } catch (err) {
@@ -1826,3 +2368,5 @@ if (dom.jsonFileInput) {
 
 // Handle exports for manual access if needed
 window.cadApp = { state, dom, helpers, exportJsonObject, importJsonObject };
+
+

@@ -5,6 +5,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
   <title>S-CAD App</title>
   <style>
     :root {
@@ -63,6 +64,35 @@
       pointer-events: auto;
     }
 
+    .cad-home-link {
+      display: block;
+      text-decoration: none;
+    }
+
+    .cad-home-logo {
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 8px 10px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: var(--shadow-soft);
+      font-family: 'Orbitron', sans-serif;
+      font-size: 15px;
+      font-weight: 900;
+      letter-spacing: 0.04em;
+      color: #0f172a;
+      text-align: center;
+      transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .cad-home-logo .logo-s {
+      color: #0082b4;
+    }
+
+    .cad-home-link:hover .cad-home-logo {
+      background: #f0f9ff;
+      border-color: #9fd8f0;
+    }
+
     .section {
       border: 1px solid var(--line);
       border-radius: 10px;
@@ -108,6 +138,23 @@
 
     button:hover {
       background: #f8fafc;
+    }
+
+    .menu-link-btn {
+      display: block;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      padding: 7px 10px;
+      text-decoration: none;
+      text-align: center;
+      transition: background-color 120ms ease, border-color 120ms ease;
+    }
+
+    .menu-link-btn:hover {
+      background: #f8fafc;
+      border-color: #b8c5d6;
     }
 
     button:disabled {
@@ -595,6 +642,86 @@
       margin-left: 0;
     }
 
+    .left-aux-stack .section[data-panel-id="snap"] {
+      padding: 4px 5px;
+      gap: 3px;
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .panel-toggle.section-title {
+      padding: 2px 6px;
+      font-size: 10px;
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .snap-grid {
+      display: grid;
+      width: 100%;
+      grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+      gap: 1px 2px;
+      align-items: center;
+    }
+
+    .touch-confirm-overlay {
+      position: absolute;
+      left: 50%;
+      bottom: 44px;
+      transform: translateX(-50%);
+      z-index: 120;
+      pointer-events: auto;
+      display: none;
+    }
+
+    .touch-confirm-btn {
+      min-width: 120px;
+      min-height: 40px;
+      padding: 8px 18px;
+      border-radius: 999px;
+      border: 1px solid #1d4ed8;
+      background: #2563eb;
+      color: #ffffff;
+      font-size: 14px;
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.34);
+    }
+
+    .touch-confirm-btn:disabled {
+      border-color: #93c5fd;
+      background: #93c5fd;
+      color: #eff6ff;
+      box-shadow: none;
+      cursor: default;
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .snap-grid label {
+      min-height: 16px;
+      font-size: 10px;
+      justify-content: flex-start;
+      gap: 2px;
+      white-space: nowrap;
+      min-width: 0;
+      display: inline-flex !important;
+      align-items: center;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      padding: 0;
+      margin: 0;
+      overflow: hidden;
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .snap-grid label span {
+      min-width: 0;
+      max-width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .left-aux-stack .section[data-panel-id="snap"] .snap-grid input[type="checkbox"] {
+      width: 11px;
+      height: 11px;
+      flex: 0 0 auto;
+      margin: 0;
+    }
+
     .left-aux-stack .section[data-panel-id="attrs"] {
       position: absolute;
       left: calc(100% + 6px);
@@ -737,6 +864,13 @@
       grid-template-columns: repeat(3, minmax(50px, 1fr));
       gap: 2px 3px;
       align-items: center;
+    }
+
+    #topContext .section[data-context="settings"] {
+      max-height: min(72vh, calc(100vh - 72px));
+      overflow-y: auto;
+      overflow-x: hidden;
+      scrollbar-gutter: stable;
     }
 
     #topContext .section[data-context="settings"] .settings-item {
@@ -959,18 +1093,23 @@
 <body>
   <div id="app">
     <aside class="sidebar">
+      <a id="cadHomeLink" class="cad-home-link" href="./web/index.html" title="S-CAD トップへ">
+        <div class="cad-home-logo"><span class="logo-s">S-</span>CAD</div>
+      </a>
       <div class="left-aux-stack">
         <div class="section" data-panel-id="snap">
           <button class="section-title panel-toggle" type="button">スナップ</button>
-          <label>グリッド <input id="gridSnapToggle" type="checkbox" checked></label>
-          <label>線上 <input id="objSnapToggle" type="checkbox" checked></label>
-          <label>端点 <input id="objSnapEndpointToggle" type="checkbox" checked></label>
-          <label>中点 <input id="objSnapMidpointToggle" type="checkbox"></label>
-          <label>中心 <input id="objSnapCenterToggle" type="checkbox" checked></label>
-          <label>交点 <input id="objSnapIntersectionToggle" type="checkbox" checked></label>
-          <label>接線 <input id="objSnapTangentToggle" type="checkbox"></label>
-          <label>ベクトル <input id="objSnapVectorToggle" type="checkbox"></label>
-          <label>属性を保持 <input id="objSnapTangentKeepToggle" type="checkbox"></label>
+          <div class="snap-grid">
+            <label><input id="gridSnapToggle" type="checkbox" checked><span>グリッド</span></label>
+            <label><input id="objSnapToggle" type="checkbox" checked><span>線上</span></label>
+            <label><input id="objSnapEndpointToggle" type="checkbox" checked><span>端点</span></label>
+            <label><input id="objSnapMidpointToggle" type="checkbox"><span>中点</span></label>
+            <label><input id="objSnapCenterToggle" type="checkbox" checked><span>中心</span></label>
+            <label><input id="objSnapIntersectionToggle" type="checkbox" checked><span>交点</span></label>
+            <label><input id="objSnapTangentToggle" type="checkbox"><span>接線</span></label>
+            <label><input id="objSnapVectorToggle" type="checkbox"><span>ベクトル</span></label>
+            <label><input id="objSnapTangentKeepToggle" type="checkbox"><span>属性を保持</span></label>
+          </div>
         </div>
         <div class="section" data-panel-id="attrs" id="attrPanel">
           <button class="section-title panel-toggle" type="button">属性</button>
@@ -993,6 +1132,7 @@
       <div class="section" data-panel-id="fileTools">
         <button class="section-title panel-toggle" type="button">ファイル</button>
         <div id="fileToolButtons" class="tool-buttons"></div>
+        <a id="openManualBtn" class="menu-link-btn" href="./web/manual.html">使い方ガイド</a>
       </div>
       <div class="section utilities" style="display:none;">
         <div class="section-title">View</div>
@@ -1035,7 +1175,13 @@
           </div>
           <div class="section" data-context="line" style="font-size:12px;">
             <div class="section-title">Line</div>
-            <label style="display:inline-flex; align-items:center; gap:4px;">連続線モード <input id="lineContinuousToggle" type="checkbox" style="margin-left:0;"></label>
+            <label style="display:inline-flex; align-items:center; gap:4px;">モード
+              <select id="lineModeSelect" style="width:auto; min-width:84px;">
+                <option value="segment" selected>線分</option>
+                <option value="continuous">連続線</option>
+                <option value="freehand">Bスプライン</option>
+              </select>
+            </label>
             <div style="display:grid; grid-template-columns:auto 78px auto 78px auto auto auto; gap:4px; align-items:center; justify-content:start;">
               <span>長さ</span><input id="lineLengthInput" type="number" value="100" min="0" step="1"
                 style="width:100%; min-width:0;">
@@ -1048,6 +1194,9 @@
                 <option value="center">中央</option>
               </select>
               <button id="applyLineInputBtn" type="button">サイズ固定</button>
+            </div>
+            <div style="display:flex; justify-content:flex-end;">
+              <button id="lineTouchFinalizeBtn" type="button" style="display:none;">確定</button>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
               <span>線幅(mm)</span>
@@ -1172,6 +1321,7 @@
                 <option value="trim">トリムも行う</option>
                 <option value="split" selected>トリムしない</option>
               </select>
+              <button id="applyFilletBtn" type="button" style="display:none;">実行</button>
             </div>
           </div>
           <div class="section" data-context="trim">
@@ -1229,6 +1379,23 @@
                 <input id="selectionPositionSizeInput" type="number" min="1" step="1" value="20"
                   style="width:100%; min-width:0;">
               </div>
+              <div id="selectionImageOps"
+                style="display:none; flex-direction:column; gap:6px; align-items:flex-start; justify-content:start;">
+                <div style="display:grid; grid-template-columns:auto 92px auto 92px; gap:6px; align-items:center; justify-content:start;">
+                  <span>幅</span>
+                  <input id="selectionImageWidthInput" type="number" min="1" step="1" value="200"
+                    style="width:100%; min-width:0;">
+                  <span>高さ</span>
+                  <input id="selectionImageHeightInput" type="number" min="1" step="1" value="150"
+                    style="width:100%; min-width:0;">
+                </div>
+                <div style="display:grid; grid-template-columns:auto auto auto auto; gap:10px; align-items:center; justify-content:start;">
+                  <span>縦横比ロック</span>
+                  <input id="selectionImageLockAspectToggle" type="checkbox" checked>
+                  <span>位置とスケールをロック</span>
+                  <input id="selectionImageLockTransformToggle" type="checkbox">
+                </div>
+              </div>
               <div id="selectionCircleOps"
                 style="display:none; flex-direction:column; align-items:flex-start; justify-content:start; gap:6px;">
                 <div style="display:grid; grid-template-columns:auto 92px auto; gap:6px; align-items:center; justify-content:start;">
@@ -1281,6 +1448,17 @@
                   <input id="groupRotateSnapInput" type="number" value="5" min="0.1" step="0.1">
                 </label>
                 <button id="deleteGroupBtn" type="button">このグループを削除</button>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:6px;">
+                <label style="justify-content:flex-start; gap:8px;">
+                  <input id="groupAimEnableToggle" type="checkbox">
+                  <span>Aim Constraint</span>
+                </label>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                  <button id="groupAimPickBtn" type="button">注視先を指定</button>
+                  <button id="groupAimClearBtn" type="button">解除</button>
+                </div>
+                <div id="groupAimStatus" style="font-size:11px; color:var(--muted); min-height:1.2em;">Target: none</div>
               </div>
             </div>
           </div>
@@ -1460,6 +1638,10 @@
               <div id="dimChainOps" style="display:none; align-items:center;">
                 <button id="dimChainPopBtn" type="button" class="btn secondary small"
                   style="padding:2px 8px; font-size:12px;">点を取り消し</button>
+                <button id="dimChainPrepareBtn" type="button" class="btn secondary small"
+                  style="display:none; padding:2px 8px; font-size:12px;">配置位置を指定</button>
+                <button id="dimChainFinalizeBtn" type="button" class="btn secondary small"
+                  style="display:none; padding:2px 8px; font-size:12px;">寸法確定</button>
               </div>
               <div id="dimMergeGroupsRow" style="display:none; align-items:center;">
                 <button id="dimMergeGroupsBtn" type="button">選択した図形をグループ化</button>
@@ -1602,8 +1784,79 @@
           <div class="section" data-context="settings">
             <div class="section-title">設定</div>
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <div style="font-size:12px; color:var(--muted);">用紙設定</div>
+              <div style="font-size:12px; color:var(--muted); font-weight:700;">用紙設定</div>
               <div class="settings-grid">
+                <label class="settings-item">用紙サイズ
+                  <select id="pageSizeSelect">
+                    <option value="A4">A4</option>
+                    <option value="A3">A3</option>
+                    <option value="A2">A2</option>
+                    <option value="A1">A1</option>
+                  </select>
+                </label>
+                <label class="settings-item">向き
+                  <select id="pageOrientationSelect">
+                    <option value="landscape">横</option>
+                    <option value="portrait">縦</option>
+                  </select>
+                </label>
+                <label class="settings-item">縮尺 (1:)
+                  <select id="pageScaleInput">
+                    <option value="1" selected>1</option>
+                    <option value="5">5</option>
+                    <option value="10">10</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="500">500</option>
+                    <option value="1000">1000</option>
+                  </select>
+                </label>
+                <label class="settings-item">単位
+                  <select id="pageUnitSelect">
+                    <option value="mm">mm</option>
+                    <option value="cm">cm</option>
+                    <option value="m">m</option>
+                    <option value="inch">inch</option>
+                  </select>
+                </label>
+                <label class="settings-item">用紙枠 <input id="pageShowFrameToggle" type="checkbox" checked></label>
+                <label class="settings-item">内側余白(mm)
+                  <input id="pageInnerMarginInput" type="number" min="0" step="1" value="10">
+                </label>
+              </div>
+            </div>
+            <hr style="margin: 10px 0; opacity: 0.1;">
+            <div class="section-title" style="margin-top: 5px;">グリッド設定</div>
+            <div class="settings-grid">
+              <label class="settings-item">基本グリッドサイズ
+                <select id="gridSizeContextInput">
+                  <option value="1">1</option>
+                  <option value="5">5</option>
+                  <option value="10">10</option>
+                  <option value="50">50</option>
+                  <option value="100" selected>100</option>
+                  <option value="500">500</option>
+                  <option value="1000">1000</option>
+                </select>
+              </label>
+              <label class="settings-item">表示
+                <input id="gridShowContextToggle" type="checkbox" checked>
+              </label>
+              <label class="settings-item">可変グリッド
+                <input id="gridAutoContextToggle" type="checkbox" checked>
+              </label>
+              <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
+                <label style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px; font-size:12px;">
+                  <span>可変グリッド切替タイミング</span>
+                  <input id="gridAutoTimingSlider" type="range" min="0" max="100" step="1" value="35">
+                  <span id="gridAutoTimingLabel">早い</span>
+                </label>
+                <div id="gridAutoTimingHint" style="font-size:10px; color:var(--muted);">目標 1grid 表示幅: 22.4 px</div>
+              </div>
+            </div>
+            <hr style="margin: 10px 0; opacity: 0.1;">
+            <div class="settings-grid">
+                <div class="settings-wide" style="font-size:12px; color:var(--muted); font-weight:700;">インターフェース</div>
                 <label class="settings-item"><span id="uiLanguageLabel">言語</span>
                   <select id="uiLanguageSelect">
                     <option value="ja" selected>日本語</option>
@@ -1645,35 +1898,25 @@
                     <option value="200">200%</option>
                   </select>
                 </label>
+                <label class="settings-item">タッチモード
+                  <input id="touchModeToggle" type="checkbox">
+                </label>
                 <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
-                  <div id="leftMenuVisibilityLabel" style="font-size:12px; color:var(--muted);">左メニュー表示項目</div>
+                  <hr style="margin: 2px 0 3px; opacity: 0.1;">
+                  <div id="leftMenuVisibilityLabel" style="font-size:12px; color:var(--muted); font-weight:700;">左メニュー表示項目</div>
                   <div id="leftMenuVisibilityList" style="display:grid; grid-template-columns:repeat(3,minmax(110px,1fr)); gap:4px 8px;"></div>
                 </div>
-                <label class="settings-item">用紙サイズ
-                  <select id="pageSizeSelect">
-                    <option value="A4">A4</option>
-                    <option value="A3">A3</option>
-                    <option value="A2">A2</option>
-                    <option value="A1">A1</option>
-                  </select>
-                </label>
-                <label class="settings-item">向き
-                  <select id="pageOrientationSelect">
-                    <option value="landscape">横</option>
-                    <option value="portrait">縦</option>
-                  </select>
-                </label>
-                <label class="settings-item">縮尺 (1:)
-                  <select id="pageScaleInput">
-                    <option value="1" selected>1</option>
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="50">50</option>
-                    <option value="100">100</option>
-                    <option value="500">500</option>
-                    <option value="1000">1000</option>
-                  </select>
-                </label>
+                <div class="settings-wide">
+                  <hr style="margin: 4px 0 2px; opacity: 0.1;">
+                </div>
+                <div class="settings-wide" style="display:flex; flex-direction:column; gap:6px;">
+                  <div id="shortcutSettingsLabel" style="font-size:12px; color:var(--muted);">キーボードショートカット</div>
+                  <div id="shortcutSettingsHint" style="font-size:11px; color:#64748b;">主要ツールの切替キー（英字1文字）</div>
+                  <div id="toolShortcutList" style="display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)); gap:4px 8px;"></div>
+                  <div>
+                    <button id="resetToolShortcutsBtn" type="button">初期値に戻す</button>
+                  </div>
+                </div>
                 <label class="settings-item">最大ズーム
                   <select id="maxZoomInput">
                     <option value="1">100%</option>
@@ -1699,48 +1942,6 @@
                     <option value="600">10分</option>
                   </select>
                 </label>
-                <label class="settings-item">単位
-                  <select id="pageUnitSelect">
-                    <option value="mm">mm</option>
-                    <option value="cm">cm</option>
-                    <option value="m">m</option>
-                    <option value="inch">inch</option>
-                  </select>
-                </label>
-                <label class="settings-item">用紙枠 <input id="pageShowFrameToggle" type="checkbox" checked></label>
-                <label class="settings-item">内側余白(mm)
-                  <input id="pageInnerMarginInput" type="number" min="0" step="1" value="10">
-                </label>
-              </div>
-            </div>
-            <hr style="margin: 10px 0; opacity: 0.1;">
-            <div class="section-title" style="margin-top: 5px;">グリッド設定</div>
-            <div class="settings-grid">
-              <label class="settings-item">基本グリッドサイズ
-                <select id="gridSizeContextInput">
-                  <option value="1">1</option>
-                  <option value="5">5</option>
-                  <option value="10">10</option>
-                  <option value="50">50</option>
-                  <option value="100" selected>100</option>
-                  <option value="500">500</option>
-                  <option value="1000">1000</option>
-                </select>
-              </label>
-              <label class="settings-item">表示
-                <input id="gridShowContextToggle" type="checkbox" checked>
-              </label>
-              <label class="settings-item">可変グリッド
-                <input id="gridAutoContextToggle" type="checkbox" checked>
-              </label>
-              <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
-                <label style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px; font-size:12px;">
-                  <span>オードグリッド切替タイミング</span>
-                  <input id="gridAutoTimingSlider" type="range" min="0" max="100" step="1" value="35">
-                  <span id="gridAutoTimingLabel">早い</span>
-                </label>
-                <div id="gridAutoTimingHint" style="font-size:10px; color:var(--muted);">目標 1grid 表示幅: 22.4 px</div>
-              </div>
             </div>
           </div>
         </div>
@@ -1821,6 +2022,9 @@
       <div class="bottom-left-overlay">
         <div id="statusText" class="status"></div>
       </div>
+      <div id="touchConfirmOverlay" class="touch-confirm-overlay">
+        <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">決定</button>
+      </div>
       <div class="bottom-scale-overlay">
         <div id="gridScaleIndicator" class="grid-scale-indicator">
           <div class="grid-scale-bar-wrap"><div id="gridScaleBar" class="grid-scale-bar"></div></div>
@@ -1830,10 +2034,29 @@
       </div>
     </main>
   </div>
-  <input id="jsonFileInput" type="file" accept=".json,application/json" hidden>
+  <input id="jsonFileInput" type="file" accept=".json,application/json,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,image/*" hidden>
   <div id="colorPalettePopup"
     style="position:fixed; display:none; z-index:1200; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:6px; box-shadow:0 8px 24px rgba(2,6,23,0.18);"></div>
+  <script>
+    (function () {
+      const a = document.getElementById("cadHomeLink");
+      if (!a) return;
+      const p = String(location.pathname || "").toLowerCase();
+      a.href = p.endsWith("/cad.html") || p.endsWith("cad.html")
+        ? "./index.html"
+        : "./web/index.html";
+    })();
+    (function () {
+      const a = document.getElementById("openManualBtn");
+      if (!a) return;
+      const p = String(location.pathname || "").toLowerCase();
+      a.href = p.endsWith("/cad.html") || p.endsWith("cad.html")
+        ? "./manual.html"
+        : "./web/manual.html";
+    })();
+  </script>
   <script type="module" src="./cad/app.js"></script>
 </body>
 
 </html>
+

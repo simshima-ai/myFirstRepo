@@ -1,4 +1,5 @@
-﻿export function createToolRegistry() {
+﻿import { TOOL_SHORTCUT_TOOL_ORDER, sanitizeToolShortcuts } from "./state.js";
+export function createToolRegistry() {
   return [
     { id: "select", label: "Select" },
     { id: "vertex", label: "Vertex" },
@@ -18,9 +19,8 @@
 
 function createHtmlLikeLeftMenuRegistry() {
   return [
-    { type: "tool", id: "select", label: "選択", group: "select" },
-    { type: "action", id: "resetView", label: "表示リセット", implemented: true, group: "view" },
-    { type: "sep" },
+    { type: "tool", id: "select", label: "選択", group: "create" },
+    { type: "action", id: "resetView", label: "表示リセット", implemented: true, group: "create" },
     { type: "tool", id: "line", label: "線", group: "create" },
     { type: "tool", id: "rect", label: "四角", group: "create" },
     { type: "tool", id: "circle", label: "円", group: "create" },
@@ -312,7 +312,15 @@ function applyLanguageUi(state, dom) {
       filletApply: "実行",
       language: "言語",
       menuScale: "メニュー倍率",
+      touchMode: "タッチモード",
       leftMenuVisibleItems: "左メニュー表示項目",
+      touchConfirmCommon: "決定",
+      touchConfirm: "確定",
+      dimPreparePlacement: "配置位置を指定",
+      dimFinalize: "寸法確定",
+      shortcutSettings: "キーボードショートカット",
+      shortcutHint: "主要ツールの切替キー（英字1文字）",
+      resetShortcuts: "初期値に戻す",
       groups: "グループ",
       layers: "レイヤー",
       groupOps: "グループ操作",
@@ -389,7 +397,10 @@ function applyLanguageUi(state, dom) {
       angle: "角度",
       normal: "通常",
       reverse: "反転",
-      lineContinuousMode: "連続線モード",
+      lineMode: "モード",
+      lineModeSegment: "線分",
+      lineModeContinuous: "連続線",
+      lineModeFreehand: "Bスプライン",
       length: "長さ",
       anchor: "基準",
       endpointA: "端点A",
@@ -428,6 +439,13 @@ function applyLanguageUi(state, dom) {
       groupSelectedShapes: "選択した図形をグループ化",
       unparent: "親から外す",
       deleteThisGroup: "このグループを削除",
+      aimConstraint: "方位拘束",
+      aimPickTarget: "注視先を指定",
+      aimClear: "解除",
+      aimTargetNone: "ターゲット: なし",
+      aimTargetGroupPrefix: "ターゲット: グループ #",
+      aimTargetPositionPrefix: "ターゲット: 位置 #",
+      aimPicking: "クリック待機中...",
       object: "オブジェクト",
       lineSegment: "線分",
       arc: "円弧",
@@ -504,7 +522,15 @@ function applyLanguageUi(state, dom) {
       filletApply: "Execute",
       language: "Language",
       menuScale: "Menu Scale",
+      touchMode: "Touch Mode",
       leftMenuVisibleItems: "Left Menu Items",
+      touchConfirmCommon: "Confirm",
+      touchConfirm: "Confirm",
+      dimPreparePlacement: "Set Placement",
+      dimFinalize: "Finalize Dim",
+      shortcutSettings: "Keyboard Shortcuts",
+      shortcutHint: "Tool switch key (single character)",
+      resetShortcuts: "Reset Defaults",
       groups: "Groups",
       layers: "Layers",
       groupOps: "Group Ops",
@@ -581,7 +607,10 @@ function applyLanguageUi(state, dom) {
       angle: "Angle",
       normal: "Normal",
       reverse: "Reverse",
-      lineContinuousMode: "Continuous Line Mode",
+      lineMode: "Mode",
+      lineModeSegment: "Segment",
+      lineModeContinuous: "Continuous",
+      lineModeFreehand: "B-Spline",
       length: "Length",
       anchor: "Anchor",
       endpointA: "Endpoint A",
@@ -620,6 +649,13 @@ function applyLanguageUi(state, dom) {
       groupSelectedShapes: "Group Selected Objects",
       unparent: "Remove from Parent",
       deleteThisGroup: "Delete This Group",
+      aimConstraint: "Aim Constraint",
+      aimPickTarget: "Pick Target",
+      aimClear: "Clear",
+      aimTargetNone: "Target: None",
+      aimTargetGroupPrefix: "Target: Group #",
+      aimTargetPositionPrefix: "Target: Position #",
+      aimPicking: "Picking target...",
       object: "Object",
       lineSegment: "Line",
       arc: "Arc",
@@ -736,10 +772,21 @@ function applyLanguageUi(state, dom) {
   if (dom.applyFilletBtn) dom.applyFilletBtn.textContent = t.filletApply;
   setText("#uiLanguageLabel", t.language);
   setLabelByControl("menuScaleSelect", t.menuScale);
+  setLabelByControl("touchModeToggle", t.touchMode);
   setText("#leftMenuVisibilityLabel", t.leftMenuVisibleItems);
+  setButtonById("touchConfirmBtn", t.touchConfirmCommon);
+  setButtonById("lineTouchFinalizeBtn", t.touchConfirm);
+  setButtonById("dimChainPrepareBtn", t.dimPreparePlacement);
+  setButtonById("dimChainFinalizeBtn", t.dimFinalize);
+  setText("#shortcutSettingsLabel", t.shortcutSettings);
+  setText("#shortcutSettingsHint", t.shortcutHint);
+  setButtonById("resetToolShortcutsBtn", t.resetShortcuts);
 
   // Tool context labels/options
-  setLabelByControl("lineContinuousToggle", t.lineContinuousMode);
+  setPrevSpanByControl("lineModeSelect", t.lineMode);
+  setOptionText("lineModeSelect", "segment", t.lineModeSegment);
+  setOptionText("lineModeSelect", "continuous", t.lineModeContinuous);
+  setOptionText("lineModeSelect", "freehand", t.lineModeFreehand);
   setPrevSpanByControl("lineLengthInput", t.length);
   setPrevSpanByControl("lineAngleInput", t.angle);
   setPrevSpanByControl("lineAnchorSelect", t.anchor);
@@ -782,6 +829,9 @@ function applyLanguageUi(state, dom) {
   setButtonById("dimMergeGroupsBtn", t.groupSelectedShapes);
   setButtonById("unparentGroupBtn", t.unparent);
   setButtonById("deleteGroupBtn", t.deleteThisGroup);
+  setLabelByControl("groupAimEnableToggle", t.aimConstraint);
+  setButtonById("groupAimPickBtn", t.aimPickTarget);
+  setButtonById("groupAimClearBtn", t.aimClear);
   setButtonById("dimChainPopBtn", t.undoPoint);
   setLabelByControl("groupRotateSnapInput", (lang === "en" ? "Rotate Snap" : "回転角スナップ"));
   setLabelByControl("dimLinearMode", t.mode);
@@ -1980,6 +2030,8 @@ export function initUi(state, dom, actions) {
       if (e.button !== 0 || e.detail < 2) return;
       const objRow = e.target.closest?.("[data-group-shape-row]");
       if (objRow) return;
+      const visCb = e.target.closest?.("input[data-group-visible]");
+      if (visCb) return;
       const toggle = e.target.closest?.("button[data-group-toggle]");
       if (toggle) return;
       const row = e.target.closest?.("[data-group-row]");
@@ -2011,6 +2063,14 @@ export function initUi(state, dom, actions) {
         refreshUi(state, dom);
         return;
       }
+      const visCb = t?.closest?.("input[data-group-visible]");
+      if (visCb) {
+        const gid = Number(visCb.getAttribute("data-group-visible"));
+        if (Number.isFinite(gid)) {
+          actions.setGroupVisible?.(gid, !!visCb.checked);
+        }
+        return;
+      }
       const row = t?.closest?.("[data-group-row]");
       if (!row) return;
       const gid = Number(row.dataset.groupRow);
@@ -2036,6 +2096,14 @@ export function initUi(state, dom, actions) {
         groupRowClickTimer = null;
         actions.selectGroup(gid);
       }, 220);
+    });
+    dom.groupList.addEventListener("change", (e) => {
+      const t = toElementTarget(e.target);
+      const visCb = t?.closest?.("input[data-group-visible]");
+      if (!visCb) return;
+      const gid = Number(visCb.getAttribute("data-group-visible"));
+      if (!Number.isFinite(gid)) return;
+      actions.setGroupVisible?.(gid, !!visCb.checked);
     });
     dom.groupList.addEventListener("dblclick", (e) => {
       const t = toElementTarget(e.target);
@@ -2190,6 +2258,21 @@ export function initUi(state, dom, actions) {
       actions.beginMoveActiveGroupOriginOnly?.();
     });
   }
+  if (dom.groupAimEnableToggle) {
+    dom.groupAimEnableToggle.addEventListener("change", () => {
+      actions.setActiveGroupAimEnabled?.(!!dom.groupAimEnableToggle.checked);
+    });
+  }
+  if (dom.groupAimPickBtn) {
+    dom.groupAimPickBtn.addEventListener("click", () => {
+      actions.pickOrConfirmActiveGroupAimTarget?.();
+    });
+  }
+  if (dom.groupAimClearBtn) {
+    dom.groupAimClearBtn.addEventListener("click", () => {
+      actions.clearActiveGroupAimTarget?.();
+    });
+  }
   if (dom.moveSelectedShapesBtn) {
     dom.moveSelectedShapesBtn.addEventListener("click", () => {
       const dx = Number(dom.selectMoveDxInput?.value || 0);
@@ -2297,9 +2380,23 @@ export function initUi(state, dom, actions) {
       actions.setLineSizeLocked?.(null);
     });
   }
-  if (dom.lineContinuousToggle) {
-    dom.lineContinuousToggle.addEventListener("change", () => {
-      state.lineSettings.continuous = !!dom.lineContinuousToggle.checked;
+  if (dom.lineModeSelect) {
+    dom.lineModeSelect.addEventListener("change", () => {
+      const mode = String(dom.lineModeSelect.value || "segment").toLowerCase();
+      const nextMode = (mode === "continuous" || mode === "freehand") ? mode : "segment";
+      state.lineSettings.mode = nextMode;
+      state.lineSettings.continuous = nextMode === "continuous";
+    });
+  }
+  if (dom.lineTouchFinalizeBtn) {
+    dom.lineTouchFinalizeBtn.addEventListener("click", () => {
+      const modeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+      const mode = (modeRaw === "continuous" || modeRaw === "freehand") ? modeRaw : "segment";
+      if (mode === "continuous") {
+        actions.finalizePolylineDraft?.();
+      } else if (mode === "freehand") {
+        actions.finalizePolylineDraft?.();
+      }
     });
   }
   const runLineApplyByEnter = (e) => {
@@ -2413,6 +2510,12 @@ export function initUi(state, dom, actions) {
       actions.applyFillet(r);
     });
   }
+  if (dom.applyFilletBtn) {
+    dom.applyFilletBtn.addEventListener("click", () => {
+      const r = Number(dom.filletRadiusInput?.value || 0);
+      actions.applyFillet(r);
+    });
+  }
   if (dom.filletLineModeSelect) {
     dom.filletLineModeSelect.addEventListener("change", () => {
       const v = String(dom.filletLineModeSelect.value || "split").toLowerCase();
@@ -2445,6 +2548,34 @@ export function initUi(state, dom, actions) {
     };
     dom.selectionPositionSizeInput.addEventListener("change", applySelectionPositionSize);
     dom.selectionPositionSizeInput.addEventListener("input", applySelectionPositionSize);
+  }
+  if (dom.selectionImageWidthInput) {
+    const applySelectionImageWidth = () => {
+      const v = Math.max(1, Number(dom.selectionImageWidthInput.value || 1));
+      dom.selectionImageWidthInput.value = String(v);
+      actions.updateSelectedImageSettings?.({ width: v });
+    };
+    dom.selectionImageWidthInput.addEventListener("change", applySelectionImageWidth);
+    dom.selectionImageWidthInput.addEventListener("input", applySelectionImageWidth);
+  }
+  if (dom.selectionImageHeightInput) {
+    const applySelectionImageHeight = () => {
+      const v = Math.max(1, Number(dom.selectionImageHeightInput.value || 1));
+      dom.selectionImageHeightInput.value = String(v);
+      actions.updateSelectedImageSettings?.({ height: v });
+    };
+    dom.selectionImageHeightInput.addEventListener("change", applySelectionImageHeight);
+    dom.selectionImageHeightInput.addEventListener("input", applySelectionImageHeight);
+  }
+  if (dom.selectionImageLockAspectToggle) {
+    dom.selectionImageLockAspectToggle.addEventListener("change", () => {
+      actions.updateSelectedImageSettings?.({ lockAspect: !!dom.selectionImageLockAspectToggle.checked });
+    });
+  }
+  if (dom.selectionImageLockTransformToggle) {
+    dom.selectionImageLockTransformToggle.addEventListener("change", () => {
+      actions.updateSelectedImageSettings?.({ lockTransform: !!dom.selectionImageLockTransformToggle.checked });
+    });
   }
   if (dom.selectionCircleCenterMarkToggle) {
     dom.selectionCircleCenterMarkToggle.addEventListener("change", () => {
@@ -2594,6 +2725,26 @@ export function initUi(state, dom, actions) {
     });
   }
   if (dom.dimChainPopBtn) dom.dimChainPopBtn.addEventListener("click", () => actions.popDimChainPoint());
+  if (dom.dimChainPrepareBtn) {
+    dom.dimChainPrepareBtn.addEventListener("click", () => {
+      if (state.tool !== "dim" || String(state.dimSettings?.linearMode || "single") !== "chain") return;
+      if (!state.dimDraft || state.dimDraft.type !== "dimchain") return;
+      if ((state.dimDraft.points || []).length < 2) return;
+      state.dimDraft.awaitingPlacement = true;
+      actions.setStatus?.("Chain dim: click to place dimension line.");
+      actions.render?.();
+    });
+  }
+  if (dom.dimChainFinalizeBtn) {
+    dom.dimChainFinalizeBtn.addEventListener("click", () => {
+      if (state.tool !== "dim" || String(state.dimSettings?.linearMode || "single") !== "chain") return;
+      if (!state.dimDraft || state.dimDraft.type !== "dimchain") return;
+      if (!(state.dimDraft.awaitingPlacement && state.dimDraft.place)) return;
+      actions.finalizeDimDraft?.();
+      actions.setStatus?.("Dim finished");
+      actions.render?.();
+    });
+  }
   if (dom.applyDimSettingsBtn) {
     dom.applyDimSettingsBtn.addEventListener("click", () => {
       const p = Math.max(0, Math.min(3, Math.round(Number(dom.dimPrecisionSelect?.value) || 0)));
@@ -2650,6 +2801,66 @@ export function initUi(state, dom, actions) {
       actions.setMenuScalePct?.(v);
     });
   }
+  if (dom.touchModeToggle) {
+    dom.touchModeToggle.addEventListener("change", () => {
+      actions.setTouchMode?.(!!dom.touchModeToggle.checked);
+    });
+  }
+  if (dom.touchConfirmBtn) {
+    dom.touchConfirmBtn.addEventListener("click", () => {
+      if (!state.ui?.touchMode) return;
+      const tool = String(state.tool || "");
+      const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+      const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+      if (tool === "line" && (lineMode === "continuous" || lineMode === "freehand")) {
+        actions.finalizePolylineDraft?.();
+        return;
+      }
+      if (tool === "dim" && String(state.dimSettings?.linearMode || "single") === "chain") {
+        const draft = state.dimDraft;
+        if (draft && draft.type === "dimchain") {
+          if (!draft.awaitingPlacement && (draft.points || []).length >= 2) {
+            draft.awaitingPlacement = true;
+            actions.setStatus?.("Chain dim: click to place dimension line.");
+            actions.render?.();
+            return;
+          }
+          if (draft.awaitingPlacement && draft.place) {
+            actions.finalizeDimDraft?.();
+            actions.setStatus?.("Dim finished");
+            actions.render?.();
+            return;
+          }
+        }
+      }
+      if (tool === "circle") {
+        const modeRaw = String(state.circleSettings?.mode || "").toLowerCase();
+        const mode = (modeRaw === "fixed" || modeRaw === "threepoint" || modeRaw === "drag")
+          ? modeRaw
+          : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
+        if (mode === "threepoint") {
+          actions.executeCircleThreePointFromTargets?.();
+          return;
+        }
+      }
+      if (tool === "patterncopy") {
+        actions.executePatternCopy?.();
+        return;
+      }
+      if (tool === "fillet") {
+        const r = Number(dom.filletRadiusInput?.value || 0);
+        actions.applyFillet?.(r);
+        return;
+      }
+      if (tool === "doubleline") {
+        actions.executeDoubleLine?.();
+        return;
+      }
+      if (tool === "hatch") {
+        actions.executeHatch?.();
+      }
+    });
+  }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.addEventListener("change", () => {
       actions.setFpsDisplay?.(!!dom.fpsDisplayToggle.checked);
@@ -2674,6 +2885,21 @@ export function initUi(state, dom, actions) {
   }
   if (dom.pageUnitSelect) {
     dom.pageUnitSelect.addEventListener("change", () => actions.setPageSetup({ unit: dom.pageUnitSelect.value }));
+  }
+  if (dom.toolShortcutList) {
+    dom.toolShortcutList.addEventListener("change", (e) => {
+      const sel = e.target?.closest?.("select[data-tool-shortcut]");
+      if (!sel) return;
+      const tool = String(sel.dataset.toolShortcut || "");
+      const key = String(sel.value || "").toUpperCase();
+      actions.setToolShortcut?.(tool, key);
+    });
+  }
+  if (dom.resetToolShortcutsBtn) {
+    dom.resetToolShortcutsBtn.addEventListener("click", () => {
+      actions.resetToolShortcuts?.();
+      refreshUi(state, dom);
+    });
   }
   const toolStrokeControls = [
     { tool: "line", width: dom.lineToolLineWidthInput, type: dom.lineToolLineTypeInput },
@@ -2947,6 +3173,74 @@ function refreshLeftMenuVisibilitySettings(state, dom) {
   }
 }
 
+function refreshToolShortcutSettings(state, dom) {
+  const host = dom.toolShortcutList;
+  if (!host) return;
+  const lang = getUiLanguage(state);
+  const labels = (lang === "en")
+    ? {
+      select: "Select",
+      line: "Line",
+      rect: "Rectangle",
+      circle: "Circle",
+      position: "Position",
+      dim: "Dimension",
+      text: "Text",
+      vertex: "Vertex",
+      fillet: "Fillet",
+      trim: "Trim",
+      hatch: "Hatching",
+      doubleline: "Double Line",
+      patterncopy: "Pattern Copy",
+      none: "(None)",
+    }
+    : {
+      select: "選択",
+      line: "線",
+      rect: "四角",
+      circle: "円",
+      position: "位置",
+      dim: "寸法線",
+      text: "テキスト",
+      vertex: "頂点編集",
+      fillet: "フィレット",
+      trim: "トリム",
+      hatch: "ハッチング",
+      doubleline: "二重線",
+      patterncopy: "パターンコピー",
+      none: "(なし)",
+    };
+  const shortcuts = sanitizeToolShortcuts(state?.ui?.toolShortcuts);
+  host.innerHTML = "";
+  for (const tool of TOOL_SHORTCUT_TOOL_ORDER) {
+    const row = document.createElement("label");
+    row.style.display = "inline-flex";
+    row.style.alignItems = "center";
+    row.style.gap = "6px";
+    row.style.justifyContent = "space-between";
+    row.style.fontSize = "12px";
+    row.style.whiteSpace = "nowrap";
+    const title = document.createElement("span");
+    title.textContent = labels[tool] || tool;
+    const select = document.createElement("select");
+    select.dataset.toolShortcut = tool;
+    const optNone = document.createElement("option");
+    optNone.value = "";
+    optNone.textContent = labels.none;
+    select.appendChild(optNone);
+    for (let code = 65; code <= 90; code++) {
+      const k = String.fromCharCode(code);
+      const opt = document.createElement("option");
+      opt.value = k;
+      opt.textContent = k;
+      select.appendChild(opt);
+    }
+    select.value = String(shortcuts[tool] || "");
+    row.append(title, select);
+    host.appendChild(row);
+  }
+}
+
 let _groupListRenderSignature = "";
 let _layerListRenderSignature = "";
 let _activeLayerSelectSignature = "";
@@ -2967,6 +3261,7 @@ export function refreshUi(state, dom) {
   }
   if (String(state.tool || "") === "settings") {
     refreshLeftMenuVisibilitySettings(state, dom);
+    refreshToolShortcutSettings(state, dom);
   }
   const panelLang = getUiLanguage(state);
   const panelText = (panelLang === "en")
@@ -3149,9 +3444,18 @@ export function refreshUi(state, dom) {
       if (on) visibleCount++;
     }
     const lang = getUiLanguage(state);
-    const lineHelp = (tool === "line" && state.lineSettings?.continuous)
-      ? (lang === "en" ? "Click to add vertices. Press Enter to confirm." : "クリックで頂点追加  Enterキーで決定")
-      : (lang === "en" ? "Click first point, then second point. You can also input Length / Angle." : "1点目クリック後、2点目をクリック。Length / Angle の数値入力も使えます。");
+    const isTouchMode = !!state.ui?.touchMode;
+    const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+    const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+    const lineHelp = (tool === "line" && lineMode === "continuous")
+      ? (lang === "en"
+        ? (isTouchMode ? "Click to add vertices, then tap Confirm." : "Click to add vertices. Press Enter to confirm.")
+        : (isTouchMode ? "クリックで頂点追加後、下中央の「確定」を押します。" : "クリックで頂点追加  Enterキーで決定"))
+      : ((tool === "line" && lineMode === "freehand")
+        ? (lang === "en"
+          ? (isTouchMode ? "Click to add control points, then tap Confirm to finalize B-Spline." : "Click to add control points. Press Enter or double-click to finalize B-Spline.")
+          : (isTouchMode ? "クリックで制御点を追加し、下中央の「確定」でBスプラインを確定します。" : "クリックで制御点を追加。EnterまたはダブルクリックでBスプライン確定。"))
+        : (lang === "en" ? "Click first point, then second point. You can also input Length / Angle." : "1点目クリック後、2点目をクリック。Length / Angle の数値入力も使えます。"));
     const helpMap = (lang === "en")
       ? {
         select: "Switch click target type. Toggle with Space key.",
@@ -3165,9 +3469,9 @@ export function refreshUi(state, dom) {
         trim: "Click shape to trim. You can also split without deleting.",
         settings: "Configure paper size, orientation, scale, and grid.",
         text: "Click canvas to place text. Edit content/size/color in the top panel.",
-        hatch: "Click boundaries to select. Press Enter or Apply to execute hatching.",
-        patterncopy: "Execute pattern copy. Choose mode and set center/axis if needed, then click Apply.",
-        doubleline: "Create double lines from selected lines. Adjust offset/mode and confirm by Apply or Enter.",
+        hatch: isTouchMode ? "Click boundaries to select, then tap Confirm." : "Click boundaries to select. Press Enter or Apply to execute hatching.",
+        patterncopy: isTouchMode ? "Choose mode and set center/axis if needed, then tap Confirm." : "Execute pattern copy. Choose mode and set center/axis if needed, then click Apply.",
+        doubleline: isTouchMode ? "Create double lines from selected lines. Adjust offset/mode, then tap Confirm." : "Create double lines from selected lines. Adjust offset/mode and confirm by Apply or Enter.",
       }
       : {
         select: "クリック選択の対象を切り替えます。スペースキーでトグル",
@@ -3181,9 +3485,9 @@ export function refreshUi(state, dom) {
         trim: "図形をクリックしてトリムを実行。削除せずに分割のみ行うことも可能です。",
         settings: "用紙サイズ、方位、縮尺、およびグリッド設定を行います。",
         text: "キャンバスをクリックしてテキストを配置。配置後、上部パネルで内容、サイズ、色などを変更できます。",
-        hatch: "境界をクリックして選択。Enter または Apply でハッチングを実行します。",
-        patterncopy: "パターンコピーを実行します。モードを選択し、必要であれば中心点や軸線をキャンバス上でクリックしてから Apply を押してください。",
-        doubleline: "選択した線分から二重線（オフセット線）を生成します。Offset値やMode（片側/両側）を調整し、ApplyまたはEnterで確定します。",
+        hatch: isTouchMode ? "境界をクリックして選択後、下中央の「確定」でハッチングを実行します。" : "境界をクリックして選択。Enter または Apply でハッチングを実行します。",
+        patterncopy: isTouchMode ? "モードを選択し、必要なら中心点や軸線を指定して、下中央の「確定」を押してください。" : "パターンコピーを実行します。モードを選択し、必要であれば中心点や軸線をキャンバス上でクリックしてから Apply を押してください。",
+        doubleline: isTouchMode ? "選択した線分から二重線を生成します。Offset値やModeを調整後、下中央の「確定」で実行します。" : "選択した線分から二重線（オフセット線）を生成します。Offset値やMode（片側/両側）を調整し、ApplyまたはEnterで確定します。",
       };
     const helpText = helpMap[tool] || "";
     if (topContextHelp) {
@@ -3295,6 +3599,7 @@ export function refreshUi(state, dom) {
   const selectionStyleOps = document.getElementById("selectionStyleOps");
   const selectionColorOps = document.getElementById("selectionColorOps");
   const selectionPositionOps = document.getElementById("selectionPositionOps");
+  const selectionImageOps = document.getElementById("selectionImageOps");
   const selectionCircleOps = document.getElementById("selectionCircleOps");
   const groupRelativeMoveOps = document.getElementById("groupRelativeMoveOps");
   const dimMergeGroupsRow = document.getElementById("dimMergeGroupsRow");
@@ -3302,6 +3607,8 @@ export function refreshUi(state, dom) {
     const selectedCount = (state.selection?.ids || []).length;
     const hasObjectSelection = selectedCount > 0;
     const hasActiveGroup = state.activeGroupId != null;
+    const aimPickActive = !!(state.input?.groupAimPick?.active)
+      && Number(state.input?.groupAimPick?.groupId) === Number(state.activeGroupId);
     const selIds = new Set((state.selection?.ids || []).map(Number));
     // Avoid iterating all shapes when nothing is selected
     const selectedShapes = selIds.size > 0 ? (state.shapes || []).filter(s => selIds.has(Number(s.id))) : [];
@@ -3313,6 +3620,8 @@ export function refreshUi(state, dom) {
       && selectedShapes.every(s => colorTargetTypes.has(String(s.type || "")));
     const hasOnlyPositionSelection = selectedShapes.length > 0
       && selectedShapes.every(s => String(s.type || "") === "position");
+    const hasOnlyImageSelection = selectedShapes.length > 0
+      && selectedShapes.every(s => String(s.type || "") === "image");
     const hasOnlyCircleSelection = selectedShapes.length > 0
       && selectedShapes.every(s => {
         const t = String(s.type || "");
@@ -3324,7 +3633,9 @@ export function refreshUi(state, dom) {
       && selectedShapes.every(s => s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "circleDim");
     if (groupCtxTitle) {
       let title = panelLang === "en" ? "Group" : "グループ";
-      if (hasActiveGroup) {
+      if (aimPickActive) {
+        title = panelLang === "en" ? "Aim Target" : "方位拘束ターゲット";
+      } else if (hasActiveGroup) {
         title = panelLang === "en" ? "Group" : "グループ";
       } else if (selectedShapes.length === 1) {
         const t = String(selectedShapes[0]?.type || "");
@@ -3333,23 +3644,27 @@ export function refreshUi(state, dom) {
         else if (t === "arc") title = panelLang === "en" ? "Arc" : "円弧";
         else if (t === "position") title = panelLang === "en" ? "Position" : "位置";
         else if (t === "rect") title = panelLang === "en" ? "Rectangle" : "四角";
+        else if (t === "image") title = panelLang === "en" ? "Image" : "画像";
         else title = panelLang === "en" ? "Object" : "オブジェクト";
       } else if (selectedShapes.length >= 2) {
         title = panelLang === "en" ? "Object" : "オブジェクト";
       }
       groupCtxTitle.textContent = title;
     }
-    const showObjectOps = hasObjectSelection;
+    const showObjectOps = hasObjectSelection && !aimPickActive;
     if (groupCtxObjectOps) groupCtxObjectOps.style.display = showObjectOps ? "flex" : "none";
     if (groupCtxGroupOps) groupCtxGroupOps.style.display = hasActiveGroup ? "flex" : "none";
     if (lineCircleMoveOps) lineCircleMoveOps.style.display = hasOnlyStyleTargetSelection ? "grid" : "none";
     if (selectionStyleOps) selectionStyleOps.style.display = hasOnlyStyleTargetSelection ? "grid" : "none";
     if (selectionColorOps) selectionColorOps.style.display = hasOnlyColorTargetSelection ? "grid" : "none";
     if (selectionPositionOps) selectionPositionOps.style.display = hasOnlyPositionSelection ? "grid" : "none";
+    if (selectionImageOps) selectionImageOps.style.display = hasOnlyImageSelection ? "grid" : "none";
     if (selectionCircleOps) selectionCircleOps.style.display = hasOnlyCircleSelection ? "flex" : "none";
     if (mergeGroupsRow) mergeGroupsRow.style.display = (!hasActiveGroup && selectedCount >= 2) ? "flex" : "none";
     if (dimMergeGroupsRow) dimMergeGroupsRow.style.display = (state.tool === "select" && !hasActiveGroup && selectedCount >= 2 && hasOnlyDimSelection) ? "flex" : "none";
-    if (groupRelativeMoveOps) groupRelativeMoveOps.style.display = hasLineCircleOnlySelection ? "none" : "grid";
+    if (groupRelativeMoveOps) {
+      groupRelativeMoveOps.style.display = (hasLineCircleOnlySelection && !aimPickActive) ? "none" : "grid";
+    }
     if (groupCtxObjectOps && groupCtxGroupOps) {
       groupCtxGroupOps.style.order = "0";
       groupCtxObjectOps.style.order = "1";
@@ -3409,7 +3724,19 @@ export function refreshUi(state, dom) {
   if (dom.objSnapMidpointToggle) dom.objSnapMidpointToggle.checked = !!state.objectSnap?.midpoint;
   if (dom.objSnapCenterToggle) dom.objSnapCenterToggle.checked = state.objectSnap?.center !== false;
   if (dom.objSnapIntersectionToggle) dom.objSnapIntersectionToggle.checked = state.objectSnap?.intersection !== false;
-  if (dom.lineContinuousToggle) dom.lineContinuousToggle.checked = !!state.lineSettings.continuous;
+  if (dom.lineModeSelect) {
+    const modeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+    const mode = (modeRaw === "continuous" || modeRaw === "freehand") ? modeRaw : "segment";
+    if (dom.lineModeSelect.value !== mode) dom.lineModeSelect.value = mode;
+    if (dom.lineTouchFinalizeBtn) {
+      const touchMode = !!state.ui?.touchMode;
+      const show = !touchMode && state.tool === "line" && (mode === "continuous" || mode === "freehand");
+      dom.lineTouchFinalizeBtn.style.display = show ? "" : "none";
+      dom.lineTouchFinalizeBtn.textContent = mode === "freehand"
+        ? (panelLang === "en" ? "Finalize B-Spline" : "Bスプライン確定")
+        : (panelLang === "en" ? "Finish Continuous Line" : "連続線を確定");
+    }
+  }
   if (dom.objSnapTangentToggle) dom.objSnapTangentToggle.checked = !!state.objectSnap?.tangent;
   if (dom.objSnapTangentKeepToggle) dom.objSnapTangentKeepToggle.checked = !!(state.objectSnap?.keepAttributes || state.objectSnap?.tangentKeep);
   if (dom.objSnapVectorToggle) dom.objSnapVectorToggle.checked = !!state.objectSnap?.vector;
@@ -3455,7 +3782,11 @@ export function refreshUi(state, dom) {
   }
   if (dom.hatchDashMmInput) syncInputValue(dom.hatchDashMmInput, Number(hatchUi?.lineDashMm ?? state.hatchSettings.lineDashMm));
   if (dom.hatchGapMmInput) syncInputValue(dom.hatchGapMmInput, Number(hatchUi?.lineGapMm ?? state.hatchSettings.lineGapMm));
-  if (dom.applyHatchBtn) dom.applyHatchBtn.disabled = !(state.tool === "hatch" && state.hatchDraft?.boundaryIds?.length > 0);
+  if (dom.applyHatchBtn) {
+    const touchMode = !!state.ui?.touchMode;
+    dom.applyHatchBtn.style.display = touchMode ? "none" : "";
+    dom.applyHatchBtn.disabled = !(state.tool === "hatch" && state.hatchDraft?.boundaryIds?.length > 0);
+  }
 
   if (dom.patternCopyModeSelect) dom.patternCopyModeSelect.value = state.patternCopySettings.mode;
   if (dom.patternCopyArrayOptions) dom.patternCopyArrayOptions.style.display = state.patternCopySettings.mode === "array" ? "block" : "none";
@@ -3493,6 +3824,8 @@ export function refreshUi(state, dom) {
   }
 
   if (dom.patternCopyApplyBtn) {
+    const touchMode = !!state.ui?.touchMode;
+    dom.patternCopyApplyBtn.style.display = touchMode ? "none" : "";
     const hasSelection = ((state.selection?.ids || []).length > 0) || ((state.selection?.groupIds || []).length > 0);
     const mode = state.patternCopySettings.mode;
     let ok = hasSelection;
@@ -3908,10 +4241,11 @@ export function refreshUi(state, dom) {
       rows.map(({ group, depth }) => {
         const gid = Number(group.id);
         const expanded = state.ui.groupTreeExpanded[gid] !== false ? 1 : 0;
+        const visible = group.visible !== false ? 1 : 0;
         // Use count + first/last ID instead of full list to avoid O(n) string for large groups
         const shapeIds = group.shapeIds || [];
         const sids = `${shapeIds.length}:${Number(shapeIds[0] ?? -1)}:${Number(shapeIds[shapeIds.length - 1] ?? -1)}`;
-        return `${gid}:${depth}:${expanded}:${String(group.name || "")}:${String(group.parentId ?? "")}:${sids}`;
+        return `${gid}:${depth}:${expanded}:${visible}:${String(group.name || "")}:${String(group.parentId ?? "")}:${sids}`;
       }).join("|"),
       // Use count + first ID as cheap proxy to avoid O(n) string for large ungrouped sets
       `${unGroupedShapes.length}:${Number(unGroupedShapes[0]?.id ?? -1)}`,
@@ -3981,12 +4315,32 @@ export function refreshUi(state, dom) {
         && (group.shapeIds || []).some(sid => selectedShapeIdSet.has(Number(sid)));
       name.style.color = groupHasSelectedObject ? "#16a34a" : "var(--muted)";
       name.style.fontWeight = isActiveGroup ? "600" : "400";
+      if (group.visible === false) {
+        name.style.opacity = "0.55";
+      }
       name.style.fontSize = "11px";
       name.style.flex = "1";
       row.style.cursor = "pointer";
       row.title = isActiveGroup ? panelText.active : panelText.clickToSelect;
       nameWrap.append(treeBtn, name);
-      row.append(nameWrap);
+      const visWrap = document.createElement("label");
+      visWrap.style.display = "inline-flex";
+      visWrap.style.alignItems = "center";
+      visWrap.style.gap = "4px";
+      visWrap.style.marginLeft = "auto";
+      visWrap.style.cursor = "pointer";
+      visWrap.title = (group.visible === false) ? "Show group" : "Hide group";
+      visWrap.addEventListener("click", (ev) => ev.stopPropagation());
+      visWrap.addEventListener("mousedown", (ev) => ev.stopPropagation());
+      const visCb = document.createElement("input");
+      visCb.type = "checkbox";
+      visCb.setAttribute("data-group-visible", String(group.id));
+      visCb.checked = group.visible !== false;
+      visCb.style.margin = "0";
+      visCb.addEventListener("click", (ev) => ev.stopPropagation());
+      visCb.addEventListener("mousedown", (ev) => ev.stopPropagation());
+      visWrap.append(visCb);
+      row.append(nameWrap, visWrap);
       dom.groupList.appendChild(row);
 
       // Show child objects when this group is expanded.
@@ -4172,6 +4526,49 @@ export function refreshUi(state, dom) {
     dom.moveGroupOriginOnlyBtn.classList.toggle("is-active", active);
     dom.moveGroupOriginOnlyBtn.textContent = active ? panelText.movingOrigin : panelText.moveOrigin;
   }
+  const activeGroup = (state.groups || []).find((g) => Number(g.id) === Number(state.activeGroupId)) || null;
+  const aim = activeGroup?.aimConstraint || {};
+  const aimEnabled = !!aim.enabled;
+  const aimTargetType = String(aim.targetType || "");
+  const aimTargetId = Number(aim.targetId);
+  const aimPickActive = !!(state.input?.groupAimPick?.active)
+    && Number(state.input?.groupAimPick?.groupId) === Number(state.activeGroupId);
+  const aimCandidateType = String(state.input?.groupAimPick?.candidateType || "");
+  const aimCandidateId = Number(state.input?.groupAimPick?.candidateId);
+  if (dom.groupAimEnableToggle) {
+    dom.groupAimEnableToggle.disabled = (state.activeGroupId == null);
+    dom.groupAimEnableToggle.checked = aimEnabled;
+  }
+  if (dom.groupAimPickBtn) {
+    dom.groupAimPickBtn.disabled = (state.activeGroupId == null);
+    dom.groupAimPickBtn.classList.toggle("is-active", aimPickActive);
+    dom.groupAimPickBtn.textContent = aimPickActive
+      ? ((panelLang === "en") ? "Confirm" : "決定")
+      : ((panelLang === "en") ? "Pick Target" : "注視先を指定");
+  }
+  if (dom.groupAimClearBtn) {
+    const hasAimTarget = aimTargetType.length > 0 && Number.isFinite(aimTargetId);
+    dom.groupAimClearBtn.disabled = (state.activeGroupId == null) || (!hasAimTarget && !aimEnabled);
+  }
+  if (dom.groupAimStatus) {
+    let text = (panelLang === "en") ? "Target: None" : "ターゲット: なし";
+    if (aimTargetType === "group" && Number.isFinite(aimTargetId)) {
+      text = (panelLang === "en") ? `Target: Group #${aimTargetId}` : `ターゲット: グループ #${aimTargetId}`;
+    } else if (aimTargetType === "position" && Number.isFinite(aimTargetId)) {
+      text = (panelLang === "en") ? `Target: Position #${aimTargetId}` : `ターゲット: 位置 #${aimTargetId}`;
+    }
+    if (aimPickActive) {
+      if (aimCandidateType === "group" && Number.isFinite(aimCandidateId)) {
+        text = (panelLang === "en") ? `Candidate: Group #${aimCandidateId}` : `候補: グループ #${aimCandidateId}`;
+      } else if (aimCandidateType === "position" && Number.isFinite(aimCandidateId)) {
+        text = (panelLang === "en") ? `Candidate: Position #${aimCandidateId}` : `候補: 位置 #${aimCandidateId}`;
+      } else {
+        text = (panelLang === "en") ? "Picking target..." : "クリック待機中...";
+      }
+    }
+    if (aimEnabled && !aimPickActive) text += (panelLang === "en") ? " (ON)" : " (ON)";
+    dom.groupAimStatus.textContent = text;
+  }
   if (dom.mergeGroupsBtn) {
     dom.mergeGroupsBtn.disabled = !(state.tool === "select" && (state.selection?.ids?.length > 1) && state.activeGroupId == null);
   }
@@ -4272,7 +4669,9 @@ export function refreshUi(state, dom) {
     if (dom.circleThreePointHint) dom.circleThreePointHint.style.display = (mode === "threepoint") ? "block" : "none";
     if (dom.circleThreePointOps) dom.circleThreePointOps.style.display = (mode === "threepoint") ? "block" : "none";
     if (dom.circleThreePointRunBtn) {
+      const touchMode = !!state.ui?.touchMode;
       const count = Array.isArray(state.input?.circleThreePointRefs) ? state.input.circleThreePointRefs.length : 0;
+      dom.circleThreePointRunBtn.style.display = touchMode ? "none" : "";
       dom.circleThreePointRunBtn.disabled = !(mode === "threepoint" && count >= 3);
     }
   }
@@ -4300,7 +4699,9 @@ export function refreshUi(state, dom) {
     dom.trimNoDeleteToggle.checked = !!state.trimSettings?.noDelete;
   }
   if (dom.applyFilletBtn) {
-    dom.applyFilletBtn.disabled = false;
+    const touchMode = !!state.ui?.touchMode;
+    dom.applyFilletBtn.style.display = (!touchMode && state.tool === "fillet") ? "" : "none";
+    dom.applyFilletBtn.disabled = !((state.selection?.ids || []).length >= 2);
   }
   if (dom.dlineOffsetInput) {
     const v = Number(state.dlineSettings?.offset || 10);
@@ -4314,7 +4715,9 @@ export function refreshUi(state, dom) {
     dom.dlineNoTrimToggle.checked = !!state.dlineSettings?.noTrim;
   }
   if (dom.applyDLineBtn) {
+    const touchMode = !!state.ui?.touchMode;
     const ready = !!(state.tool === "doubleline" && state.dlinePreview && state.dlinePreview.length > 0);
+    dom.applyDLineBtn.style.display = touchMode ? "none" : "";
     dom.applyDLineBtn.disabled = !ready;
   }
   if (dom.positionSizeInput) {
@@ -4384,6 +4787,38 @@ export function refreshUi(state, dom) {
     const v = Math.max(1, Number(first?.size ?? state.positionSettings?.size ?? 20));
     syncInputValue(dom.selectionPositionSizeInput, v);
     dom.selectionPositionSizeInput.disabled = !first;
+  }
+  if (dom.selectionImageWidthInput || dom.selectionImageHeightInput || dom.selectionImageLockAspectToggle || dom.selectionImageLockTransformToggle) {
+    const ids = new Set((state.selection?.ids || []).map(Number));
+    let first = null;
+    for (const s of (state.shapes || [])) {
+      if (!ids.has(Number(s.id))) continue;
+      if (s.type !== "image") continue;
+      first = s;
+      break;
+    }
+    if (dom.selectionImageWidthInput) {
+      const v = Math.max(1, Number(first?.width || 1));
+      syncInputValue(dom.selectionImageWidthInput, v);
+      dom.selectionImageWidthInput.disabled = !first;
+    }
+    if (dom.selectionImageHeightInput) {
+      const v = Math.max(1, Number(first?.height || 1));
+      syncInputValue(dom.selectionImageHeightInput, v);
+      dom.selectionImageHeightInput.disabled = !first;
+    }
+    if (dom.selectionImageLockAspectToggle) {
+      dom.selectionImageLockAspectToggle.checked = !!first?.lockAspect;
+      dom.selectionImageLockAspectToggle.disabled = !first;
+    }
+    if (dom.selectionImageLockTransformToggle) {
+      dom.selectionImageLockTransformToggle.checked = !!first?.lockTransform;
+      dom.selectionImageLockTransformToggle.disabled = !first;
+    }
+    const transformLocked = !!first?.lockTransform;
+    if (dom.selectionImageWidthInput) dom.selectionImageWidthInput.disabled = !first || transformLocked;
+    if (dom.selectionImageHeightInput) dom.selectionImageHeightInput.disabled = !first || transformLocked;
+    if (dom.selectionImageLockAspectToggle) dom.selectionImageLockAspectToggle.disabled = !first || transformLocked;
   }
   if (dom.selectionCircleCenterMarkToggle) {
     const ids = new Set((state.selection?.ids || []).map(Number));
@@ -4465,6 +4900,19 @@ export function refreshUi(state, dom) {
   const dimChainOps = document.getElementById("dimChainOps");
   if (dimChainOps) {
     dimChainOps.style.display = (state.tool === "dim" && state.dimSettings.linearMode === "chain") ? "block" : "none";
+    const touchMode = !!state.ui?.touchMode;
+    const isChain = state.tool === "dim" && String(state.dimSettings?.linearMode || "single") === "chain";
+    const isDraft = !!(state.dimDraft && state.dimDraft.type === "dimchain");
+    const canPrepare = isChain && isDraft && !state.dimDraft.awaitingPlacement && (state.dimDraft.points || []).length >= 2;
+    const canFinalize = isChain && isDraft && !!state.dimDraft.awaitingPlacement && !!state.dimDraft.place;
+    if (dom.dimChainPrepareBtn) {
+      dom.dimChainPrepareBtn.style.display = (!touchMode && isChain) ? "" : "none";
+      dom.dimChainPrepareBtn.disabled = !canPrepare;
+    }
+    if (dom.dimChainFinalizeBtn) {
+      dom.dimChainFinalizeBtn.style.display = (!touchMode && isChain) ? "" : "none";
+      dom.dimChainFinalizeBtn.disabled = !canFinalize;
+    }
   }
   const dimModeOptions = document.getElementById("dimModeOptions");
   if (dimModeOptions) {
@@ -4501,6 +4949,66 @@ export function refreshUi(state, dom) {
   }
   if (dom.menuScaleSelect) {
     syncInputValue(dom.menuScaleSelect, menuScalePct);
+  }
+  if (dom.touchModeToggle) {
+    dom.touchModeToggle.checked = !!state.ui?.touchMode;
+  }
+  if (dom.touchConfirmOverlay && dom.touchConfirmBtn) {
+    const touchMode = !!state.ui?.touchMode;
+    const tool = String(state.tool || "");
+    const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+    const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+    const circleModeRaw = String(state.circleSettings?.mode || "").toLowerCase();
+    const circleMode = (circleModeRaw === "fixed" || circleModeRaw === "threepoint" || circleModeRaw === "drag")
+      ? circleModeRaw
+      : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
+    const circleThreePointCount = Array.isArray(state.input?.circleThreePointRefs) ? state.input.circleThreePointRefs.length : 0;
+    const isChainDim = tool === "dim" && String(state.dimSettings?.linearMode || "single") === "chain";
+    const chainDraft = (state.dimDraft && state.dimDraft.type === "dimchain") ? state.dimDraft : null;
+    const canPrepareDim = !!(isChainDim && chainDraft && !chainDraft.awaitingPlacement && (chainDraft.points || []).length >= 2);
+    const canFinalizeDim = !!(isChainDim && chainDraft && chainDraft.awaitingPlacement && chainDraft.place);
+    const canLineFinalize = (tool === "line" && (lineMode === "continuous" || lineMode === "freehand"));
+    const canCircleThreePoint = (tool === "circle" && circleMode === "threepoint" && circleThreePointCount >= 3);
+    const hasPatternCopySelection = ((state.selection?.ids || []).length > 0) || ((state.selection?.groupIds || []).length > 0);
+    const patternCopyMode = String(state.patternCopySettings?.mode || "array");
+    let canPatternCopy = (tool === "patterncopy" && hasPatternCopySelection);
+    if (canPatternCopy && patternCopyMode === "rotate") canPatternCopy = !!state.input?.patternCopyFlow?.centerPositionId;
+    if (canPatternCopy && patternCopyMode === "mirror") canPatternCopy = !!state.input?.patternCopyFlow?.axisLineId;
+    const canFillet = (tool === "fillet" && (state.selection?.ids || []).length >= 2);
+    const canDline = (tool === "doubleline" && Array.isArray(state.dlinePreview) && state.dlinePreview.length > 0);
+    const canHatch = (tool === "hatch" && (state.hatchDraft?.boundaryIds || []).length > 0);
+    const show = touchMode && (canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy");
+    let enabled = false;
+    let label = panelLang === "en" ? "Confirm" : "決定";
+    if (canLineFinalize) {
+      enabled = !!(state.polylineDraft && (state.polylineDraft.points || []).length >= 2);
+      label = (lineMode === "freehand")
+        ? (panelLang === "en" ? "Finalize B-Spline" : "Bスプライン確定")
+        : (panelLang === "en" ? "Finish Continuous Line" : "連続線を確定");
+    } else if (isChainDim) {
+      enabled = canPrepareDim || canFinalizeDim;
+      label = canFinalizeDim
+        ? (panelLang === "en" ? "Finalize Dim" : "寸法確定")
+        : (panelLang === "en" ? "Set Placement" : "配置位置を指定");
+    } else if (tool === "circle" && circleMode === "threepoint") {
+      enabled = canCircleThreePoint;
+      label = panelLang === "en" ? "Create 3-Point Circle" : "三点円を作成";
+    } else if (tool === "fillet") {
+      enabled = canFillet;
+      label = panelLang === "en" ? "Apply Fillet" : "フィレット実行";
+    } else if (tool === "doubleline") {
+      enabled = canDline;
+      label = panelLang === "en" ? "Apply Double Line" : "二重線を適用";
+    } else if (tool === "hatch") {
+      enabled = canHatch;
+      label = panelLang === "en" ? "Apply Hatch" : "ハッチング実行";
+    } else if (tool === "patterncopy") {
+      enabled = canPatternCopy;
+      label = panelLang === "en" ? "Run Pattern Copy" : "パターンコピー実行";
+    }
+    dom.touchConfirmOverlay.style.display = show ? "block" : "none";
+    dom.touchConfirmBtn.disabled = !enabled;
+    dom.touchConfirmBtn.textContent = label;
   }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.checked = !!state.ui?.showFps;

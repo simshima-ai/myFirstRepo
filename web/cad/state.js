@@ -1,4 +1,68 @@
-﻿export function createState() {
+﻿export const TOOL_SHORTCUT_TOOL_ORDER = Object.freeze([
+  "select",
+  "line",
+  "rect",
+  "circle",
+  "position",
+  "dim",
+  "text",
+  "vertex",
+  "fillet",
+  "trim",
+  "hatch",
+  "doubleline",
+  "patterncopy",
+]);
+
+export const DEFAULT_TOOL_SHORTCUTS = Object.freeze({
+  select: "S",
+  line: "L",
+  rect: "R",
+  circle: "C",
+  position: "P",
+  dim: "D",
+  text: "T",
+  vertex: "V",
+  fillet: "F",
+  trim: "M",
+  hatch: "H",
+  doubleline: "B",
+  patterncopy: "Y",
+});
+
+export function normalizeShortcutKey(v) {
+  if (v == null) return "";
+  const key = String(v).trim().toUpperCase();
+  return /^[A-Z0-9]$/.test(key) ? key : "";
+}
+
+export function sanitizeToolShortcuts(rawMap) {
+  const out = {};
+  for (const tool of TOOL_SHORTCUT_TOOL_ORDER) {
+    out[tool] = normalizeShortcutKey(DEFAULT_TOOL_SHORTCUTS[tool] || "");
+  }
+  if (!rawMap || typeof rawMap !== "object") return out;
+  for (const tool of TOOL_SHORTCUT_TOOL_ORDER) {
+    if (!Object.prototype.hasOwnProperty.call(rawMap, tool)) continue;
+    const normalized = normalizeShortcutKey(rawMap[tool]);
+    out[tool] = normalized;
+  }
+  return out;
+}
+
+function normalizeGroupAimConstraint(raw) {
+  const enabled = !!raw?.enabled;
+  const targetTypeRaw = String(raw?.targetType || "").toLowerCase();
+  const targetType = (targetTypeRaw === "group" || targetTypeRaw === "position") ? targetTypeRaw : null;
+  const targetId = Number(raw?.targetId);
+  return {
+    enabled,
+    targetType,
+    targetId: Number.isFinite(targetId) ? targetId : null,
+  };
+}
+
+export function createState() {
   return {
     buildVersion: "v00-scaffold",
     tool: "select",
@@ -29,6 +93,7 @@
     lineSettings: {
       length: 100,
       angleDeg: 0,
+      mode: "segment", // "segment" | "continuous" | "freehand"
       continuous: false,
       sizeLocked: false,
       anchor: "endpoint_a", // "endpoint_a" | "endpoint_b" | "center"
@@ -133,6 +198,10 @@
         startWorldRaw: null,
         shapeSnapshots: null,
         modelSnapshotBeforeMove: null,
+        mode: null, // "move" | "resize-image"
+        resizeShapeId: null,
+        resizeCorner: null, // "tl" | "br"
+        resizeAnchor: null,
       },
     },
     vertexEdit: {
@@ -249,6 +318,12 @@
         moved: false,
         modelSnapshotBeforeMove: null,
       },
+      groupAimPick: {
+        active: false,
+        groupId: null,
+        candidateType: null,
+        candidateId: null,
+      },
       dimHandleDrag: {
         active: false,
         dimId: null,
@@ -312,10 +387,12 @@
       selectPickMode: "object", // "object" | "group"
       language: "ja",
       menuScalePct: 100,
+      touchMode: false,
       showFps: false,
       showObjectCount: false,
       autoBackupEnabled: true,
       autoBackupIntervalSec: 60,
+      toolShortcuts: sanitizeToolShortcuts(null),
       panelLayout: {
         rightPanelWidth: 188,
         groupPanelHeight: 420,
@@ -351,10 +428,12 @@ export function restoreModel(state, snap) {
       id: Number(g.id) || (i + 1),
       name: String(g.name || `Group ${i + 1}`),
       shapeIds: Array.isArray(g.shapeIds) ? g.shapeIds.map(Number) : [],
+      visible: g.visible !== false,
       parentId: (g.parentId == null) ? null : Number(g.parentId),
       originX: Number.isFinite(Number(g.originX)) ? Number(g.originX) : 0,
       originY: Number.isFinite(Number(g.originY)) ? Number(g.originY) : 0,
       rotationDeg: Number.isFinite(Number(g.rotationDeg)) ? Number(g.rotationDeg) : 0,
+      aimConstraint: normalizeGroupAimConstraint(g.aimConstraint),
     }))))
     : [];
   state.nextGroupId = Number(snap.nextGroupId) || (Math.max(0, ...state.groups.map(g => Number(g.id) || 0)) + 1);
@@ -475,6 +554,21 @@ export function isSelected(state, id) {
   return state.selection.ids.includes(Number(id));
 }
 
+export function isGroupVisible(state, groupId) {
+  const gid = Number(groupId);
+  if (!Number.isFinite(gid)) return true;
+  const byId = new Map((state.groups || []).map((g) => [Number(g.id), g]));
+  let cur = byId.get(gid);
+  let guard = 0;
+  while (cur && guard < 10000) {
+    if (cur.visible === false) return false;
+    if (cur.parentId == null) return true;
+    cur = byId.get(Number(cur.parentId));
+    guard += 1;
+  }
+  return true;
+}
+
 export function addShape(state, shape) {
   if (shape && (shape.layerId == null)) shape.layerId = state.activeLayerId;
   if (shape && !Number.isFinite(Number(shape.lineWidthMm))) {
@@ -497,6 +591,9 @@ export function addShape(state, shape) {
     } else if (shape.type === "circle" || shape.type === "arc") {
       ox = shape.cx;
       oy = shape.cy;
+    } else if (shape.type === "image") {
+      ox = Number(shape.x) + Number(shape.width) * 0.5;
+      oy = Number(shape.y) + Number(shape.height) * 0.5;
     } else if (shape.type === "position" || shape.type === "text") {
       ox = shape.x || shape.x1 || 0;
       oy = shape.y || shape.y1 || 0;
@@ -515,10 +612,12 @@ export function addShape(state, shape) {
       id,
       name: `Group ${id}`,
       shapeIds: [Number(shape.id)],
+      visible: true,
       parentId: null,
       originX: sox,
       originY: soy,
       rotationDeg: 0,
+      aimConstraint: normalizeGroupAimConstraint(null),
     };
     state.groups.unshift(group);
     shape.groupId = id;
@@ -542,6 +641,12 @@ export function addShapesAsGroup(state, shapes) {
     } else if (s.type === "circle" || s.type === "arc") {
       minX = Math.min(minX, s.cx - s.r); minY = Math.min(minY, s.cy - s.r);
       maxX = Math.max(maxX, s.cx + s.r); maxY = Math.max(maxY, s.cy + s.r);
+    } else if (s.type === "image") {
+      const x = Number(s.x), y = Number(s.y), w = Number(s.width), h = Number(s.height);
+      if ([x, y, w, h].every(Number.isFinite)) {
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
+      }
     }
   }
 
@@ -555,10 +660,12 @@ export function addShapesAsGroup(state, shapes) {
     id: gid,
     name: `Group ${gid}`,
     shapeIds: shapes.map(s => Number(s.id)),
+    visible: true,
     parentId: null,
     originX: sox,
     originY: soy,
     rotationDeg: 0,
+    aimConstraint: normalizeGroupAimConstraint(null),
   };
 
   state.groups.unshift(group);
@@ -627,6 +734,12 @@ export function translateShape(shape, dx, dy) {
   if (shape.type === "circleDim") {
     if (Number.isFinite(Number(shape.tx)) && Number.isFinite(Number(shape.ty))) {
       shape.tx += dx; shape.ty += dy;
+    }
+    return;
+  }
+  if (shape.type === "image") {
+    if (Number.isFinite(Number(shape.x)) && Number.isFinite(Number(shape.y))) {
+      shape.x += dx; shape.y += dy;
     }
     return;
   }
@@ -711,6 +824,12 @@ export function createGroupFromSelection(state, name) {
     } else if (s.type === "position") {
       minX = Math.min(minX, s.x); minY = Math.min(minY, s.y);
       maxX = Math.max(maxX, s.x); maxY = Math.max(maxY, s.y);
+    } else if (s.type === "image") {
+      const x = Number(s.x), y = Number(s.y), w = Number(s.width), h = Number(s.height);
+      if ([x, y, w, h].every(Number.isFinite)) {
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + w); maxY = Math.max(maxY, y + h);
+      }
     } else if (s.type === "dim") {
       minX = Math.min(minX, s.x1, s.x2, s.px); minY = Math.min(minY, s.y1, s.y2, s.py);
       maxX = Math.max(maxX, s.x1, s.x2, s.px); maxY = Math.max(maxY, s.y1, s.y2, s.py);
@@ -758,10 +877,12 @@ export function createGroupFromSelection(state, name) {
     id,
     name: String(name || `Group ${id}`),
     shapeIds: ids.slice(),
+    visible: true,
     parentId: null,
     originX: snapOriginX,
     originY: snapOriginY,
     rotationDeg: 0,
+    aimConstraint: normalizeGroupAimConstraint(null),
   };
   state.groups.unshift(group);
   // Keep shape.groupId consistent with groups[].shapeIds so group-pick hit tests work.
@@ -779,6 +900,8 @@ export function nextGroupId(state) {
 
 export function addGroup(state, group) {
   if (group && (group.id == null)) group.id = state.nextGroupId++;
+  if (group) group.visible = group.visible !== false;
+  if (group) group.aimConstraint = normalizeGroupAimConstraint(group.aimConstraint);
   state.groups.push(group);
   return group;
 }

@@ -1,5 +1,6 @@
 ﻿import {
-    clearSelection, setSelection, getGroup, pushHistorySnapshot
+    clearSelection, setSelection, getGroup, pushHistorySnapshot,
+    sanitizeToolShortcuts, normalizeShortcutKey
 } from "./state.js";
 import {
     screenToWorld, snapPoint, getEffectiveGridSize
@@ -8,7 +9,7 @@ import {
     hitActiveGroupRotateHandle, hitActiveGroupOriginHandle, hitTestVertexHandle,
     beginGroupRotateDrag, beginGroupOriginDrag, beginSelectionBox,
     hitTestShapes, hitTestDimHandle, beginDimHandleDrag, beginVertexDrag,
-    beginSelectionDrag, toggleGroupSelectionById,
+    beginSelectionDrag, beginImageScaleDrag, hitTestImageScaleHandle, toggleGroupSelectionById,
     findConnectedLinesChain,
     applyGroupRotateDrag, applyGroupOriginDrag, applyDimHandleDrag, applyVertexDrag,
     applySelectionDrag, updateSelectionBox,
@@ -59,13 +60,34 @@ export function getMouseWorld(state, dom, e, snapped = false) {
     return snapPoint(world, gridStep);
 }
 
+
+function isTypingTarget(target) {
+    if (!target) return false;
+    const el = target.nodeType === 1 ? target : target.parentElement;
+    if (!el) return false;
+    if (el.closest?.("input, textarea, select, [contenteditable='true']")) return true;
+    const tag = String(el.tagName || "").toLowerCase();
+    if (tag === "input" || tag === "textarea" || tag === "select") return true;
+    if (el.isContentEditable) return true;
+    return false;
+}
+
+function findToolByShortcut(state, keyRaw) {
+    const key = normalizeShortcutKey(keyRaw);
+    if (!key) return null;
+    const shortcuts = sanitizeToolShortcuts(state?.ui?.toolShortcuts);
+    for (const [tool, bound] of Object.entries(shortcuts)) {
+        if (normalizeShortcutKey(bound) === key) return tool;
+    }
+    return null;
+}
 export function setupInputListeners(state, dom, helpers) {
     const {
         draw, setStatus, pushHistory, snapshotModel, addShape, nextShapeId,
         clearSelection, setSelection, finalizeDimDraft, trimClickedLineAtNearestIntersection,
         createLine, createRect, createCircle, createPosition, createText, createArc,
         beginOrExtendPolyline, updatePolylineHover, finalizePolylineDraft,
-        beginOrAdvanceDim, updateDimHover, executeHatch, executeDoubleLine
+        beginOrAdvanceDim, updateDimHover, executeHatch, executeDoubleLine, setTool
     } = helpers;
     const normalizeLineType = (v) => {
         const allowed = new Set(["solid", "dashed", "dotted", "dashdot", "longdash", "center", "hidden"]);
@@ -76,6 +98,52 @@ export function setupInputListeners(state, dom, helpers) {
         const raw = String(state.circleSettings?.mode || "").toLowerCase();
         if (raw === "drag" || raw === "fixed" || raw === "threepoint") return raw;
         return state.circleSettings?.radiusLocked ? "fixed" : "drag";
+    };
+    const getLineCreateMode = () => {
+        const raw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+        if (raw === "continuous" || raw === "freehand") return raw;
+        return "segment";
+    };
+    const beginOrExtendBsplineDraft = (world) => {
+        const x = Number(world?.x), y = Number(world?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+        if (!state.polylineDraft || state.polylineDraft.kind !== "bspline") {
+            state.polylineDraft = { kind: "bspline", points: [], hoverPoint: null };
+        }
+        const pts = state.polylineDraft.points;
+        const prev = pts.length ? pts[pts.length - 1] : null;
+        if (prev && Math.hypot(x - Number(prev.x), y - Number(prev.y)) < 1e-9) return;
+        pts.push({ x, y });
+        state.polylineDraft.hoverPoint = { x, y };
+    };
+    const updateBsplineDraftHover = (world) => {
+        if (!state.polylineDraft || state.polylineDraft.kind !== "bspline") return;
+        state.polylineDraft.hoverPoint = { x: Number(world?.x) || 0, y: Number(world?.y) || 0 };
+    };
+    const finalizeBsplineDraft = () => {
+        const d = state.polylineDraft;
+        if (!d || d.kind !== "bspline" || !Array.isArray(d.points) || d.points.length < 2) {
+            state.polylineDraft = null;
+            return false;
+        }
+        const controlPoints = d.points
+            .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+        state.polylineDraft = null;
+        if (controlPoints.length < 2) return false;
+        const shape = {
+            type: "bspline",
+            controlPoints,
+            degree: Math.max(1, Math.min(3, controlPoints.length - 1)),
+        };
+        shape.id = nextShapeId();
+        shape.layerId = state.activeLayerId;
+        applyToolStrokeToShape(shape, "line");
+        pushHistory();
+        addShape(shape);
+        clearSelection();
+        state.activeGroupId = null;
+        return true;
     };
     const applyToolStrokeToShape = (shape, toolKey = state.tool) => {
         if (!shape) return shape;
@@ -240,7 +308,7 @@ export function setupInputListeners(state, dom, helpers) {
         return false;
     };
     const resolvePolylineDraftEndpointSnap = (worldRaw, baseSnap = null) => {
-        const isContinuousLine = state.tool === "line" && !!state.lineSettings?.continuous;
+        const isContinuousLine = state.tool === "line" && getLineCreateMode() === "continuous";
         const isPolylineTool = state.tool === "polyline";
         const pts = state.polylineDraft?.points;
         if ((!isContinuousLine && !isPolylineTool) || !Array.isArray(pts) || pts.length === 0) return baseSnap;
@@ -338,6 +406,12 @@ export function setupInputListeners(state, dom, helpers) {
                 if (draw) draw();
                 return;
             }
+            const imageHandleHit = hitTestImageScaleHandle(state, worldRaw);
+            if (imageHandleHit) {
+                beginImageScaleDrag(state, imageHandleHit, worldRaw);
+                if (draw) draw();
+                return;
+            }
             const hit = hitTestShapes(state, worldRaw, dom);
             if (hit) {
                 const pickMode = String(state.ui?.selectPickMode || "object");
@@ -356,7 +430,14 @@ export function setupInputListeners(state, dom, helpers) {
                         state.activeGroupId = null;
                     }
                 }
-                beginSelectionDrag(state, worldRaw, helpers);
+                let dragStarted = beginSelectionDrag(state, worldRaw, helpers);
+                // In group-pick mode, object drag can fail because selection.ids is empty.
+                // Allow direct line dragging once the line is clicked.
+                if (!dragStarted && hit.type === "line") {
+                    setSelection([Number(hit.id)]);
+                    state.activeGroupId = null;
+                    dragStarted = beginSelectionDrag(state, worldRaw, helpers);
+                }
                 if (draw) draw();
                 return;
             } else {
@@ -395,6 +476,19 @@ export function setupInputListeners(state, dom, helpers) {
 
         if (state.tool === "line" || state.tool === "rect" || state.tool === "circle") {
             if (e.button !== 0) return;
+            // Allow dragging already-selected objects even while draw tools are active.
+            // This is especially useful for selected lines in object-pick mode.
+            {
+                const hitForDrag = hitTestShapes(state, worldRaw, dom);
+                const pickMode = String(state.ui?.selectPickMode || "object");
+                const selSet = new Set((state.selection?.ids || []).map(Number));
+                const isSelectedHit = !!hitForDrag && selSet.has(Number(hitForDrag.id));
+                if (pickMode === "object" && isSelectedHit) {
+                    beginSelectionDrag(state, worldRaw, helpers);
+                    if (draw) draw();
+                    return;
+                }
+            }
             if (state.tool === "circle") {
                 const circleMode = getCircleCreateMode();
                 if (circleMode === "threepoint") {
@@ -444,7 +538,18 @@ export function setupInputListeners(state, dom, helpers) {
                 if (draw) draw();
                 return;
             }
-            if (state.tool === "line" && !!state.lineSettings?.sizeLocked && !state.input.dragStartWorld && !state.lineSettings?.continuous) {
+            if (state.tool === "line" && getLineCreateMode() === "freehand") {
+                beginOrExtendBsplineDraft(world);
+                if (setStatus) {
+                    const touchMode = !!state.ui?.touchMode;
+                    setStatus(touchMode
+                        ? "Bスプライン: 制御点を追加（下中央の「確定」で作成）"
+                        : "Bスプライン: 制御点を追加（Enter/ダブルクリックで確定）");
+                }
+                if (draw) draw();
+                return;
+            }
+            if (state.tool === "line" && !!state.lineSettings?.sizeLocked && !state.input.dragStartWorld && getLineCreateMode() === "segment") {
                 const ll = Math.max(0, Number(state.lineSettings?.length) || 0);
                 const aa = Number(state.lineSettings?.angleDeg ?? state.lineSettings?.angle ?? 0) || 0;
                 if (ll > 0) {
@@ -487,9 +592,14 @@ export function setupInputListeners(state, dom, helpers) {
                 }
                 return;
             }
-            if (state.tool === "line" && state.lineSettings.continuous) {
+            if (state.tool === "line" && getLineCreateMode() === "continuous") {
                 beginOrExtendPolyline(world);
-                if (setStatus) setStatus("クリックで頂点追加  Enterキーで決定");
+                if (setStatus) {
+                    const touchMode = !!state.ui?.touchMode;
+                    setStatus(touchMode
+                        ? "クリックで頂点追加  下中央の「確定」で作成"
+                        : "クリックで頂点追加  Enterキーで決定");
+                }
                 if (draw) draw();
                 return;
             }
@@ -650,7 +760,12 @@ export function setupInputListeners(state, dom, helpers) {
                     setSelection([cur[1], hid]);
                 }
                 if (setStatus) {
-                    if (state.selection.ids.length >= 2) setStatus("Fillet: candidate ready. Click or press Enter to apply, Esc to cancel.");
+                    if (state.selection.ids.length >= 2) {
+                        const touchMode = !!state.ui?.touchMode;
+                        setStatus(touchMode
+                            ? "Fillet: candidate ready. Tap the bottom-center Confirm button to apply."
+                            : "Fillet: candidate ready. Click or press Enter to apply, Esc to cancel.");
+                    }
                     else setStatus("Fillet: select 2 objects.");
                 }
             }
@@ -839,8 +954,11 @@ export function setupInputListeners(state, dom, helpers) {
             helpers.updateDimHover(worldRaw, dimWorld);
         }
 
-        if (state.tool === "polyline" || (state.tool === "line" && state.lineSettings.continuous)) {
+        if (state.tool === "polyline" || (state.tool === "line" && getLineCreateMode() === "continuous")) {
             helpers.updatePolylineHover(state.input.hoverWorld);
+        }
+        if (state.tool === "line" && getLineCreateMode() === "freehand") {
+            updateBsplineDraftHover(state.input.hoverWorld);
         }
 
         // Preview Shape
@@ -862,7 +980,7 @@ export function setupInputListeners(state, dom, helpers) {
                     state.preview = helpers.createPosition(ph);
                     state.preview.size = Number(state.positionSettings?.size) || 20;
                     state.preview.positionPreviewMode = "actual";
-                } else if (state.tool === "line" && !!state.lineSettings?.sizeLocked && !state.lineSettings?.continuous) {
+                } else if (state.tool === "line" && !!state.lineSettings?.sizeLocked && getLineCreateMode() === "segment") {
                     const ll = Math.max(0, Number(state.lineSettings?.length) || 0);
                     const aa = Number(state.lineSettings?.angleDeg ?? state.lineSettings?.angle ?? 0) || 0;
                     const anchorKey = String(state.lineSettings?.anchor || "endpoint_a");
@@ -870,6 +988,9 @@ export function setupInputListeners(state, dom, helpers) {
                     state.preview = helpers.createLine(p1, p2);
                     state.preview.linePreviewMode = "fixed";
                     state.preview.lineAnchorWorld = { x: Number(ph.x), y: Number(ph.y) };
+                } else if (state.tool === "line" && getLineCreateMode() === "freehand") {
+                    state.preview = helpers.createPosition(ph);
+                    state.preview.positionPreviewMode = "marker";
                 } else if (state.tool === "rect" && !!state.rectSettings?.sizeLocked) {
                     const ww = Math.max(0, Number(state.rectSettings?.width) || 0);
                     const hh = Math.max(0, Number(state.rectSettings?.height) || 0);
@@ -1019,20 +1140,16 @@ export function setupInputListeners(state, dom, helpers) {
                     }
                 }
                 if (keepUsed) {
-                    if (!state.objectSnap) state.objectSnap = {};
-                    state.objectSnap.keepAttributes = false;
-                    state.objectSnap.tangentKeep = false; // legacy alias
-                    if (dom.objSnapTangentKeepToggle) dom.objSnapTangentKeepToggle.checked = false;
+                    // Keep "属性を保持" toggle state as-is after applying once.
                 }
                 pushHistorySnapshot(state, snapshot);
             }
         }
         if (state.selection.drag.active) {
-            const moved = endSelectionDrag(state);
+            const { moved, snapshot } = endSelectionDrag(state);
             if (moved) {
-                // We should have a snapshot from beginSelectionDrag
-                const snap = state.selection.drag.modelSnapshotBeforeMove;
-                if (snap) pushHistorySnapshot(state, snap);
+                // Snapshot captured at beginSelectionDrag.
+                if (snapshot) pushHistorySnapshot(state, snapshot);
                 else pushHistory(state); // fallback
             }
         }
@@ -1073,9 +1190,14 @@ export function setupInputListeners(state, dom, helpers) {
     });
 
     dom.canvas.addEventListener("dblclick", (e) => {
-        if (state.tool === "polyline" || (state.tool === "line" && state.lineSettings.continuous)) {
+        if (state.tool === "polyline" || (state.tool === "line" && getLineCreateMode() === "continuous")) {
             helpers.finalizePolylineDraft();
             if (setStatus) setStatus(state.tool === "line" ? "Continuous line finished" : "Polyline finished");
+            if (draw) draw();
+        }
+        if (state.tool === "line" && getLineCreateMode() === "freehand") {
+            const ok = finalizeBsplineDraft();
+            if (ok && setStatus) setStatus("Bスプライン作成完了");
             if (draw) draw();
         }
         if (state.tool === "dim") {
@@ -1099,12 +1221,12 @@ export function setupInputListeners(state, dom, helpers) {
         if (draw) draw();
     }, { passive: false });
 
-    // Hatch: double-click to auto-select connected chain from clicked line/arc/rect.
+    // Hatch: double-click to auto-select connected chain from clicked line/arc/rect/bspline.
     dom.canvas.addEventListener("dblclick", (e) => {
         if (state.tool !== "hatch") return;
         const worldRaw = getMouseWorld(state, dom, e, false);
         const hit = hitTestShapes(state, worldRaw, dom);
-        if (!hit || (hit.type !== "line" && hit.type !== "arc" && hit.type !== "rect")) return;
+        if (!hit || (hit.type !== "line" && hit.type !== "arc" && hit.type !== "rect" && hit.type !== "bspline")) return;
         const id = Number(hit.id);
         const chain = findConnectedLinesChain(state, id).map(Number).filter(Number.isFinite);
         if (!state.hatchDraft.boundaryIds) state.hatchDraft.boundaryIds = [];
@@ -1146,6 +1268,17 @@ export function setupInputListeners(state, dom, helpers) {
             e.preventDefault();
             return;
         }
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(e.target)) {
+            const shortcutTool = findToolByShortcut(state, e.key);
+            if (shortcutTool) {
+                if (setTool) setTool(shortcutTool);
+                else state.tool = shortcutTool;
+                if (setStatus) setStatus(`Tool changed: ${String(shortcutTool).toUpperCase()}`);
+                if (draw) draw();
+                e.preventDefault();
+                return;
+            }
+        }
         if (e.key === "Escape") {
             state.input.dragStartWorld = null;
             state.polylineDraft = null;
@@ -1169,9 +1302,16 @@ export function setupInputListeners(state, dom, helpers) {
         if (e.key === "Delete") {
             if (helpers.delete) helpers.delete();
         }
-        if (e.key === "Enter" && (state.tool === "polyline" || (state.tool === "line" && state.lineSettings.continuous))) {
+        if (e.key === "Enter" && (state.tool === "polyline" || (state.tool === "line" && getLineCreateMode() === "continuous"))) {
             helpers.finalizePolylineDraft();
             if (setStatus) setStatus(state.tool === "line" ? "Continuous line finished" : "Polyline finished");
+            if (draw) draw();
+            e.preventDefault();
+            return;
+        }
+        if (e.key === "Enter" && state.tool === "line" && getLineCreateMode() === "freehand") {
+            const ok = finalizeBsplineDraft();
+            if (ok && setStatus) setStatus("Bスプライン作成完了");
             if (draw) draw();
             e.preventDefault();
             return;
@@ -1252,3 +1392,5 @@ export function setupInputListeners(state, dom, helpers) {
         if (draw) draw();
     });
 }
+
+

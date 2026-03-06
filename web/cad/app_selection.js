@@ -1,7 +1,7 @@
 ﻿import {
     getGroup, setActiveGroup, setSelection, clearSelection,
     snapshotModel, pushHistory, pushHistorySnapshot,
-    isLayerVisible, isLayerLocked
+    isLayerVisible, isLayerLocked, isGroupVisible
 } from "./state.js";
 import {
     normalizeRad, angleDegFromOrigin, rotatePointAround,
@@ -182,6 +182,16 @@ export function getVertexAtKey(shape, key) {
     if (!shape) return null;
     if (key === "p1" && (shape.type === "line" || shape.type === "rect")) return { x: shape.x1, y: shape.y1 };
     if (key === "p2" && (shape.type === "line" || shape.type === "rect")) return { x: shape.x2, y: shape.y2 };
+    if (shape.type === "bspline") {
+        const m = /^cp(\d+)$/.exec(String(key || ""));
+        if (!m) return null;
+        const idx = Number(m[1]);
+        const cp = Array.isArray(shape.controlPoints) ? shape.controlPoints[idx] : null;
+        if (!cp) return null;
+        const x = Number(cp.x), y = Number(cp.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+        return { x, y };
+    }
     if (shape.type === "arc" && key === "a1") {
         const cx = Number(shape.cx), cy = Number(shape.cy), r = Number(shape.r), a1 = Number(shape.a1);
         if (![cx, cy, r, a1].every(Number.isFinite)) return null;
@@ -211,6 +221,15 @@ export function setVertexAtKey(shape, key, p) {
         else shape.a2 = ang;
         return true;
     }
+    if (shape.type === "bspline") {
+        const m = /^cp(\d+)$/.exec(String(key || ""));
+        if (!m) return false;
+        const idx = Number(m[1]);
+        if (!Array.isArray(shape.controlPoints) || !shape.controlPoints[idx]) return false;
+        shape.controlPoints[idx].x = Number(p.x);
+        shape.controlPoints[idx].y = Number(p.y);
+        return Number.isFinite(shape.controlPoints[idx].x) && Number.isFinite(shape.controlPoints[idx].y);
+    }
     return false;
 }
 
@@ -222,7 +241,7 @@ export function hitTestVertexHandle(state, world) {
     for (let i = state.shapes.length - 1; i >= 0; i--) {
         const s = state.shapes[i];
         if (!isLayerVisibleFast(s.layerId)) continue;
-        if (!(s.type === "line" || s.type === "rect" || s.type === "arc")) continue;
+        if (!(s.type === "line" || s.type === "rect" || s.type === "arc" || s.type === "bspline")) continue;
         if (filterShapeId !== null && Number(s.id) !== filterShapeId) continue;
         if (s.type === "line" || s.type === "rect") {
             const p1d = Math.hypot(world.x - s.x1, world.y - s.y1);
@@ -234,6 +253,13 @@ export function hitTestVertexHandle(state, world) {
             const pA2 = getVertexAtKey(s, "a2");
             if (pA1 && Math.hypot(world.x - pA1.x, world.y - pA1.y) <= tol) return { shapeId: s.id, key: "a1" };
             if (pA2 && Math.hypot(world.x - pA2.x, world.y - pA2.y) <= tol) return { shapeId: s.id, key: "a2" };
+        } else if (s.type === "bspline" && Array.isArray(s.controlPoints)) {
+            for (let ci = 0; ci < s.controlPoints.length; ci++) {
+                const cp = s.controlPoints[ci];
+                const x = Number(cp?.x), y = Number(cp?.y);
+                if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+                if (Math.hypot(world.x - x, world.y - y) <= tol) return { shapeId: s.id, key: `cp${ci}` };
+            }
         }
     }
     return null;
@@ -254,8 +280,12 @@ export function getCoincidentVertexGroup(state, hit) {
     const out = [];
     for (const s of state.shapes) {
         if (!s || !isLayerVisible(state, s.layerId)) continue;
-        if (!(s.type === "line" || s.type === "rect" || s.type === "arc")) continue;
-        const keys = (s.type === "arc") ? ["a1", "a2"] : ["p1", "p2"];
+        if (!(s.type === "line" || s.type === "rect" || s.type === "arc" || s.type === "bspline")) continue;
+        const keys = (s.type === "arc")
+            ? ["a1", "a2"]
+            : (s.type === "bspline"
+                ? (Array.isArray(s.controlPoints) ? s.controlPoints.map((_, i) => `cp${i}`) : [])
+                : ["p1", "p2"]);
         for (const k of keys) {
             const p = getVertexAtKey(s, k);
             if (!p) continue;
@@ -323,16 +353,24 @@ export function endVertexSelectionBox(state, helpers) {
         const picked = [];
         for (const s of state.shapes) {
             if (!isLayerVisible(state, s.layerId)) continue;
-            if (!(s.type === "line" || s.type === "rect" || s.type === "arc")) continue;
+            if (!(s.type === "line" || s.type === "rect" || s.type === "arc" || s.type === "bspline")) continue;
             const pts = (s.type === "arc")
                 ? [
                     (() => { const p = getVertexAtKey(s, "a1"); return p ? { shapeId: Number(s.id), key: "a1", x: p.x, y: p.y } : null; })(),
                     (() => { const p = getVertexAtKey(s, "a2"); return p ? { shapeId: Number(s.id), key: "a2", x: p.x, y: p.y } : null; })(),
                 ].filter(Boolean)
-                : [
+                : (s.type === "bspline"
+                    ? (Array.isArray(s.controlPoints)
+                        ? s.controlPoints.map((cp, idx) => {
+                            const x = Number(cp?.x), y = Number(cp?.y);
+                            if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+                            return { shapeId: Number(s.id), key: `cp${idx}`, x, y };
+                        }).filter(Boolean)
+                        : [])
+                    : [
                     { shapeId: Number(s.id), key: "p1", x: s.x1, y: s.y1 },
                     { shapeId: Number(s.id), key: "p2", x: s.x2, y: s.y2 },
-                ];
+                ]);
             for (const p of pts) {
                 const sx = p.x * state.view.scale + state.view.offsetX;
                 const sy = p.y * state.view.scale + state.view.offsetY;
@@ -918,6 +956,13 @@ export function applyGroupOriginDrag(state, worldRaw) {
             }
         } else if (t.type === "text") {
             t.x1 = b.x1 + dx; t.y1 = b.y1 + dy;
+        } else if (t.type === "bspline") {
+            if (Array.isArray(b.controlPoints)) {
+                t.controlPoints = b.controlPoints.map((cp) => ({
+                    x: Number(cp?.x) + dx,
+                    y: Number(cp?.y) + dy,
+                }));
+            }
         }
     }
 }
@@ -1005,6 +1050,14 @@ export function applyGroupRotateDrag(state, worldRaw) {
             const p = rotatePointAround(b.x1, b.y1, ox, oy, delta);
             t.x1 = p.x; t.y1 = p.y;
             t.textRotate = (Number(b.textRotate) || 0) + delta;
+        } else if (t.type === "image") {
+            const p = rotatePointAround(Number(b.x), Number(b.y), ox, oy, delta);
+            t.x = p.x; t.y = p.y;
+            t.rotationDeg = (Number(b.rotationDeg) || 0) + delta;
+        } else if (t.type === "bspline") {
+            if (Array.isArray(b.controlPoints)) {
+                t.controlPoints = b.controlPoints.map((cp) => rotatePointAround(Number(cp?.x), Number(cp?.y), ox, oy, delta));
+            }
         }
     }
 }
@@ -1091,6 +1144,69 @@ export function beginSelectionDrag(state, worldRaw, helpers) {
     state.selection.drag.startWorldRaw = { x: worldRaw.x, y: worldRaw.y };
     state.selection.drag.shapeSnapshots = selected.map((s) => ({ id: s.id, shape: cloneShapeForDrag(s) }));
     state.selection.drag.modelSnapshotBeforeMove = snapshotModel(state);
+    state.selection.drag.mode = "move";
+    state.selection.drag.resizeShapeId = null;
+    state.selection.drag.resizeCorner = null;
+    state.selection.drag.resizeAnchor = null;
+    return true;
+}
+
+function getImageCornersWorld(shape) {
+    const x = Number(shape?.x), y = Number(shape?.y);
+    const w = Math.max(1e-9, Number(shape?.width) || 0);
+    const h = Math.max(1e-9, Number(shape?.height) || 0);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !(w > 0) || !(h > 0)) return null;
+    const cx = x + w * 0.5;
+    const cy = y + h * 0.5;
+    const rotDeg = Number(shape?.rotationDeg) || 0;
+    const rotPt = (px, py) => rotatePointAround(px, py, cx, cy, rotDeg);
+    return {
+        tl: rotPt(x, y),
+        tr: rotPt(x + w, y),
+        br: rotPt(x + w, y + h),
+        bl: rotPt(x, y + h),
+    };
+}
+
+function inverseRotatePointAround(p, cx, cy, rotDeg) {
+    return rotatePointAround(Number(p?.x), Number(p?.y), Number(cx), Number(cy), -Number(rotDeg || 0));
+}
+
+export function hitTestImageScaleHandle(state, worldRaw) {
+    const selectedIds = new Set((state.selection?.ids || []).map(Number));
+    if (!selectedIds.size) return null;
+    const images = (state.shapes || []).filter((s) => selectedIds.has(Number(s.id)) && String(s.type || "") === "image");
+    if (images.length !== 1) return null;
+    const s = images[0];
+    if (!isLayerVisible(state, s.layerId) || isLayerLocked(state, s.layerId)) return null;
+    const corners = getImageCornersWorld(s);
+    if (!corners) return null;
+    const tol = 9 / Math.max(1e-9, Number(state.view?.scale) || 1);
+    const dTl = Math.hypot(Number(worldRaw.x) - Number(corners.tl.x), Number(worldRaw.y) - Number(corners.tl.y));
+    const dBr = Math.hypot(Number(worldRaw.x) - Number(corners.br.x), Number(worldRaw.y) - Number(corners.br.y));
+    if (dTl <= tol) return { shapeId: Number(s.id), corner: "tl" };
+    if (dBr <= tol) return { shapeId: Number(s.id), corner: "br" };
+    return null;
+}
+
+export function beginImageScaleDrag(state, handleHit, worldRaw) {
+    const sid = Number(handleHit?.shapeId);
+    if (!Number.isFinite(sid)) return false;
+    const shape = (state.shapes || []).find((s) => Number(s.id) === sid && String(s.type || "") === "image");
+    if (!shape) return false;
+    if (!!shape.lockTransform) return false;
+    const corners = getImageCornersWorld(shape);
+    if (!corners) return false;
+    const anchor = (String(handleHit.corner || "") === "tl") ? corners.br : corners.tl;
+    state.selection.drag.active = true;
+    state.selection.drag.moved = false;
+    state.selection.drag.mode = "resize-image";
+    state.selection.drag.startWorldRaw = { x: Number(worldRaw.x), y: Number(worldRaw.y) };
+    state.selection.drag.shapeSnapshots = [{ id: Number(shape.id), shape: JSON.parse(JSON.stringify(shape)) }];
+    state.selection.drag.modelSnapshotBeforeMove = snapshotModel(state);
+    state.selection.drag.resizeShapeId = Number(shape.id);
+    state.selection.drag.resizeCorner = (String(handleHit.corner || "") === "tl") ? "tl" : "br";
+    state.selection.drag.resizeAnchor = { x: Number(anchor.x), y: Number(anchor.y) };
     return true;
 }
 
@@ -1116,9 +1232,78 @@ function shiftShapeDeepForSelection(node, dx, dy) {
 export function applySelectionDrag(state, worldRaw) {
     const drag = state.selection.drag;
     if (!drag.active || !drag.startWorldRaw || !drag.shapeSnapshots) return;
+    if (drag.mode === "resize-image") {
+        const sid = Number(drag.resizeShapeId);
+        const anchor = drag.resizeAnchor;
+        const base = drag.shapeSnapshots[0]?.shape || null;
+        const target = (state.shapes || []).find((s) => Number(s.id) === sid && String(s.type || "") === "image");
+        if (!base || !target || !anchor) return;
+        if (!!base.lockTransform) return;
+        const rotDeg = Number(base.rotationDeg) || 0;
+        const centerBase = {
+            x: Number(base.x) + Number(base.width) * 0.5,
+            y: Number(base.y) + Number(base.height) * 0.5,
+        };
+        const localA = inverseRotatePointAround(anchor, centerBase.x, centerBase.y, rotDeg);
+        const localM = inverseRotatePointAround(worldRaw, centerBase.x, centerBase.y, rotDeg);
+        const corner = String(drag.resizeCorner || "br");
+        const baseW = Math.max(1, Number(base.width) || 1);
+        const baseH = Math.max(1, Number(base.height) || 1);
+        let rawW = (corner === "tl")
+            ? (Number(localA.x) - Number(localM.x))
+            : (Number(localM.x) - Number(localA.x));
+        let rawH = (corner === "tl")
+            ? (Number(localA.y) - Number(localM.y))
+            : (Number(localM.y) - Number(localA.y));
+        const minSize = 1;
+        const lock = !!base.lockAspect;
+        const aspect = (() => {
+            const nw = Number(base.naturalWidth), nh = Number(base.naturalHeight);
+            if (nw > 0 && nh > 0) return nw / nh;
+            const bw = Math.max(1e-9, Number(base.width) || 1);
+            const bh = Math.max(1e-9, Number(base.height) || 1);
+            return bw / bh;
+        })();
+        rawW = Math.max(minSize, Number(rawW) || 0);
+        rawH = Math.max(minSize, Number(rawH) || 0);
+        let w = rawW;
+        let h = rawH;
+        if (lock && Number.isFinite(aspect) && aspect > 0) {
+            const opt1W = rawW;
+            const opt1H = Math.max(minSize, rawW / aspect);
+            const opt2H = rawH;
+            const opt2W = Math.max(minSize, rawH * aspect);
+            const d1 = Math.abs(opt1H - rawH);
+            const d2 = Math.abs(opt2W - rawW);
+            if (d1 <= d2) {
+                w = opt1W;
+                h = opt1H;
+            } else {
+                w = opt2W;
+                h = opt2H;
+            }
+        }
+        let tlLocalX = Number(localA.x);
+        let tlLocalY = Number(localA.y);
+        if (corner === "tl") {
+            tlLocalX = Number(localA.x) - w;
+            tlLocalY = Number(localA.y) - h;
+        }
+        const worldTopLeft = rotatePointAround(tlLocalX, tlLocalY, centerBase.x, centerBase.y, rotDeg);
+        target.x = Number(worldTopLeft.x);
+        target.y = Number(worldTopLeft.y);
+        target.width = w;
+        target.height = h;
+        target.rotationDeg = rotDeg;
+        if (Math.abs(w - Number(base.width)) > 1e-9 || Math.abs(h - Number(base.height)) > 1e-9 || Math.abs(Number(worldTopLeft.x) - Number(base.x)) > 1e-9 || Math.abs(Number(worldTopLeft.y) - Number(base.y)) > 1e-9) {
+            drag.moved = true;
+        }
+        return;
+    }
     const gridStep = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
+    const draggingShapeIds = new Set((drag.shapeSnapshots || []).map(it => Number(it.id)));
 
-    const objSnapCur = getObjectSnapPoint(state, worldRaw, () => true);
+    const objSnapCur = getObjectSnapPoint(state, worldRaw, () => true, draggingShapeIds);
     const curRaw = objSnapCur
         ? { x: objSnapCur.x, y: objSnapCur.y }
         : worldRaw;
@@ -1126,7 +1311,7 @@ export function applySelectionDrag(state, worldRaw) {
         ? { x: objSnapCur.x, y: objSnapCur.y }
         : (state.grid.snap ? snapPoint(worldRaw, gridStep) : worldRaw);
 
-    const objSnapStart = getObjectSnapPoint(state, drag.startWorldRaw, () => true);
+    const objSnapStart = getObjectSnapPoint(state, drag.startWorldRaw, () => true, draggingShapeIds);
     const startRaw = objSnapStart
         ? { x: objSnapStart.x, y: objSnapStart.y }
         : drag.startWorldRaw;
@@ -1146,8 +1331,21 @@ export function applySelectionDrag(state, worldRaw) {
         if (!target) continue;
         const base = it.shape;
         if (target.type === "line" || target.type === "rect" || target.type === "dim") {
-            // 邱壹∫洸蠖｢縲∝ｯｸ豕慕ｷ壹・蛟句挨繝峨Λ繝・げ縺ｧ縺ｯ蜍輔°縺輔↑縺・ｼ磯らせ邱ｨ髮・°繧ｰ繝ｫ繝ｼ繝礼ｧｻ蜍輔・縺ｿ・・
-            continue;
+            let tx = dxRaw;
+            let ty = dyRaw;
+            if (state.grid.snap) {
+                const p = snapPoint({ x: base.x1 + dxRaw, y: base.y1 + dyRaw }, gridStep);
+                tx = p.x - base.x1;
+                ty = p.y - base.y1;
+            }
+            target.x1 = base.x1 + tx; target.y1 = base.y1 + ty;
+            target.x2 = base.x2 + tx; target.y2 = base.y2 + ty;
+            if (target.type === "dim") {
+                target.px = base.px + tx; target.py = base.py + ty;
+                if (Number.isFinite(base.tx) && Number.isFinite(base.ty)) {
+                    target.tx = base.tx + tx; target.ty = base.ty + ty;
+                }
+            }
         } else if (target.type === "circle") {
             let nx = base.cx + dxRaw;
             let ny = base.cy + dyRaw;
@@ -1176,18 +1374,94 @@ export function applySelectionDrag(state, worldRaw) {
             target.x = nx; target.y = ny; target.size = base.size;
         } else if (target.type === "text") {
             target.x1 = base.x1 + dx; target.y1 = base.y1 + dy;
+        } else if (target.type === "image") {
+            if (!!base.lockTransform) continue;
+            let nx = Number(base.x) + dxRaw;
+            let ny = Number(base.y) + dyRaw;
+            if (state.grid.snap) {
+                const p = snapPoint({ x: nx, y: ny }, gridStep);
+                nx = p.x; ny = p.y;
+            }
+            target.x = nx; target.y = ny;
+            target.width = Number(base.width);
+            target.height = Number(base.height);
+            target.rotationDeg = Number(base.rotationDeg) || 0;
+        } else if (target.type === "bspline") {
+            if (Array.isArray(base.controlPoints)) {
+                let tx = dxRaw;
+                let ty = dyRaw;
+                const first = base.controlPoints[0];
+                if (state.grid.snap && first) {
+                    const p = snapPoint({ x: Number(first.x) + dxRaw, y: Number(first.y) + dyRaw }, gridStep);
+                    tx = p.x - Number(first.x);
+                    ty = p.y - Number(first.y);
+                }
+                target.controlPoints = base.controlPoints.map((cp) => ({
+                    x: Number(cp?.x) + tx,
+                    y: Number(cp?.y) + ty,
+                }));
+            }
         }
     }
 }
 
 export function endSelectionDrag(state) {
     const moved = !!state.selection.drag.moved;
+    const snapshot = state.selection.drag.modelSnapshotBeforeMove;
     state.selection.drag.active = false;
     state.selection.drag.moved = false;
     state.selection.drag.startWorldRaw = null;
     state.selection.drag.shapeSnapshots = null;
     state.selection.drag.modelSnapshotBeforeMove = null;
-    return moved;
+    state.selection.drag.mode = null;
+    state.selection.drag.resizeShapeId = null;
+    state.selection.drag.resizeCorner = null;
+    state.selection.drag.resizeAnchor = null;
+    return { moved, snapshot };
+}
+
+function sampleBSplinePoints(controlPoints, degreeRaw = 3) {
+    const cps = Array.isArray(controlPoints) ? controlPoints
+        .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
+        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+        : [];
+    if (cps.length < 2) return [];
+    const degree = Math.max(1, Math.min(Number(degreeRaw) || 3, cps.length - 1));
+    const n = cps.length - 1;
+    const m = n + degree + 1;
+    const knots = new Array(m + 1).fill(0);
+    for (let i = 0; i <= m; i++) {
+        if (i <= degree) knots[i] = 0;
+        else if (i >= m - degree) knots[i] = 1;
+        else knots[i] = (i - degree) / (m - 2 * degree);
+    }
+    const basis = (i, p, u) => {
+        if (p === 0) {
+            if (u === 1) return i === n ? 1 : 0;
+            return (knots[i] <= u && u < knots[i + 1]) ? 1 : 0;
+        }
+        const d1 = knots[i + p] - knots[i];
+        const d2 = knots[i + p + 1] - knots[i + 1];
+        const a = d1 > 1e-12 ? ((u - knots[i]) / d1) * basis(i, p - 1, u) : 0;
+        const b = d2 > 1e-12 ? ((knots[i + p + 1] - u) / d2) * basis(i + 1, p - 1, u) : 0;
+        return a + b;
+    };
+    const spans = Math.max(1, n - degree + 1);
+    const sampleCount = Math.max(24, Math.min(720, spans * 32));
+    const out = [];
+    for (let s = 0; s <= sampleCount; s++) {
+        const u = s / sampleCount;
+        let x = 0;
+        let y = 0;
+        for (let i = 0; i <= n; i++) {
+            const w = basis(i, degree, u);
+            if (!w) continue;
+            x += cps[i].x * w;
+            y += cps[i].y * w;
+        }
+        out.push({ x, y });
+    }
+    return out;
 }
 
 export function moveSelectedShapesByDelta(state, dx, dy, helpers) {
@@ -1221,6 +1495,20 @@ export function moveSelectedShapesByDelta(state, dx, dy, helpers) {
             target.px = base.px + dx; target.py = base.py + dy;
             if (Number.isFinite(base.tx) && Number.isFinite(base.ty)) {
                 target.tx = base.tx + dx; target.ty = base.ty + dy;
+            }
+        } else if (target.type === "image") {
+            if (!!base.lockTransform) continue;
+            target.x = Number(base.x) + dx;
+            target.y = Number(base.y) + dy;
+            target.width = Number(base.width);
+            target.height = Number(base.height);
+            target.rotationDeg = Number(base.rotationDeg) || 0;
+        } else if (target.type === "bspline") {
+            if (Array.isArray(base.controlPoints)) {
+                target.controlPoints = base.controlPoints.map((cp) => ({
+                    x: Number(cp?.x) + dx,
+                    y: Number(cp?.y) + dy,
+                }));
             }
         }
     }
@@ -1259,6 +1547,21 @@ export function findConnectedLinesChain(state, startShapeId) {
     const visited = new Set([Number(startShapeId)]);
     const queue = [Number(startShapeId)];
     const eps = 1e-4;
+    const shapeGroupMap = new Map();
+    for (const g of (state.groups || [])) {
+        const gid = Number(g?.id);
+        if (!Number.isFinite(gid)) continue;
+        for (const sid of (g?.shapeIds || [])) {
+            const sidNum = Number(sid);
+            if (!Number.isFinite(sidNum)) continue;
+            shapeGroupMap.set(sidNum, gid);
+        }
+    }
+    const resolveGroupId = (shape) => {
+        const sid = Number(shape?.id);
+        const gidFromMap = shapeGroupMap.has(sid) ? Number(shapeGroupMap.get(sid)) : NaN;
+        return Number.isFinite(gidFromMap) ? gidFromMap : Number(shape?.groupId);
+    };
 
     while (queue.length > 0) {
         const curId = queue.shift();
@@ -1272,6 +1575,7 @@ export function findConnectedLinesChain(state, startShapeId) {
                 if (visited.has(oid)) continue;
                 if (other.type !== "line" && other.type !== "arc" && other.type !== "rect") continue;
                 if (!isLayerVisible(state, other.layerId) || isLayerLocked(state, other.layerId)) continue;
+                if (!isGroupVisible(state, resolveGroupId(other))) continue;
 
                 const oEndpoints = getShapeEndpoints(other);
                 const connected = oEndpoints.some(op => Math.hypot(p.x - op.x, p.y - op.y) < eps);
@@ -1287,16 +1591,61 @@ export function findConnectedLinesChain(state, startShapeId) {
 
 export function hitTestShapes(state, world, dom) {
     const tol = 8 / Math.max(1e-9, state.view.scale);
+    const pointInImageBounds = (shape, point, margin = 0) => {
+        const x = Number(shape?.x), y = Number(shape?.y);
+        const w = Math.max(1e-9, Number(shape?.width) || 0);
+        const h = Math.max(1e-9, Number(shape?.height) || 0);
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !(w > 0) || !(h > 0)) return false;
+        const cx = x + w * 0.5;
+        const cy = y + h * 0.5;
+        const rot = (Number(shape?.rotationDeg) || 0) * Math.PI / 180;
+        const cos = Math.cos(-rot);
+        const sin = Math.sin(-rot);
+        const dx = Number(point.x) - cx;
+        const dy = Number(point.y) - cy;
+        const lx = dx * cos - dy * sin;
+        const ly = dx * sin + dy * cos;
+        return (
+            lx >= (-w * 0.5 - margin) &&
+            lx <= (w * 0.5 + margin) &&
+            ly >= (-h * 0.5 - margin) &&
+            ly <= (h * 0.5 + margin)
+        );
+    };
     const visibleLayerSet = new Set((state.layers || []).filter(l => l?.visible !== false).map(l => Number(l.id)).filter(Number.isFinite));
     const lockedLayerSet = new Set((state.layers || []).filter(l => l?.locked === true).map(l => Number(l.id)).filter(Number.isFinite));
     const isLayerVisibleFast = (layerId) => (visibleLayerSet.size ? visibleLayerSet.has(Number(layerId)) : true);
     const isLayerLockedFast = (layerId) => lockedLayerSet.has(Number(layerId));
+    const shapeGroupMap = new Map();
+    for (const g of (state.groups || [])) {
+        const gid = Number(g?.id);
+        if (!Number.isFinite(gid)) continue;
+        for (const sid of (g?.shapeIds || [])) {
+            const sidNum = Number(sid);
+            if (!Number.isFinite(sidNum)) continue;
+            shapeGroupMap.set(sidNum, gid);
+        }
+    }
+    const resolveGroupId = (shape) => {
+        const sid = Number(shape?.id);
+        const gidFromMap = shapeGroupMap.has(sid) ? Number(shapeGroupMap.get(sid)) : NaN;
+        return Number.isFinite(gidFromMap) ? gidFromMap : Number(shape?.groupId);
+    };
     for (let i = state.shapes.length - 1; i >= 0; i--) {
         const s = state.shapes[i];
         if (!isLayerVisibleFast(s.layerId)) continue;
         if (isLayerLockedFast(s.layerId)) continue;
+        if (!isGroupVisible(state, resolveGroupId(s))) continue;
         if (state.ui?.layerView?.editOnlyActive && Number(s.layerId ?? state.activeLayerId) !== Number(state.activeLayerId)) continue;
         if (s.type === "line" && hitTestLine(world, s, tol)) return s;
+        if (s.type === "bspline") {
+            const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
+            for (let pi = 1; pi < sampled.length; pi++) {
+                const a = sampled[pi - 1];
+                const b = sampled[pi];
+                if (distancePointToSegment(world, a, b) <= tol) return s;
+            }
+        }
         if (s.type === "rect") {
             const xMin = Math.min(Number(s.x1), Number(s.x2)), xMax = Math.max(Number(s.x1), Number(s.x2));
             const yMin = Math.min(Number(s.y1), Number(s.y2)), yMax = Math.max(Number(s.y1), Number(s.y2));
@@ -1406,6 +1755,9 @@ export function hitTestShapes(state, world, dom) {
                 ry >= (-hHalfPx - pickPadPx) &&
                 ry <= (hHalfPx + pickPadPx)
             ) return s;
+        }
+        if (s.type === "image") {
+            if (pointInImageBounds(s, world, tol)) return s;
         }
         if (s.type === "hatch") {
             if (isPointInHatch(state.shapes, s, world, state.view.scale)) return s;
@@ -1749,6 +2101,35 @@ export function endSelectionBox(state, helpers) {
             }
             return { minX, minY, maxX, maxY };
         };
+        const getImageCorners = (s) => {
+            const corners = getImageCornersWorld(s);
+            if (!corners) return [];
+            return [corners.tl, corners.tr, corners.br, corners.bl];
+        };
+        const boxCorners = [
+            { x: wx1, y: wy1 },
+            { x: wx2, y: wy1 },
+            { x: wx2, y: wy2 },
+            { x: wx1, y: wy2 },
+        ];
+        const boxEdges = [
+            [boxCorners[0], boxCorners[1]],
+            [boxCorners[1], boxCorners[2]],
+            [boxCorners[2], boxCorners[3]],
+            [boxCorners[3], boxCorners[0]],
+        ];
+        const pointInRect = (p) => Number(p.x) >= wx1 && Number(p.x) <= wx2 && Number(p.y) >= wy1 && Number(p.y) <= wy2;
+        const pointInPolygon = (p, poly) => {
+            let inside = false;
+            for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+                const xi = Number(poly[i]?.x), yi = Number(poly[i]?.y);
+                const xj = Number(poly[j]?.x), yj = Number(poly[j]?.y);
+                const intersects = ((yi > p.y) !== (yj > p.y))
+                    && (p.x < ((xj - xi) * (p.y - yi)) / Math.max(1e-12, (yj - yi)) + xi);
+                if (intersects) inside = !inside;
+            }
+            return inside;
+        };
 
         const getDimLikeBounds = (s) => {
             if (!s) return null;
@@ -1810,6 +2191,16 @@ export function endSelectionBox(state, helpers) {
             if (s.type === "text") {
                 return (s.x1 >= wx1 && s.x1 <= wx2 && s.y1 >= wy1 && s.y1 <= wy2);
             }
+            if (s.type === "image") {
+                const corners = getImageCorners(s);
+                if (!corners.length) return false;
+                return corners.every(pointInRect);
+            }
+            if (s.type === "bspline") {
+                const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
+                if (!sampled.length) return false;
+                return sampled.every((p) => Number(p.x) >= wx1 && Number(p.x) <= wx2 && Number(p.y) >= wy1 && Number(p.y) <= wy2);
+            }
             return false;
         };
 
@@ -1856,6 +2247,49 @@ export function endSelectionBox(state, helpers) {
             }
             if (s.type === "position") { return s.x >= wx1 && s.x <= wx2 && s.y >= wy1 && s.y <= wy2; }
             if (s.type === "text") { return !(s.x1 > wx2 || s.x1 < wx1 || s.y1 > wy2 || s.y1 < wy1); }
+            if (s.type === "image") {
+                const corners = getImageCorners(s);
+                if (!corners.length) return false;
+                const aabb = aabbFromPoints(corners);
+                if (!aabb || aabb.maxX < wx1 || aabb.minX > wx2 || aabb.maxY < wy1 || aabb.minY > wy2) return false;
+                if (corners.some(pointInRect)) return true;
+                if (boxCorners.some((p) => pointInPolygon(p, corners))) return true;
+                const imgEdges = [
+                    [corners[0], corners[1]],
+                    [corners[1], corners[2]],
+                    [corners[2], corners[3]],
+                    [corners[3], corners[0]],
+                ];
+                for (const ie of imgEdges) {
+                    for (const be of boxEdges) {
+                        if (segmentIntersectionPoint(ie[0], ie[1], be[0], be[1])) return true;
+                    }
+                }
+                return false;
+            }
+            if (s.type === "bspline") {
+                const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
+                if (sampled.length < 2) return false;
+                const edges = [
+                    [{ x: wx1, y: wy1 }, { x: wx2, y: wy1 }],
+                    [{ x: wx2, y: wy1 }, { x: wx2, y: wy2 }],
+                    [{ x: wx2, y: wy2 }, { x: wx1, y: wy2 }],
+                    [{ x: wx1, y: wy2 }, { x: wx1, y: wy1 }]
+                ];
+                for (let i = 1; i < sampled.length; i++) {
+                    const p1 = sampled[i - 1];
+                    const p2 = sampled[i];
+                    const minX = Math.min(Number(p1.x), Number(p2.x));
+                    const maxX = Math.max(Number(p1.x), Number(p2.x));
+                    const minY = Math.min(Number(p1.y), Number(p2.y));
+                    const maxY = Math.max(Number(p1.y), Number(p2.y));
+                    if (maxX < wx1 || minX > wx2 || maxY < wy1 || minY > wy2) continue;
+                    if ((Number(p1.x) >= wx1 && Number(p1.x) <= wx2 && Number(p1.y) >= wy1 && Number(p1.y) <= wy2)
+                        || (Number(p2.x) >= wx1 && Number(p2.x) <= wx2 && Number(p2.y) >= wy1 && Number(p2.y) <= wy2)) return true;
+                    if (edges.some((e) => segmentIntersectionPoint(p1, p2, e[0], e[1]))) return true;
+                }
+                return false;
+            }
             if (s.type === "hatch") {
                 const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, s.boundaryIds || [], state.view.scale);
                 if (parsed.ok && parsed.bounds) {
@@ -2242,6 +2676,14 @@ export function getShapeBoundsForAutoGroup(s) {
         // Approximation for bounds if no actual w/h stored
         return { minX: x, minY: y - 5, maxX: x + 20, maxY: y + 5 };
     }
+    if (s.type === "bspline") {
+        const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
+        if (!sampled.length) return null;
+        const xs = sampled.map((p) => Number(p.x)).filter(Number.isFinite);
+        const ys = sampled.map((p) => Number(p.y)).filter(Number.isFinite);
+        if (!xs.length || !ys.length) return null;
+        return { minX: Math.min(...xs), minY: Math.min(...ys), maxX: Math.max(...xs), maxY: Math.max(...ys) };
+    }
     if (s.type === "circleDim") {
         const g = getCircleDimGeometry(s, state.shapes || []);
         if (!g) return null;
@@ -2310,4 +2752,6 @@ export function ensureUngroupedShapesHaveGroups(state) {
     }
     return created;
 }
+
+
 

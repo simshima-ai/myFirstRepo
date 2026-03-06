@@ -557,12 +557,94 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
         if (!visibleLayerSet.size) return true; // no layer definition fallback
         return visibleLayerSet.has(Number(layerId));
     };
+    const groupById = new Map((state.groups || []).map((g) => [Number(g.id), g]));
+    const groupVisibleMemo = new Map();
+    const shapeGroupMap = new Map();
+    for (const g of (state.groups || [])) {
+        const gid = Number(g?.id);
+        if (!Number.isFinite(gid)) continue;
+        for (const sid of (g?.shapeIds || [])) {
+            const sidNum = Number(sid);
+            if (!Number.isFinite(sidNum)) continue;
+            shapeGroupMap.set(sidNum, gid);
+        }
+    }
+    const resolveGroupId = (shape) => {
+        const sid = Number(shape?.id);
+        const gidFromMap = shapeGroupMap.has(sid) ? Number(shapeGroupMap.get(sid)) : NaN;
+        return Number.isFinite(gidFromMap) ? gidFromMap : Number(shape?.groupId);
+    };
+    const isGroupVisibleFast = (groupId) => {
+        const gid = Number(groupId);
+        if (!Number.isFinite(gid)) return true;
+        if (groupVisibleMemo.has(gid)) return !!groupVisibleMemo.get(gid);
+        let cur = groupById.get(gid);
+        let guard = 0;
+        while (cur && guard < 10000) {
+            if (cur.visible === false) {
+                groupVisibleMemo.set(gid, false);
+                return false;
+            }
+            if (cur.parentId == null) {
+                groupVisibleMemo.set(gid, true);
+                return true;
+            }
+            cur = groupById.get(Number(cur.parentId));
+            guard += 1;
+        }
+        groupVisibleMemo.set(gid, true);
+        return true;
+    };
     const visibleShapes = [];
     for (const s of (state.shapes || [])) {
         if (!s || !isVisibleFast(s.layerId)) continue;
+        if (!isGroupVisibleFast(resolveGroupId(s))) continue;
         if (excludeSet && excludeSet.has(Number(s.id))) continue;
         visibleShapes.push(s);
     }
+    const sampleBSplinePoints = (controlPoints, degreeRaw = 3) => {
+        const cps = Array.isArray(controlPoints) ? controlPoints
+            .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+            : [];
+        if (cps.length < 2) return [];
+        const degree = Math.max(1, Math.min(Number(degreeRaw) || 3, cps.length - 1));
+        const n = cps.length - 1;
+        const m = n + degree + 1;
+        const knots = new Array(m + 1).fill(0);
+        for (let i = 0; i <= m; i++) {
+            if (i <= degree) knots[i] = 0;
+            else if (i >= m - degree) knots[i] = 1;
+            else knots[i] = (i - degree) / (m - 2 * degree);
+        }
+        const basis = (i, p, u) => {
+            if (p === 0) {
+                if (u === 1) return i === n ? 1 : 0;
+                return (knots[i] <= u && u < knots[i + 1]) ? 1 : 0;
+            }
+            const d1 = knots[i + p] - knots[i];
+            const d2 = knots[i + p + 1] - knots[i + 1];
+            const a = d1 > 1e-12 ? ((u - knots[i]) / d1) * basis(i, p - 1, u) : 0;
+            const b = d2 > 1e-12 ? ((knots[i + p + 1] - u) / d2) * basis(i + 1, p - 1, u) : 0;
+            return a + b;
+        };
+        const spans = Math.max(1, n - degree + 1);
+        const sampleCount = Math.max(24, Math.min(720, spans * 32));
+        const out = [];
+        for (let s = 0; s <= sampleCount; s++) {
+            const u = s / sampleCount;
+            let x = 0;
+            let y = 0;
+            for (let i = 0; i <= n; i++) {
+                const w = basis(i, degree, u);
+                if (!w) continue;
+                x += cps[i].x * w;
+                y += cps[i].y * w;
+            }
+            out.push({ x, y });
+        }
+        return out;
+    };
 
     // High-priority snaps: endpoint, center, intersection
     // These always win over nearest-on-line fallback
@@ -611,6 +693,18 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
             }
         } else if (s.type === "position") {
             if (state.objectSnap?.center !== false) consider(Number(s.x), Number(s.y), "center", { shapeId: Number(s.id), refType: "position_center", refKey: "center" });
+        } else if (s.type === "bspline") {
+            const cps = Array.isArray(s.controlPoints) ? s.controlPoints : [];
+            if (state.objectSnap?.endpoint !== false && cps.length) {
+                const first = cps[0];
+                const last = cps[cps.length - 1];
+                if (Number.isFinite(Number(first?.x)) && Number.isFinite(Number(first?.y))) {
+                    consider(Number(first.x), Number(first.y), "endpoint", { shapeId: Number(s.id), refType: "bspline_control", refKey: "cp0" });
+                }
+                if (Number.isFinite(Number(last?.x)) && Number.isFinite(Number(last?.y))) {
+                    consider(Number(last.x), Number(last.y), "endpoint", { shapeId: Number(s.id), refType: "bspline_control", refKey: `cp${Math.max(0, cps.length - 1)}` });
+                }
+            }
         } else if (s.type === "dim") {
             if (state.objectSnap?.endpoint !== false) {
                 consider(Number(s.x1), Number(s.y1), "endpoint", { shapeId: Number(s.id), refType: "dim_endpoint", refKey: "p1" });
@@ -708,6 +802,16 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
                 if (d > 1e-9) np = { x: cx + (dx / d) * r, y: cy + (dy / d) * r };
             } else if (s.type === "arc") {
                 np = nearestPointOnArc(worldRaw, s);
+            } else if (s.type === "bspline") {
+                const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
+                if (sampled.length >= 2) {
+                    let minD = Infinity;
+                    for (let i = 1; i < sampled.length; i++) {
+                        const cand = nearestPointOnSegment(worldRaw, sampled[i - 1], sampled[i]);
+                        const d = Math.hypot(worldRaw.x - cand.x, worldRaw.y - cand.y);
+                        if (d < minD) { minD = d; np = cand; }
+                    }
+                }
             }
             if (np) {
                 const d = Math.hypot(worldRaw.x - np.x, worldRaw.y - np.y);

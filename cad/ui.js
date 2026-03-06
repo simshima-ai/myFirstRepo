@@ -710,6 +710,8 @@ function applyLanguageUi(state, dom) {
   setText(".sidebar .section[data-panel-id='editTools'] > .panel-toggle", t.edit);
   setText(".sidebar .section[data-panel-id='fileTools'] > .panel-toggle", t.file);
   setText("#openManualBtn", t.manualGuide);
+  const manualBtn = document.getElementById("openManualBtn");
+  if (manualBtn) manualBtn.setAttribute("href", lang === "en" ? "/manual_en.html" : "/manual.html");
   setText(".left-aux-stack .section[data-panel-id='snap'] > .panel-toggle", t.snap);
   setText(".left-aux-stack .section[data-panel-id='attrs'] > .panel-toggle", t.attrs);
 

@@ -6,7 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
-  <title>S-CAD App</title>
+  <title>s-cad (scaffold)</title>
   <style>
     :root {
       --bg: #f2f4f8;
@@ -238,8 +238,11 @@
       transform: translateX(-8px);
       pointer-events: none;
       transition: opacity 150ms ease, transform 170ms ease;
-      z-index: 20;
+      z-index: 1200;
       min-width: 82px;
+      max-height: calc(100vh - 16px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     .tool-buttons .left-flyout>.left-flyout-menu.floating {
@@ -2085,4 +2088,3 @@
 </body>
 
 </html>
-

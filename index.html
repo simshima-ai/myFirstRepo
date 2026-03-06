@@ -99,6 +99,19 @@ nav {
 }
 .nav-cta:hover { background: var(--accent); color: #fff; }
 
+.lang-btn {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  cursor: pointer;
+  padding: 4px 10px;
+  transition: color 0.2s, border-color 0.2s;
+}
+.lang-btn:hover { color: var(--accent); border-color: var(--accent); }
+
 /* 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武
    HERO
 笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武笊絶武 */
@@ -564,11 +577,10 @@ footer {
   <nav>
     <a class="nav-logo" href="./index.html"><span style="color:var(--accent)">S-</span>CAD</a>
     <ul class="nav-links">
-      <li><a href="#features">Features</a></li>
-      <li><a href="./manual.html">Docs</a></li>
-      <li><a href="./cad.html">CAD App</a></li>
+      <li><a href="./manual.html" data-i18n="nav-guide">使い方ガイド</a></li>
+      <li><button id="lang-toggle" class="lang-btn">EN</button></li>
     </ul>
-    <a href="./cad.html" class="nav-cta">無料で始める</a>
+    <a href="./cad.html" class="nav-cta" data-i18n="nav-cta">無料で始める</a>
   </nav>
 
   <!-- Hero -->
@@ -581,7 +593,7 @@ footer {
     <span class="coord br">100% Free &amp; Open</span>
 
     <!-- FREE badge -->
-    <div class="free-badge">無料ですぐ使える 2D CAD</div>
+    <div class="free-badge" data-i18n="free-badge">無料ですぐ使える 2D CAD</div>
 
     <!-- Wordmark -->
     <div class="hero-wordmark">
@@ -590,7 +602,7 @@ footer {
     </div>
 
     <!-- Description -->
-    <p class="hero-desc">
+    <p class="hero-desc" data-i18n="hero-desc">
       インストール不要、登録不要。ブラウザですぐ使える。<br>
       シンプルで実務的な 2D CAD ツール。<strong style="color:var(--accent);font-weight:500;">完全無料</strong>
     </p>
@@ -599,8 +611,8 @@ footer {
     <div class="free-block">
       <div class="free-num">¥0</div>
       <div class="free-info">
-        <div class="free-title">完全無料 · No Payment · No Registration</div>
-        <div class="free-desc">
+        <div class="free-title" data-i18n="free-title">完全無料 · No Payment · No Registration</div>
+        <div class="free-desc" data-i18n="free-desc">
           支払いなし、登録なし。<br>
           全ての機能が制限なく使えます。
         </div>
@@ -609,7 +621,7 @@ footer {
 
     <!-- CTAs -->
     <div class="hero-actions">
-      <a href="./cad.html" class="btn-primary">無料で使い始める</a>
+      <a href="./cad.html" class="btn-primary" data-i18n="cta-btn">オープンベータテストに参加</a>
     </div>
   </section>
 
@@ -617,7 +629,7 @@ footer {
   <div id="stats" class="stats">
     <div class="stat-item free-stat">
       <div class="stat-num">FREE<span></span></div>
-      <div class="stat-label">完全無料 · Full Featured</div>
+      <div class="stat-label" data-i18n="stat-free">完全無料 · Full Featured</div>
     </div>
     <div class="stat-item">
       <div class="stat-num">0.01<span>mm</span></div>
@@ -644,7 +656,7 @@ footer {
         <circle cx="18" cy="18" r="5" stroke="#0082b4" stroke-width="1.5"/>
       </svg>
       <div class="feature-title">Snap &amp; Grid</div>
-      <div class="feature-text">多彩なスナップと可変グリッドで正確な図形を素早く作図。スマートガイドで操作に悩みません。</div>
+      <div class="feature-text" data-i18n="feat-01">多彩なスナップと可変グリッドで正確な図形を素早く作図。スマートガイドで操作に悩みません。</div>
     </div>
     <div class="feature-card">
       <div class="feature-num">02</div>
@@ -654,7 +666,7 @@ footer {
         <circle cx="18" cy="6" r="2" fill="#0082b4"/>
       </svg>
       <div class="feature-title">Easy &amp; Safety</div>
-      <div class="feature-text">直感的な操作ですぐ使えます。オートバックアップ機能でブラウザをリロードしても直前の作業に戻り、データを失うことがありません。</div>
+      <div class="feature-text" data-i18n="feat-02">直感的な操作ですぐ使えます。オートバックアップ機能でブラウザをリロードしても直前の作業に戻り、データを失うことがありません。</div>
     </div>
     <div class="feature-card">
       <div class="feature-num">03</div>
@@ -665,7 +677,7 @@ footer {
         <line x1="33" y1="9" x2="33" y2="27" stroke="#0082b4" stroke-width="1" opacity="0.6"/>
       </svg>
       <div class="feature-title">Quick &amp; Fast</div>
-      <div class="feature-text">瞬時に起動し、高速描画エンジンで複雑な図面を描いてもパフォーマンスが低下しません。</div>
+      <div class="feature-text" data-i18n="feat-03">瞬時に起動し、高速描画エンジンで複雑な図面を描いてもパフォーマンスが低下しません。</div>
     </div>
   </div>
 
@@ -3795,6 +3807,59 @@ document.addEventListener('mousemove', e=>{
     s.vy  = Math.min(s.vy,-0.04);
   });
 });
+</script>
+
+<script>
+(function () {
+  const LABELS = {
+    ja: {
+      'nav-guide': '使い方ガイド',
+      'nav-cta': '無料で始める',
+      'free-badge': '無料ですぐ使える 2D CAD',
+      'hero-desc': 'インストール不要、登録不要。ブラウザですぐ使える。<br>シンプルで実務的な 2D CAD ツール。<strong style="color:var(--accent);font-weight:500;">完全無料</strong>',
+      'free-title': '完全無料 · No Payment · No Registration',
+      'free-desc': '支払いなし、登録なし。<br>全ての機能が制限なく使えます。',
+      'stat-free': '完全無料 · Full Featured',
+      'feat-01': '多彩なスナップと可変グリッドで正確な図形を素早く作図。スマートガイドで操作に悩みません。',
+      'feat-02': '直感的な操作ですぐ使えます。オートバックアップ機能でブラウザをリロードしても直前の作業に戻り、データを失うことがありません。',
+      'feat-03': '瞬時に起動し、高速描画エンジンで複雑な図面を描いてもパフォーマンスが低下しません。',
+      'cta-btn': 'オープンベータテストに参加',
+    },
+    en: {
+      'nav-guide': 'User Guide',
+      'nav-cta': 'Start Free',
+      'free-badge': 'Free 2D CAD — No Install Required',
+      'hero-desc': 'No install, no registration. Use it right in your browser.<br>A simple, practical 2D CAD tool. <strong style="color:var(--accent);font-weight:500;">100% Free</strong>',
+      'free-title': 'Completely Free · No Payment · No Registration',
+      'free-desc': 'No payment, no sign-up.<br>All features available without any limits.',
+      'stat-free': 'Completely Free · Full Featured',
+      'feat-01': 'Snap to grid and objects for precise drawings. Smart guides make working accurately effortless.',
+      'feat-02': 'Intuitive controls — start drawing right away. Auto-backup restores your last session on reload, so you never lose work.',
+      'feat-03': 'Launches instantly. The high-performance rendering engine handles complex drawings without slowing down.',
+      'cta-btn': 'Join the Open Beta',
+    }
+  };
+
+  let lang = localStorage.getItem('scad-lang') || 'ja';
+
+  function applyLang(l) {
+    lang = l;
+    localStorage.setItem('scad-lang', l);
+    document.querySelectorAll('[data-i18n]').forEach(function (el) {
+      var key = el.dataset.i18n;
+      if (LABELS[l][key] !== undefined) el.innerHTML = LABELS[l][key];
+    });
+    var btn = document.getElementById('lang-toggle');
+    if (btn) btn.textContent = l === 'ja' ? 'EN' : 'JP';
+    document.documentElement.lang = l;
+  }
+
+  document.getElementById('lang-toggle').addEventListener('click', function () {
+    applyLang(lang === 'ja' ? 'en' : 'ja');
+  });
+
+  applyLang(lang);
+})();
 </script>
 </body>
 </html>

@@ -714,6 +714,12 @@ export function saveJsonAsToFile(state, helpers) {
 
 export function loadJsonFromFileDialog(state, dom) {
     if (!dom.jsonFileInput) return;
+    const mode = String(state.ui?.jsonFileMode || "replace");
+    if (mode === "import" || mode === "append") {
+        dom.jsonFileInput.accept = ".json,application/json,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,image/*";
+    } else {
+        dom.jsonFileInput.accept = ".json,application/json";
+    }
     dom.jsonFileInput.value = "";
     dom.jsonFileInput.click();
 }
@@ -2255,6 +2261,86 @@ export function setVertexMoveInputs(state, dx, dy) {
     if (dx !== null) state.vertexEdit.moveDx = dx;
     if (dy !== null) state.vertexEdit.moveDy = dy;
 }
+export function updateSelectedImageSettings(state, helpers, settings = {}) {
+    const { pushHistory, draw, setStatus } = helpers;
+    const selected = getSelectedShapes(state).filter((s) => s && s.type === "image");
+    if (!selected.length) return;
+
+    const hasWidth = Object.prototype.hasOwnProperty.call(settings, "width");
+    const hasHeight = Object.prototype.hasOwnProperty.call(settings, "height");
+    const hasLock = Object.prototype.hasOwnProperty.call(settings, "lockAspect");
+    const hasTransformLock = Object.prototype.hasOwnProperty.call(settings, "lockTransform");
+    const reqWidth = Math.max(1, Number(settings.width) || 0);
+    const reqHeight = Math.max(1, Number(settings.height) || 0);
+    const reqLock = !!settings.lockAspect;
+    const reqTransformLock = !!settings.lockTransform;
+
+    const deriveAspect = (shape) => {
+        const nw = Number(shape?.naturalWidth);
+        const nh = Number(shape?.naturalHeight);
+        if (nw > 0 && nh > 0) return nw / nh;
+        const w = Number(shape?.width);
+        const h = Number(shape?.height);
+        if (w > 0 && h > 0) return w / h;
+        return 1;
+    };
+
+    const planned = [];
+    for (const s of selected) {
+        let nextW = Math.max(1, Number(s.width) || 1);
+        let nextH = Math.max(1, Number(s.height) || 1);
+        let nextLock = !!s.lockAspect;
+        let nextTransformLock = !!s.lockTransform;
+        if (hasLock) nextLock = reqLock;
+        if (hasTransformLock) nextTransformLock = reqTransformLock;
+        const aspect = Math.max(1e-9, deriveAspect(s));
+
+        if (!nextTransformLock) {
+            if (hasWidth && hasHeight) {
+                if (nextLock) {
+                    nextW = reqWidth;
+                    nextH = Math.max(1, reqWidth / aspect);
+                } else {
+                    nextW = reqWidth;
+                    nextH = reqHeight;
+                }
+            } else if (hasWidth) {
+                nextW = reqWidth;
+                if (nextLock) nextH = Math.max(1, reqWidth / aspect);
+            } else if (hasHeight) {
+                nextH = reqHeight;
+                if (nextLock) nextW = Math.max(1, reqHeight * aspect);
+            }
+        }
+
+        if (
+            Math.abs(nextW - Number(s.width)) > 1e-9 ||
+            Math.abs(nextH - Number(s.height)) > 1e-9 ||
+            nextLock !== !!s.lockAspect ||
+            nextTransformLock !== !!s.lockTransform
+        ) {
+            planned.push({
+                shape: s,
+                width: nextW,
+                height: nextH,
+                lockAspect: nextLock,
+                lockTransform: nextTransformLock
+            });
+        }
+    }
+
+    if (!planned.length) return;
+    pushHistory();
+    for (const row of planned) {
+        row.shape.width = row.width;
+        row.shape.height = row.height;
+        row.shape.lockAspect = row.lockAspect;
+        row.shape.lockTransform = row.lockTransform;
+    }
+    if (setStatus) setStatus(selected.length === 1 ? "画像設定を更新" : `${selected.length}個の画像設定を更新`);
+    if (draw) draw();
+}
+
 export function moveSelectedShapes(state, helpers, dx, dy) {
     const sel = getSelectedShapes(state);
     if (sel.length === 0) return;
@@ -2267,6 +2353,10 @@ export function moveSelectedShapes(state, helpers, dx, dy) {
             s.cx += dx; s.cy += dy;
         } else if (s.type === 'text' || s.type === 'position') {
             if (s.x1 != null) { s.x1 += dx; s.y1 += dy; } else { s.x += dx; s.y += dy; }
+        } else if (s.type === "image") {
+            if (!!s.lockTransform) continue;
+            s.x = Number(s.x || 0) + Number(dx || 0);
+            s.y = Number(s.y || 0) + Number(dy || 0);
         } else if (s.type === 'dimchain') {
             if (Array.isArray(s.points)) {
                 for (const pt of s.points) { pt.x += dx; pt.y += dy; }

@@ -75,6 +75,39 @@ function buildCurrentShapeGroupMap(state) {
   return map;
 }
 
+function isGroupVisibleWithCache(groupById, groupId, memo) {
+  const gid = Number(groupId);
+  if (!Number.isFinite(gid)) return true;
+  if (memo.has(gid)) return memo.get(gid);
+  const g = groupById.get(gid);
+  if (!g) {
+    memo.set(gid, true);
+    return true;
+  }
+  if (g.visible === false) {
+    memo.set(gid, false);
+    return false;
+  }
+  if (g.parentId == null) {
+    memo.set(gid, true);
+    return true;
+  }
+  const v = isGroupVisibleWithCache(groupById, Number(g.parentId), memo);
+  memo.set(gid, v);
+  return v;
+}
+
+function isShapeGroupVisible(state, shape, shapeGroupMap = null, groupById = null, memo = null) {
+  const sid = Number(shape?.id);
+  const gidFromMap = (shapeGroupMap && Number.isFinite(sid)) ? Number(shapeGroupMap.get(sid)) : NaN;
+  const gid = Number.isFinite(gidFromMap) ? gidFromMap : Number(shape?.groupId);
+  if (!Number.isFinite(gid)) return true;
+  if (groupById && memo) return isGroupVisibleWithCache(groupById, gid, memo);
+  const map = new Map((state.groups || []).map((g) => [Number(g.id), g]));
+  const mm = new Map();
+  return isGroupVisibleWithCache(map, gid, mm);
+}
+
 function collectGroupTreeShapeIdSet(state, rootGroupId) {
   const rootId = Number(rootGroupId);
   if (!Number.isFinite(rootId)) return new Set();
@@ -155,6 +188,28 @@ function lineWidthMmToScreenPx(state, lineWidthMm) {
   const unitMm = mmPerUnit(state?.pageSetup?.unit || "mm");
   const world = (mm * pageScale) / Math.max(1e-9, unitMm);
   return Math.max(0.5, world * Math.max(1e-9, Number(state?.view?.scale) || 1));
+}
+
+function getImageCache(state) {
+  if (!state.ui) state.ui = {};
+  if (!state.ui._imageCache || typeof state.ui._imageCache !== "object") {
+    state.ui._imageCache = {};
+  }
+  return state.ui._imageCache;
+}
+
+function getImageResource(state, src) {
+  const key = String(src || "");
+  if (!key) return null;
+  const cache = getImageCache(state);
+  if (cache[key]) return cache[key];
+  const img = new Image();
+  const rec = { img, loaded: false, error: false };
+  img.onload = () => { rec.loaded = true; rec.error = false; };
+  img.onerror = () => { rec.loaded = false; rec.error = true; };
+  img.src = key;
+  cache[key] = rec;
+  return rec;
 }
 
 function drawPageFrame(ctx, canvas, state) {
@@ -254,12 +309,12 @@ function drawGrid(ctx, canvas, state) {
   if (!state.grid.show) return;
   const step = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
   const majorStep = step * 5;
+  const viewW = Math.max(1, Number(state.view?.viewportWidth) || Number(canvas?.clientWidth) || Number(canvas?.width) || 1);
+  const viewH = Math.max(1, Number(state.view?.viewportHeight) || Number(canvas?.clientHeight) || Number(canvas?.height) || 1);
   const left = (0 - state.view.offsetX) / state.view.scale;
   const top = (0 - state.view.offsetY) / state.view.scale;
-  const right = (canvas.width - state.view.offsetX) / state.view.scale;
-  const bottom = (canvas.height - state.view.offsetY) / state.view.scale;
-  const x0 = Math.floor(left / step) * step;
-  const y0 = Math.floor(top / step) * step;
+  const right = (viewW - state.view.offsetX) / state.view.scale;
+  const bottom = (viewH - state.view.offsetY) / state.view.scale;
   ctx.save();
   const drawGridPass = (gridStep, color) => {
     if (!(Number.isFinite(gridStep) && gridStep > 0)) return;
@@ -283,14 +338,14 @@ function drawGrid(ctx, canvas, state) {
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let x = gx0; x <= right; x += adaptiveStep) {
-      const sx = x * state.view.scale + state.view.offsetX;
+      const sx = Math.round(x * state.view.scale + state.view.offsetX) + 0.5;
       ctx.moveTo(sx, 0);
-      ctx.lineTo(sx, canvas.height);
+      ctx.lineTo(sx, viewH);
     }
     for (let y = gy0; y <= bottom; y += adaptiveStep) {
-      const sy = y * state.view.scale + state.view.offsetY;
+      const sy = Math.round(y * state.view.scale + state.view.offsetY) + 0.5;
       ctx.moveTo(0, sy);
-      ctx.lineTo(canvas.width, sy);
+      ctx.lineTo(viewW, sy);
     }
     ctx.stroke();
   };
@@ -313,8 +368,9 @@ function drawAxes(ctx, canvas, state) {
   ctx.restore();
 }
 
-function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet = null, activeGroupShapeSet = null, layerCache = null) {
+function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet = null, activeGroupShapeSet = null, layerCache = null, groupById = null, groupVisibleMemo = null) {
   if (!isLayerVisible(state, shape.layerId, layerCache)) return;
+  if (!isShapeGroupVisible(state, shape, currentShapeGroupMap, groupById, groupVisibleMemo)) return;
   ctx.save();
   if (isLayerLocked(state, shape.layerId, layerCache)) {
     ctx.globalAlpha *= 0.5;
@@ -346,7 +402,7 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
   ctx.lineWidth = (selected || isHatchBoundary || isPatternCopyReference)
     ? Math.max(2, shapeStrokePx)
     : (isHovered ? Math.max(2, shapeStrokePx) : shapeStrokePx);
-  if (shape.type !== "hatch" && shape.type !== "text") {
+  if (shape.type !== "hatch" && shape.type !== "text" && shape.type !== "image") {
     applyShapeLineDash(ctx, getShapeLineType(shape), ctx.lineWidth);
   } else {
     ctx.setLineDash([]);
@@ -378,6 +434,19 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
   }
+  if (shape.type === "bspline") {
+    const sampled = sampleBSplinePoints(shape.controlPoints, Number(shape.degree) || 3);
+    if (sampled.length >= 2) {
+      const p0 = worldToScreen(state.view, sampled[0]);
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < sampled.length; i++) {
+        const p = worldToScreen(state.view, sampled[i]);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+  }
   if (shape.type === "text") {
     const p1 = worldToScreen(state.view, { x: shape.x1, y: shape.y1 });
     ctx.save();
@@ -394,6 +463,34 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
     ctx.textBaseline = "middle";
     ctx.fillText(shape.text || "", 0, 0);
     ctx.restore();
+  }
+  if (shape.type === "image") {
+    const x = Number(shape.x), y = Number(shape.y);
+    const w = Math.max(1e-9, Number(shape.width) || 0);
+    const h = Math.max(1e-9, Number(shape.height) || 0);
+    if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) {
+      const p1 = worldToScreen(state.view, { x, y });
+      const p2 = worldToScreen(state.view, { x: x + w, y: y + h });
+      const sw = Number(p2.x) - Number(p1.x);
+      const sh = Number(p2.y) - Number(p1.y);
+      const cx = Number(p1.x) + sw * 0.5;
+      const cy = Number(p1.y) + sh * 0.5;
+      const rot = (Number(shape.rotationDeg) || 0) * Math.PI / 180;
+      const res = getImageResource(state, shape.src);
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(rot);
+      if (res?.loaded && res.img) {
+        ctx.drawImage(res.img, -sw * 0.5, -sh * 0.5, sw, sh);
+      } else {
+        ctx.fillStyle = "rgba(148,163,184,0.14)";
+        ctx.fillRect(-sw * 0.5, -sh * 0.5, sw, sh);
+      }
+      if (selected || groupActive || isHovered) {
+        ctx.strokeRect(-sw * 0.5, -sh * 0.5, sw, sh);
+      }
+      ctx.restore();
+    }
   }
   if (shape.type === "rect") {
     const p1 = worldToScreen(state.view, { x: shape.x1, y: shape.y1 });
@@ -688,6 +785,50 @@ function drawPreviewMetrics(ctx, state, preview) {
   }
 }
 
+function sampleBSplinePoints(controlPoints, degreeRaw = 3) {
+  const cps = Array.isArray(controlPoints) ? controlPoints
+    .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+    : [];
+  if (cps.length < 2) return [];
+  const degree = Math.max(1, Math.min(Number(degreeRaw) || 3, cps.length - 1));
+  const n = cps.length - 1;
+  const m = n + degree + 1;
+  const knots = new Array(m + 1).fill(0);
+  for (let i = 0; i <= m; i++) {
+    if (i <= degree) knots[i] = 0;
+    else if (i >= m - degree) knots[i] = 1;
+    else knots[i] = (i - degree) / (m - 2 * degree);
+  }
+  const basis = (i, p, u) => {
+    if (p === 0) {
+      if (u === 1) return i === n ? 1 : 0;
+      return (knots[i] <= u && u < knots[i + 1]) ? 1 : 0;
+    }
+    const d1 = knots[i + p] - knots[i];
+    const d2 = knots[i + p + 1] - knots[i + 1];
+    const a = d1 > 1e-12 ? ((u - knots[i]) / d1) * basis(i, p - 1, u) : 0;
+    const b = d2 > 1e-12 ? ((knots[i + p + 1] - u) / d2) * basis(i + 1, p - 1, u) : 0;
+    return a + b;
+  };
+  const spans = Math.max(1, n - degree + 1);
+  const sampleCount = Math.max(24, Math.min(720, spans * 32));
+  const out = [];
+  for (let s = 0; s <= sampleCount; s++) {
+    const u = s / sampleCount;
+    let x = 0;
+    let y = 0;
+    for (let i = 0; i <= n; i++) {
+      const w = basis(i, degree, u);
+      if (!w) continue;
+      x += cps[i].x * w;
+      y += cps[i].y * w;
+    }
+    out.push({ x, y });
+  }
+  return out;
+}
+
 function drawPolylineDraft(ctx, state) {
   const d = state.polylineDraft;
   if (!d || !Array.isArray(d.points) || d.points.length === 0) return;
@@ -697,17 +838,44 @@ function drawPolylineDraft(ctx, state) {
   ctx.setLineDash([]);
   ctx.lineWidth = 1.0;
   ctx.beginPath();
-  const p0 = worldToScreen(state.view, d.points[0]);
-  ctx.moveTo(p0.x, p0.y);
-  for (let i = 1; i < d.points.length; i++) {
-    const p = worldToScreen(state.view, d.points[i]);
-    ctx.lineTo(p.x, p.y);
+  if (d.kind === "bspline") {
+    const cp = d.hoverPoint ? [...d.points, d.hoverPoint] : [...d.points];
+    const sampled = sampleBSplinePoints(cp, 3);
+    if (sampled.length >= 2) {
+      const p0 = worldToScreen(state.view, sampled[0]);
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < sampled.length; i++) {
+        const p = worldToScreen(state.view, sampled[i]);
+        ctx.lineTo(p.x, p.y);
+      }
+      ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(100,116,139,0.45)";
+    ctx.beginPath();
+    const c0 = worldToScreen(state.view, d.points[0]);
+    ctx.moveTo(c0.x, c0.y);
+    for (let i = 1; i < d.points.length; i++) {
+      const p = worldToScreen(state.view, d.points[i]);
+      ctx.lineTo(p.x, p.y);
+    }
+    if (d.hoverPoint) {
+      const hp = worldToScreen(state.view, d.hoverPoint);
+      ctx.lineTo(hp.x, hp.y);
+    }
+    ctx.stroke();
+  } else {
+    const p0 = worldToScreen(state.view, d.points[0]);
+    ctx.moveTo(p0.x, p0.y);
+    for (let i = 1; i < d.points.length; i++) {
+      const p = worldToScreen(state.view, d.points[i]);
+      ctx.lineTo(p.x, p.y);
+    }
+    if (d.hoverPoint) {
+      const hp = worldToScreen(state.view, d.hoverPoint);
+      ctx.lineTo(hp.x, hp.y);
+    }
+    ctx.stroke();
   }
-  if (d.hoverPoint) {
-    const hp = worldToScreen(state.view, d.hoverPoint);
-    ctx.lineTo(hp.x, hp.y);
-  }
-  ctx.stroke();
   ctx.setLineDash([]);
   for (const wp of d.points) {
     const p = worldToScreen(state.view, wp);
@@ -1367,6 +1535,28 @@ function drawVertexHandles(ctx, state) {
           { key: "a2", x: cx + Math.cos(a2) * r, y: cy + Math.sin(a2) * r, objectSnap: { enabled: false } },
         ];
       }
+    } else if (s.type === "bspline" && Array.isArray(s.controlPoints)) {
+      pts = s.controlPoints.map((cp, idx) => ({
+        key: `cp${idx}`,
+        x: Number(cp?.x),
+        y: Number(cp?.y),
+        objectSnap: { enabled: false },
+      })).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+      if (pts.length >= 2) {
+        ctx.save();
+        ctx.setLineDash([5, 4]);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = "rgba(100,116,139,0.75)";
+        ctx.beginPath();
+        const p0 = worldToScreen(state.view, pts[0]);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < pts.length; i++) {
+          const sp = worldToScreen(state.view, pts[i]);
+          ctx.lineTo(sp.x, sp.y);
+        }
+        ctx.stroke();
+        ctx.restore();
+      }
     }
     if (!pts) continue;
     for (const p of pts) {
@@ -1666,6 +1856,45 @@ function drawDimEditHandles(ctx, state) {
   ctx.restore();
 }
 
+function drawImageScaleHandles(ctx, state) {
+  if (String(state.tool || "") !== "select") return;
+  const selectedIds = new Set((state.selection?.ids || []).map(Number));
+  if (!selectedIds.size) return;
+  const images = (state.shapes || []).filter((s) => selectedIds.has(Number(s.id)) && String(s.type || "") === "image");
+  if (!images.length) return;
+  const handleHalf = 4.5;
+  for (const s of images) {
+    if (!isLayerVisible(state, s.layerId)) continue;
+    if (!!s.lockTransform) continue;
+    const x = Number(s.x), y = Number(s.y);
+    const w = Math.max(1e-9, Number(s.width) || 0);
+    const h = Math.max(1e-9, Number(s.height) || 0);
+    if (!Number.isFinite(x) || !Number.isFinite(y) || !(w > 0) || !(h > 0)) continue;
+    const cx = x + w * 0.5;
+    const cy = y + h * 0.5;
+    const rotDeg = Number(s.rotationDeg) || 0;
+    const rotate = (px, py) => {
+      const r = rotDeg * Math.PI / 180;
+      const dx = px - cx, dy = py - cy;
+      return { x: cx + dx * Math.cos(r) - dy * Math.sin(r), y: cy + dx * Math.sin(r) + dy * Math.cos(r) };
+    };
+    const tl = rotate(x, y);
+    const br = rotate(x + w, y + h);
+    const pTl = worldToScreen(state.view, tl);
+    const pBr = worldToScreen(state.view, br);
+    ctx.save();
+    ctx.fillStyle = "#ffffff";
+    ctx.strokeStyle = "#1d4ed8";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.rect(pTl.x - handleHalf, pTl.y - handleHalf, handleHalf * 2, handleHalf * 2);
+    ctx.rect(pBr.x - handleHalf, pBr.y - handleHalf, handleHalf * 2, handleHalf * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function drawHatchFill(ctx, state, s) {
   const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, s.boundaryIds || [], state.view.scale);
   if (!parsed.ok || !parsed.loops || parsed.loops.length === 0) return;
@@ -1910,6 +2139,28 @@ function getShapeWorldBounds(shape, shapeById = null, visiting = null) {
       maxY: Math.max(y1, y2),
     };
   }
+  if (shape.type === "image") {
+    const x = Number(shape.x), y = Number(shape.y);
+    const w = Math.abs(Number(shape.width) || 0), h = Math.abs(Number(shape.height) || 0);
+    if (![x, y, w, h].every(Number.isFinite) || !(w > 0) || !(h > 0)) return null;
+    const cx = x + w * 0.5, cy = y + h * 0.5;
+    const rotDeg = Number(shape.rotationDeg) || 0;
+    const rotPt = (px, py) => {
+      const r = rotDeg * Math.PI / 180;
+      const dx = px - cx, dy = py - cy;
+      return { x: cx + dx * Math.cos(r) - dy * Math.sin(r), y: cy + dx * Math.sin(r) + dy * Math.cos(r) };
+    };
+    return boundsFromPoints([
+      rotPt(x, y),
+      rotPt(x + w, y),
+      rotPt(x + w, y + h),
+      rotPt(x, y + h),
+    ]);
+  }
+  if (shape.type === "bspline") {
+    const sampled = sampleBSplinePoints(shape.controlPoints, Number(shape.degree) || 3);
+    return boundsFromPoints(sampled);
+  }
   if (shape.type === "circle" || shape.type === "arc") {
     const cx = Number(shape.cx), cy = Number(shape.cy), r = Math.abs(Number(shape.r));
     if (![cx, cy, r].every(Number.isFinite)) return null;
@@ -2040,6 +2291,8 @@ export function render(ctx, canvas, state) {
     }
     return { visibleLayerSet, lockedLayerSet };
   })();
+  const groupById = new Map((state.groups || []).map((g) => [Number(g.id), g]));
+  const groupVisibleMemo = new Map();
   // Fast-path: when every layer is OFF, skip all shape-oriented work.
   if (layerCache.visibleLayerSet.size > 0) {
     const scale = Math.max(1e-9, Number(state.view?.scale) || 1);
@@ -2058,8 +2311,7 @@ export function render(ctx, canvas, state) {
     const activeGroupShapeSet = (state.activeGroupId == null)
       ? null
       : collectGroupTreeShapeIdSet(state, state.activeGroupId);
-    const needsGroupMap = !!state.ui?.groupView?.colorize;
-    const currentShapeGroupMap = needsGroupMap ? buildCurrentShapeGroupMap(state) : null;
+    const currentShapeGroupMap = buildCurrentShapeGroupMap(state);
     // Render order is linked to layer order:
     // panel top( index 0 ) is top-most, so we draw from bottom layer to top layer.
     const layers = Array.isArray(state.layers) ? state.layers : [];
@@ -2091,7 +2343,7 @@ export function render(ctx, canvas, state) {
       }
       const b = getShapeWorldBounds(shape, shapeById);
       if (b && isBoundsOutsideView(b, viewWorld)) return;
-      drawShape(ctx, state, shape, currentShapeGroupMap, selectedSet, activeGroupShapeSet, layerCache);
+      drawShape(ctx, state, shape, currentShapeGroupMap, selectedSet, activeGroupShapeSet, layerCache, groupById, groupVisibleMemo);
     };
     // Unknown layer shapes first (back-most).
     for (const shape of unlayeredVisibleShapes) drawVisibleShape(shape);
@@ -2115,6 +2367,7 @@ export function render(ctx, canvas, state) {
   drawActiveGroupRotateHandle(ctx, state);
   drawVertexHandles(ctx, state);
   drawDimEditHandles(ctx, state);
+  drawImageScaleHandles(ctx, state);
   drawSelectionBox(ctx, state);
   drawObjectSnapHover(ctx, state);
   drawTrimHover(ctx, state);

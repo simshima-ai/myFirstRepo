@@ -31,7 +31,7 @@ import {
   setLineWidthMm, setToolLineType, setSelectedLineWidthMm, setSelectedLineType,
   setSelectedColor,
   setFilletNoTrim,
-  executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg,
+  executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg, exportDxf,
   beginOrAdvanceDim, updateDimHover, finalizeDimDraft,
   beginOrExtendPolyline, updatePolylineHover, finalizePolylineDraft,
   executeHatch, trimateFillet, applyDimSettingsToSelection, mergeSelectedShapesToGroup,
@@ -1618,6 +1618,7 @@ const helpers = {
   saveJsonAs: () => saveJsonAsToFile(state, helpers),
   pdf: () => exportPdf(state, helpers),
   svg: () => exportSvg(state, helpers),
+  dxf: () => exportDxf(state, helpers),
 
   createLine: (p1, p2) => createLine(p1, p2),
   createRect: (p1, p2) => createRect(p1, p2),

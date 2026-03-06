@@ -75,6 +75,14 @@ function buildCurrentShapeGroupMap(state) {
   return map;
 }
 
+function isVisibleByCurrentLayerFilter(state, shape) {
+  if (!state?.ui?.groupView?.currentLayerOnly) return true;
+  const activeLayerId = Number(state?.activeLayerId);
+  const lid = Number(shape?.layerId ?? activeLayerId);
+  if (!Number.isFinite(activeLayerId)) return true;
+  return lid === activeLayerId;
+}
+
 function isGroupVisibleWithCache(groupById, groupId, memo) {
   const gid = Number(groupId);
   if (!Number.isFinite(gid)) return true;
@@ -379,6 +387,7 @@ function drawAxes(ctx, canvas, state) {
 
 function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet = null, activeGroupShapeSet = null, layerCache = null, groupById = null, groupVisibleMemo = null) {
   if (!isLayerVisible(state, shape.layerId, layerCache)) return;
+  if (!isVisibleByCurrentLayerFilter(state, shape)) return;
   if (!isShapeGroupVisible(state, shape, currentShapeGroupMap, groupById, groupVisibleMemo)) return;
   ctx.save();
   if (isLayerLocked(state, shape.layerId, layerCache)) {
@@ -1153,7 +1162,7 @@ function drawTrimHover(ctx, state) {
   const s = th.line; // th.line に直接オブジェクトが入っている
   if (th.targetType === "circle" || th.targetType === "arc") {
     const csh = th.circle || th.arc; // 直接参照
-    if (!csh || !isLayerVisible(state, csh.layerId)) return;
+    if (!csh || !isLayerVisible(state, csh.layerId) || !isVisibleByCurrentLayerFilter(state, csh)) return;
     const c = worldToScreen(state.view, { x: Number(csh.cx), y: Number(csh.cy) });
     const r = Math.max(1, Number(csh.r) * state.view.scale);
     ctx.save();
@@ -1176,7 +1185,7 @@ function drawTrimHover(ctx, state) {
     ctx.restore();
     return;
   }
-  if (!s || !isLayerVisible(state, s.layerId)) return;
+  if (!s || !isLayerVisible(state, s.layerId) || !isVisibleByCurrentLayerFilter(state, s)) return;
   const p1 = worldToScreen(state.view, { x: Number(s.x1), y: Number(s.y1) });
   const p2 = worldToScreen(state.view, { x: Number(s.x2), y: Number(s.y2) });
   ctx.save();
@@ -1528,6 +1537,7 @@ function drawVertexHandles(ctx, state) {
   ctx.save();
   for (const s of state.shapes || []) {
     if (!isLayerVisible(state, s.layerId)) continue;
+    if (!isVisibleByCurrentLayerFilter(state, s)) continue;
     if (filterShapeId !== null && Number(s.id) !== filterShapeId) continue;
     let pts = null;
     if (s.type === "line" || s.type === "rect") {
@@ -1595,6 +1605,7 @@ function drawDimEditHandles(ctx, state) {
     if (!selectedIds.has(Number(s.id))) continue;
     if (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle") continue;
     if (!isLayerVisible(state, s.layerId)) continue;
+    if (!isVisibleByCurrentLayerFilter(state, s)) continue;
 
     if (s.type === "dimchain") {
       if (!Array.isArray(s.points) || s.points.length < 2) continue;
@@ -1874,6 +1885,7 @@ function drawImageScaleHandles(ctx, state) {
   const handleHalf = 4.5;
   for (const s of images) {
     if (!isLayerVisible(state, s.layerId)) continue;
+    if (!isVisibleByCurrentLayerFilter(state, s)) continue;
     if (!!s.lockTransform) continue;
     const x = Number(s.x), y = Number(s.y);
     const w = Math.max(1e-9, Number(s.width) || 0);
@@ -2333,6 +2345,7 @@ export function render(ctx, canvas, state) {
     const unlayeredVisibleShapes = [];
     for (const shape of (state.shapes || [])) {
       if (!isLayerVisible(state, shape.layerId, layerCache)) continue;
+      if (!isVisibleByCurrentLayerFilter(state, shape)) continue;
       const lid = Number(shape.layerId);
       if (!Number.isFinite(lid) || !layerIndexById.has(lid)) {
         unlayeredVisibleShapes.push(shape);

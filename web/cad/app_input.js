@@ -104,6 +104,35 @@ export function setupInputListeners(state, dom, helpers) {
         if (raw === "continuous" || raw === "freehand") return raw;
         return "segment";
     };
+    const touchPointers = new Map();
+    const pinchState = { active: false, lastDistance: 0, lastCenter: null };
+    const upsertTouchPointer = (e) => {
+        if (e.pointerType !== "touch") return;
+        const p = getMouseScreen(dom, e);
+        touchPointers.set(e.pointerId, { x: Number(p.x) || 0, y: Number(p.y) || 0 });
+    };
+    const removeTouchPointer = (e) => {
+        if (e.pointerType !== "touch") return;
+        touchPointers.delete(e.pointerId);
+        if (touchPointers.size < 2) {
+            pinchState.active = false;
+            pinchState.lastDistance = 0;
+            pinchState.lastCenter = null;
+        }
+    };
+    const getTwoTouchMetrics = () => {
+        if (touchPointers.size < 2) return null;
+        const pts = Array.from(touchPointers.values());
+        const p0 = pts[0];
+        const p1 = pts[1];
+        const cx = (Number(p0.x) + Number(p1.x)) * 0.5;
+        const cy = (Number(p0.y) + Number(p1.y)) * 0.5;
+        const dx = Number(p1.x) - Number(p0.x);
+        const dy = Number(p1.y) - Number(p0.y);
+        const distance = Math.hypot(dx, dy);
+        if (!(distance > 0)) return null;
+        return { center: { x: cx, y: cy }, distance };
+    };
     const beginOrExtendBsplineDraft = (world) => {
         const x = Number(world?.x), y = Number(world?.y);
         if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -329,6 +358,19 @@ export function setupInputListeners(state, dom, helpers) {
 
     dom.canvas.addEventListener("pointerdown", (e) => {
         dom.canvas.setPointerCapture(e.pointerId);
+        if (e.pointerType === "touch") {
+            upsertTouchPointer(e);
+            if (touchPointers.size >= 2) {
+                const m = getTwoTouchMetrics();
+                if (m) {
+                    pinchState.active = true;
+                    pinchState.lastDistance = m.distance;
+                    pinchState.lastCenter = m.center;
+                }
+                if (e.cancelable) e.preventDefault();
+                return;
+            }
+        }
         const screen = getMouseScreen(dom, e);
         const worldRaw = getMouseWorld(state, dom, e, false);
         // Prioritize object snap point if available
@@ -849,6 +891,21 @@ export function setupInputListeners(state, dom, helpers) {
     };
     dom.canvas.addEventListener("pointermove", (e) => {
         const drawFast = () => { if (draw) draw({ skipUi: true }); };
+        if (e.pointerType === "touch") upsertTouchPointer(e);
+        if (pinchState.active && touchPointers.size >= 2) {
+            const m = getTwoTouchMetrics();
+            if (m && pinchState.lastDistance > 0) {
+                const factor = m.distance / pinchState.lastDistance;
+                if (Number.isFinite(factor) && factor > 0) {
+                    zoomAt(state, m.center, factor);
+                    pinchState.lastDistance = m.distance;
+                    pinchState.lastCenter = m.center;
+                    drawFast();
+                }
+            }
+            if (e.cancelable) e.preventDefault();
+            return;
+        }
         const screen = getMouseScreen(dom, e);
         const worldRaw = getMouseWorld(state, dom, e, false);
 
@@ -1022,6 +1079,7 @@ export function setupInputListeners(state, dom, helpers) {
 
     dom.canvas.addEventListener("pointerup", (e) => {
         dom.canvas.releasePointerCapture(e.pointerId);
+        removeTouchPointer(e);
         state.input.pointerDown = false;
         state.input.panning = false;
 
@@ -1187,6 +1245,12 @@ export function setupInputListeners(state, dom, helpers) {
         }
 
         if (draw) draw();
+    });
+    dom.canvas.addEventListener("pointercancel", (e) => {
+        removeTouchPointer(e);
+    });
+    dom.canvas.addEventListener("lostpointercapture", (e) => {
+        removeTouchPointer(e);
     });
 
     dom.canvas.addEventListener("dblclick", (e) => {

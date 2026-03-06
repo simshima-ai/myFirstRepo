@@ -1932,7 +1932,16 @@ export function setGridShow(state, val) {
     state.grid.show = !!val;
 }
 export function setGridAuto(state, val) {
-    state.grid.auto = !!val;
+    const next = !!val;
+    const prev = !!state.grid.auto;
+    state.grid.auto = next;
+    // Re-baseline auto-grid when enabling during arbitrary zoom level.
+    if (next && !prev) {
+        const sc = Math.max(1e-9, Number(state.view?.scale) || 1);
+        const base = Math.max(1e-9, Number(state.grid?.size) || 100);
+        state.grid.autoBasePxAtReset = base * sc;
+        state.grid.autoLevel = 100;
+    }
 }
 export function setGridAutoThresholds(state, t50, t10, t5, t1, timing = null) {
     const v50 = Math.max(100, Math.min(2000, Math.round(Number(t50) || 130)));

@@ -284,6 +284,8 @@ const dom = {
   statusText: document.getElementById("statusText"),
   touchConfirmOverlay: document.getElementById("touchConfirmOverlay"),
   touchConfirmBtn: document.getElementById("touchConfirmBtn"),
+  touchSelectBackOverlay: document.getElementById("touchSelectBackOverlay"),
+  touchSelectBackBtn: document.getElementById("touchSelectBackBtn"),
   gridScaleIndicator: document.getElementById("gridScaleIndicator"),
   gridScaleBar: document.getElementById("gridScaleBar"),
   gridScaleText: document.getElementById("gridScaleText"),

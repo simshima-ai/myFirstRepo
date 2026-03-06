@@ -302,6 +302,7 @@ function applyLanguageUi(state, dom) {
       import: "インポート",
       export: "出力",
       settings: "設定",
+      manualGuide: "使い方ガイド",
       selectMode: "選択モード",
       objectPick: "オブジェクト",
       groupPick: "グループ",
@@ -315,6 +316,7 @@ function applyLanguageUi(state, dom) {
       touchMode: "タッチモード",
       leftMenuVisibleItems: "左メニュー表示項目",
       touchConfirmCommon: "決定",
+      touchBackToSelect: "選択に戻る",
       touchConfirm: "確定",
       dimPreparePlacement: "配置位置を指定",
       dimFinalize: "寸法確定",
@@ -512,6 +514,7 @@ function applyLanguageUi(state, dom) {
       import: "Import",
       export: "Export",
       settings: "Settings",
+      manualGuide: "User Guide",
       selectMode: "Selection Mode",
       objectPick: "Object",
       groupPick: "Group",
@@ -525,6 +528,7 @@ function applyLanguageUi(state, dom) {
       touchMode: "Touch Mode",
       leftMenuVisibleItems: "Left Menu Items",
       touchConfirmCommon: "Confirm",
+      touchBackToSelect: "Back to Select",
       touchConfirm: "Confirm",
       dimPreparePlacement: "Set Placement",
       dimFinalize: "Finalize Dim",
@@ -705,6 +709,7 @@ function applyLanguageUi(state, dom) {
   setText(".sidebar .section[data-panel-id='tools'] > .panel-toggle", t.create);
   setText(".sidebar .section[data-panel-id='editTools'] > .panel-toggle", t.edit);
   setText(".sidebar .section[data-panel-id='fileTools'] > .panel-toggle", t.file);
+  setText("#openManualBtn", t.manualGuide);
   setText(".left-aux-stack .section[data-panel-id='snap'] > .panel-toggle", t.snap);
   setText(".left-aux-stack .section[data-panel-id='attrs'] > .panel-toggle", t.attrs);
 
@@ -775,6 +780,7 @@ function applyLanguageUi(state, dom) {
   setLabelByControl("touchModeToggle", t.touchMode);
   setText("#leftMenuVisibilityLabel", t.leftMenuVisibleItems);
   setButtonById("touchConfirmBtn", t.touchConfirmCommon);
+  setButtonById("touchSelectBackBtn", t.touchBackToSelect);
   setButtonById("lineTouchFinalizeBtn", t.touchConfirm);
   setButtonById("dimChainPrepareBtn", t.dimPreparePlacement);
   setButtonById("dimChainFinalizeBtn", t.dimFinalize);
@@ -1590,8 +1596,15 @@ export function initUi(state, dom, actions) {
     if (item.type === "tool") {
       btn.dataset.tool = item.id;
       btn.addEventListener("click", () => {
-        if (item.id === "settings" && state.tool === "settings") actions.setTool("select");
-        else actions.setTool(item.id);
+        if (item.id === "settings" && state.tool === "settings") {
+          actions.setTool("select");
+          return;
+        }
+        if (state.ui?.touchMode && state.tool === item.id && item.id !== "select") {
+          actions.setTool("select");
+          return;
+        }
+        actions.setTool(item.id);
       });
     } else {
       btn.dataset.action = item.id;
@@ -2859,6 +2872,12 @@ export function initUi(state, dom, actions) {
       if (tool === "hatch") {
         actions.executeHatch?.();
       }
+    });
+  }
+  if (dom.touchSelectBackBtn) {
+    dom.touchSelectBackBtn.addEventListener("click", () => {
+      if (!state.ui?.touchMode) return;
+      actions.setTool?.("select");
     });
   }
   if (dom.fpsDisplayToggle) {
@@ -5009,6 +5028,11 @@ export function refreshUi(state, dom) {
     dom.touchConfirmOverlay.style.display = show ? "block" : "none";
     dom.touchConfirmBtn.disabled = !enabled;
     dom.touchConfirmBtn.textContent = label;
+  }
+  if (dom.touchSelectBackOverlay && dom.touchSelectBackBtn) {
+    const touchMode = !!state.ui?.touchMode;
+    const isSelect = String(state.tool || "") === "select";
+    dom.touchSelectBackOverlay.style.display = (touchMode && !isSelect) ? "block" : "none";
   }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.checked = !!state.ui?.showFps;

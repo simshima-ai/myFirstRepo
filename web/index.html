@@ -575,12 +575,12 @@ footer {
 
   <!-- Nav -->
   <nav>
-    <a class="nav-logo" href="/index.html"><span style="color:var(--accent)">S-</span>CAD</a>
+    <a class="nav-logo" href="./index.html"><span style="color:var(--accent)">S-</span>CAD</a>
     <ul class="nav-links">
-      <li><a id="navGuideLink" href="/manual.html" data-i18n="nav-guide">使い方ガイド</a></li>
+      <li><a id="navGuideLink" href="./manual.html" data-i18n="nav-guide">使い方ガイド</a></li>
       <li><button id="lang-toggle" class="lang-btn">EN</button></li>
     </ul>
-    <a href="/cad.html" class="nav-cta" data-i18n="nav-cta">無料で始める</a>
+    <a href="./cad.html" class="nav-cta" data-i18n="nav-cta">無料で始める</a>
   </nav>
 
   <!-- Hero -->
@@ -621,7 +621,7 @@ footer {
 
     <!-- CTAs -->
     <div class="hero-actions">
-      <a href="/cad.html" class="btn-primary" data-i18n="cta-btn">オープンベータテストに参加</a>
+      <a href="./cad.html" class="btn-primary" data-i18n="cta-btn">オープンベータテストに参加</a>
     </div>
   </section>
 
@@ -683,7 +683,7 @@ footer {
 
   <!-- Footer -->
   <footer>
-    <a class="footer-logo" href="/index.html">S-CAD</a>
+    <a class="footer-logo" href="./index.html">S-CAD</a>
     <div class="footer-copy">Simple &amp; Smart 2D CAD</div>
   </footer>
 
@@ -3854,7 +3854,7 @@ document.addEventListener('mousemove', e=>{
       if (LABELS[lang][key] !== undefined) el.innerHTML = LABELS[lang][key];
     });
     var guide = document.getElementById('navGuideLink');
-    if (guide) guide.href = (lang === 'en') ? '/manual_en.html' : '/manual.html';
+    if (guide) guide.href = (lang === 'en') ? './manual_en.html' : './manual.html';
     var btn = document.getElementById('lang-toggle');
     if (btn) btn.textContent = lang === 'ja' ? 'EN' : 'JP';
     document.documentElement.lang = lang;

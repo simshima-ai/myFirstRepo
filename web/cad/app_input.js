@@ -894,14 +894,23 @@ export function setupInputListeners(state, dom, helpers) {
         if (e.pointerType === "touch") upsertTouchPointer(e);
         if (pinchState.active && touchPointers.size >= 2) {
             const m = getTwoTouchMetrics();
-            if (m && pinchState.lastDistance > 0) {
-                const factor = m.distance / pinchState.lastDistance;
-                if (Number.isFinite(factor) && factor > 0) {
-                    zoomAt(state, m.center, factor);
-                    pinchState.lastDistance = m.distance;
-                    pinchState.lastCenter = m.center;
-                    drawFast();
+            if (m) {
+                if (pinchState.lastCenter) {
+                    const dx = Number(m.center.x) - Number(pinchState.lastCenter.x);
+                    const dy = Number(m.center.y) - Number(pinchState.lastCenter.y);
+                    if (Number.isFinite(dx) && Number.isFinite(dy) && (Math.abs(dx) > 0 || Math.abs(dy) > 0)) {
+                        panByScreenDelta(state, dx, dy);
+                    }
                 }
+                if (pinchState.lastDistance > 0) {
+                    const factor = m.distance / pinchState.lastDistance;
+                    if (Number.isFinite(factor) && factor > 0) {
+                        zoomAt(state, m.center, factor);
+                    }
+                }
+                pinchState.lastDistance = m.distance;
+                pinchState.lastCenter = m.center;
+                drawFast();
             }
             if (e.cancelable) e.preventDefault();
             return;

@@ -389,6 +389,7 @@ export function createState() {
       language: "en",
       menuScalePct: 100,
       touchMode: false,
+      touchMultiSelect: false,
       showFps: false,
       showObjectCount: false,
       autoBackupEnabled: true,

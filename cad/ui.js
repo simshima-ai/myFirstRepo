@@ -337,6 +337,8 @@ function applyLanguageUi(state, dom) {
       leftMenuVisibleItems: "左メニュー表示項目",
       touchConfirmCommon: "決定",
       touchBackToSelect: "選択に戻る",
+      touchMultiSelectOn: "複数選択 ON",
+      touchMultiSelectOff: "複数選択 OFF",
       touchConfirm: "確定",
       dimPreparePlacement: "配置位置を指定",
       dimFinalize: "寸法確定",
@@ -550,6 +552,8 @@ function applyLanguageUi(state, dom) {
       leftMenuVisibleItems: "Left Menu Items",
       touchConfirmCommon: "Confirm",
       touchBackToSelect: "Back to Select",
+      touchMultiSelectOn: "Multi-Select ON",
+      touchMultiSelectOff: "Multi-Select OFF",
       touchConfirm: "Confirm",
       dimPreparePlacement: "Set Placement",
       dimFinalize: "Finalize Dim",
@@ -806,6 +810,10 @@ function applyLanguageUi(state, dom) {
   setText("#leftMenuVisibilityLabel", t.leftMenuVisibleItems);
   setButtonById("touchConfirmBtn", t.touchConfirmCommon);
   setButtonById("touchSelectBackBtn", t.touchBackToSelect);
+  if (dom.touchMultiSelectBtn) {
+    const on = !!state.ui?.touchMultiSelect;
+    dom.touchMultiSelectBtn.textContent = on ? t.touchMultiSelectOn : t.touchMultiSelectOff;
+  }
   setButtonById("lineTouchFinalizeBtn", t.touchConfirm);
   setButtonById("dimChainPrepareBtn", t.dimPreparePlacement);
   setButtonById("dimChainFinalizeBtn", t.dimFinalize);
@@ -3061,6 +3069,12 @@ export function initUi(state, dom, actions) {
       actions.setTool?.("select");
     });
   }
+  if (dom.touchMultiSelectBtn) {
+    dom.touchMultiSelectBtn.addEventListener("click", () => {
+      if (!state.ui?.touchMode) return;
+      actions.setTouchMultiSelect?.(!state.ui?.touchMultiSelect);
+    });
+  }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.addEventListener("change", () => {
       actions.setFpsDisplay?.(!!dom.fpsDisplayToggle.checked);
@@ -5269,6 +5283,21 @@ export function refreshUi(state, dom) {
     const touchMode = !!state.ui?.touchMode;
     const isSelect = String(state.tool || "") === "select";
     dom.touchSelectBackOverlay.style.display = (touchMode && !isSelect) ? "block" : "none";
+  }
+  if (dom.touchMultiSelectOverlay && dom.touchMultiSelectBtn) {
+    const touchMode = !!state.ui?.touchMode;
+    const tool = String(state.tool || "");
+    const circleModeRaw = String(state.circleSettings?.mode || "").toLowerCase();
+    const circleMode = (circleModeRaw === "fixed" || circleModeRaw === "threepoint" || circleModeRaw === "drag")
+      ? circleModeRaw
+      : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
+    const needsMultiSelect = (tool === "select" || tool === "hatch" || tool === "doubleline" || tool === "patterncopy" || (tool === "circle" && circleMode === "threepoint"));
+    const on = !!state.ui?.touchMultiSelect;
+    dom.touchMultiSelectOverlay.style.display = (touchMode && needsMultiSelect) ? "block" : "none";
+    dom.touchMultiSelectBtn.classList.toggle("is-active", on);
+    dom.touchMultiSelectBtn.textContent = on
+      ? (panelLang === "en" ? "Multi-Select ON" : "複数選択 ON")
+      : (panelLang === "en" ? "Multi-Select OFF" : "複数選択 OFF");
   }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.checked = !!state.ui?.showFps;

@@ -967,6 +967,93 @@ export function applyGroupOriginDrag(state, worldRaw) {
     }
 }
 
+function resolveFollowPointFromAttrib(state, attrib) {
+    const ref = state.shapes.find(s => Number(s.id) === Number(attrib?.shapeId));
+    if (!ref) return null;
+    if (attrib.refType === "line_endpoint" && ref.type === "line") {
+        return (attrib.refKey === "p2")
+            ? { x: Number(ref.x2), y: Number(ref.y2) }
+            : { x: Number(ref.x1), y: Number(ref.y1) };
+    }
+    if (attrib.refType === "dim_endpoint" && ref.type === "dim") {
+        return (attrib.refKey === "p2")
+            ? { x: Number(ref.x2), y: Number(ref.y2) }
+            : { x: Number(ref.x1), y: Number(ref.y1) };
+    }
+    if (attrib.refType === "rect_corner" && ref.type === "rect") {
+        const x1 = Number(ref.x1), y1 = Number(ref.y1), x2 = Number(ref.x2), y2 = Number(ref.y2);
+        if (attrib.refKey === "c2") return { x: x2, y: y1 };
+        if (attrib.refKey === "c3") return { x: x2, y: y2 };
+        if (attrib.refKey === "c4") return { x: x1, y: y2 };
+        return { x: x1, y: y1 };
+    }
+    if (attrib.refType === "line_midpoint" && ref.type === "line") {
+        return { x: (Number(ref.x1) + Number(ref.x2)) * 0.5, y: (Number(ref.y1) + Number(ref.y2)) * 0.5 };
+    }
+    if (attrib.refType === "rect_midpoint" && ref.type === "rect") {
+        const x1 = Number(ref.x1), y1 = Number(ref.y1), x2 = Number(ref.x2), y2 = Number(ref.y2);
+        if (attrib.refKey === "m2") return { x: x2, y: (y1 + y2) * 0.5 };
+        if (attrib.refKey === "m3") return { x: (x1 + x2) * 0.5, y: y2 };
+        if (attrib.refKey === "m4") return { x: x1, y: (y1 + y2) * 0.5 };
+        return { x: (x1 + x2) * 0.5, y: y1 };
+    }
+    if (attrib.refType === "circle_center" && ref.type === "circle") return { x: Number(ref.cx), y: Number(ref.cy) };
+    if (attrib.refType === "arc_center" && ref.type === "arc") return { x: Number(ref.cx), y: Number(ref.cy) };
+    if (attrib.refType === "position_center" && ref.type === "position") return { x: Number(ref.x), y: Number(ref.y) };
+    if (attrib.refType === "arc_endpoint" && ref.type === "arc") {
+        const r = Math.abs(Number(ref.r) || 0);
+        const cx = Number(ref.cx), cy = Number(ref.cy);
+        const a = (attrib.refKey === "a2") ? (Number(ref.a2) || 0) : (Number(ref.a1) || 0);
+        return { x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r };
+    }
+    return null;
+}
+
+export function resolveDimensionSnapAttribs(state) {
+    for (const shape of (state.shapes || [])) {
+        if (!shape || shape.type !== "dim") continue;
+        for (const [attrKey, xKey, yKey] of [["p1Attrib", "x1", "y1"], ["p2Attrib", "x2", "y2"]]) {
+            const attrib = shape[attrKey];
+            if (!attrib || typeof attrib !== "object") continue;
+            if (attrib.type === "fixedPoint") {
+                const fx = Number(attrib.x), fy = Number(attrib.y);
+                if (!Number.isFinite(fx) || !Number.isFinite(fy)) {
+                    shape[attrKey] = null;
+                    continue;
+                }
+                shape[xKey] = fx;
+                shape[yKey] = fy;
+                continue;
+            }
+            if (attrib.type === "followPoint") {
+                const pt = resolveFollowPointFromAttrib(state, attrib);
+                if (!pt || !Number.isFinite(Number(pt.x)) || !Number.isFinite(Number(pt.y))) {
+                    shape[attrKey] = null;
+                    continue;
+                }
+                shape[xKey] = Number(pt.x);
+                shape[yKey] = Number(pt.y);
+                continue;
+            }
+            if (attrib.type === "intersection") {
+                const la = state.shapes.find(s => Number(s.id) === Number(attrib.lineAId));
+                const lb = state.shapes.find(s => Number(s.id) === Number(attrib.lineBId));
+                if (!la || !lb || la.type !== "line" || lb.type !== "line") {
+                    shape[attrKey] = null;
+                    continue;
+                }
+                const ip = segmentIntersectionPoint(
+                    { x: Number(la.x1), y: Number(la.y1) }, { x: Number(la.x2), y: Number(la.y2) },
+                    { x: Number(lb.x1), y: Number(lb.y1) }, { x: Number(lb.x2), y: Number(lb.y2) }
+                );
+                if (!ip) continue;
+                shape[xKey] = Number(ip.x);
+                shape[yKey] = Number(ip.y);
+            }
+        }
+    }
+}
+
 export function applyGroupRotateDrag(state, worldRaw) {
     const gr = state.input.groupRotate;
     if (!gr.active || !gr.groupOrigin) return;
@@ -1834,7 +1921,7 @@ export function applyDimHandleDrag(state, worldRaw) {
     const dim = state.shapes.find(s => s && (s.id === dd.dimId || Number(s.id) === Number(dd.dimId)));
     if (!dim) return;
     const p = state.grid.snap ? snapPoint(worldRaw, getEffectiveGridSize(state.grid, state.view, state.pageSetup)) : worldRaw;
-    const objectSnapPoint = getObjectSnapPoint(state, worldRaw, () => state.objectSnap?.enabled !== false);
+    const objectSnapPoint = getObjectSnapPoint(state, worldRaw, () => true);
     const pSnap = objectSnapPoint || p;
     const projectPointToAxis = (base, axis, point) => {
         const ax = Number(axis?.x) || 0;
@@ -1851,6 +1938,39 @@ export function applyDimHandleDrag(state, worldRaw) {
         const pageScale = Math.max(0.0001, Number(state.pageSetup?.scale ?? 1) || 1);
         const unitMm = mmPerUnit(state.pageSetup?.unit || "mm");
         return mm * pageScale / Math.max(1e-9, unitMm);
+    };
+    const buildKeepSnapAttribFromPoint = (pt) => {
+        if (objectSnapPoint && objectSnapPoint.kind === "intersection"
+            && Number.isFinite(Number(objectSnapPoint.lineAId))
+            && Number.isFinite(Number(objectSnapPoint.lineBId))) {
+            return {
+                type: "intersection",
+                lineAId: Number(objectSnapPoint.lineAId),
+                lineBId: Number(objectSnapPoint.lineBId),
+            };
+        }
+        if (objectSnapPoint
+            && Number.isFinite(Number(objectSnapPoint.shapeId))
+            && String(objectSnapPoint.refType || "").length > 0) {
+            return {
+                type: "followPoint",
+                shapeId: Number(objectSnapPoint.shapeId),
+                refType: String(objectSnapPoint.refType),
+                refKey: String(objectSnapPoint.refKey || "")
+            };
+        }
+        if (Number.isFinite(Number(pt?.x)) && Number.isFinite(Number(pt?.y))) {
+            return { type: "fixedPoint", x: Number(pt.x), y: Number(pt.y) };
+        }
+        return null;
+    };
+    const applyKeepSnapToDimTarget = (dimObj, targetKey, pt) => {
+        const keepSnap = !!(state.objectSnap?.keepAttributes || state.objectSnap?.tangentKeep);
+        if (!keepSnap || !dimObj || (targetKey !== "p1" && targetKey !== "p2")) return;
+        const attrib = buildKeepSnapAttribFromPoint(pt);
+        if (!attrib) return;
+        if (targetKey === "p1") dimObj.p1Attrib = attrib;
+        else dimObj.p2Attrib = attrib;
     };
     const alignDimChainTargets = (d) => {
         if (!d || !Array.isArray(d.points) || d.points.length < 2) return;
@@ -1885,17 +2005,23 @@ export function applyDimHandleDrag(state, worldRaw) {
                         ? (my + Number(dim.tdy))
                         : (Number.isFinite(Number(dim.ty)) ? Number(dim.ty) : my)
                 };
-                const constrained = projectPointToAxis(base, { x: nx, y: ny }, p);
+                const constrained = projectPointToAxis(base, { x: nx, y: ny }, pSnap);
                 dim.tx = constrained.x;
                 dim.ty = constrained.y;
                 dim.tdx = constrained.x - mx;
                 dim.tdy = constrained.y - my;
             } else {
-                dim.tx = p.x; dim.ty = p.y;
+                dim.tx = pSnap.x; dim.ty = pSnap.y;
             }
         }
-        else if (dd.part === 'p1') { dim.x1 = p.x; dim.y1 = p.y; }
-        else if (dd.part === 'p2') { dim.x2 = p.x; dim.y2 = p.y; }
+        else if (dd.part === 'p1') {
+            dim.x1 = pSnap.x; dim.y1 = pSnap.y;
+            applyKeepSnapToDimTarget(dim, "p1", pSnap);
+        }
+        else if (dd.part === 'p2') {
+            dim.x2 = pSnap.x; dim.y2 = pSnap.y;
+            applyKeepSnapToDimTarget(dim, "p2", pSnap);
+        }
         else if (dd.part === 'all') {
             const prev = dd.lastWorld || pSnap;
             const dx = pSnap.x - Number(prev.x || 0);
@@ -1911,10 +2037,11 @@ export function applyDimHandleDrag(state, worldRaw) {
             }
         }
         else if (dd.part === 'target1' || dd.part === 'target2') {
-            const os = getObjectSnapPoint(state, worldRaw, () => true);
-            const tp = os || p;
+            const tp = pSnap;
             if (dd.part === 'target1') { dim.x1 = tp.x; dim.y1 = tp.y; }
             else { dim.x2 = tp.x; dim.y2 = tp.y; }
+            if (dd.part === 'target1') applyKeepSnapToDimTarget(dim, "p1", tp);
+            else applyKeepSnapToDimTarget(dim, "p2", tp);
         }
         else if (dd.part === 'place') {
             dim.px = pSnap.x; dim.py = pSnap.y;
@@ -1931,8 +2058,8 @@ export function applyDimHandleDrag(state, worldRaw) {
                 dim.extVisLens[idx] = dist;
             }
         }
-        else if (dd.part === 'edge') { dim.x2 = p.x; dim.y2 = p.y; }
-        else { dim.px = p.x; dim.py = p.y; }
+        else if (dd.part === 'edge') { dim.x2 = pSnap.x; dim.y2 = pSnap.y; }
+        else { dim.px = pSnap.x; dim.py = pSnap.y; }
     } else if (dim.type === 'dimchain') {
         if (dd.part === 'text') {
             const g = getDimChainGeometry(dim);
@@ -1945,11 +2072,11 @@ export function applyDimHandleDrag(state, worldRaw) {
                     x: Number.isFinite(Number(dim.tx)) ? Number(dim.tx) : mx,
                     y: Number.isFinite(Number(dim.ty)) ? Number(dim.ty) : my
                 };
-                const constrained = projectPointToAxis(base, { x: Number(g.nx), y: Number(g.ny) }, p);
+                const constrained = projectPointToAxis(base, { x: Number(g.nx), y: Number(g.ny) }, pSnap);
                 dim.tx = constrained.x;
                 dim.ty = constrained.y;
             } else {
-                dim.tx = p.x; dim.ty = p.y;
+                dim.tx = pSnap.x; dim.ty = pSnap.y;
             }
         }
         else if (dd.part.startsWith('p:')) {
@@ -2028,15 +2155,15 @@ export function applyDimHandleDrag(state, worldRaw) {
             } else if (dd.part === 'off1' || dd.part === 'off2') {
                 // Project p onto the line defined by ang
                 const ux = Math.cos(g.ang), uy = Math.sin(g.ang);
-                const dist = (p.x - g.cx) * ux + (p.y - g.cy) * uy;
+                const dist = (pSnap.x - g.cx) * ux + (pSnap.y - g.cy) * uy;
                 if (dd.part === 'off1') dim.off1 = dist;
                 else dim.off2 = dist;
             } else if (dd.part === 'text') {
                 // circleDim text position: free 2D move (no axis lock).
-                dim.tdx = Number(p.x) - Number(g.cx);
-                dim.tdy = Number(p.y) - Number(g.cy);
-                dim.tx = Number(p.x);
-                dim.ty = Number(p.y);
+                dim.tdx = Number(pSnap.x) - Number(g.cx);
+                dim.tdy = Number(pSnap.y) - Number(g.cy);
+                dim.tx = Number(pSnap.x);
+                dim.ty = Number(pSnap.y);
             }
         }
     }

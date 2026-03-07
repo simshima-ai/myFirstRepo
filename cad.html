@@ -1695,6 +1695,9 @@
                   <option value="hidden">隠れ線</option>
                 </select>
               </label>
+              <label id="dimSelectionColorWrap" style="display:inline-flex; align-items:center; gap:4px;">色
+                <input id="dimSelectionColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
+              </label>
               <div id="dimChainOps" style="display:none; align-items:center;">
                 <button id="dimChainPopBtn" type="button" class="btn secondary small"
                   style="padding:2px 8px; font-size:12px;">点を取り消し</button>
@@ -1852,8 +1855,30 @@
                     <option value="A3">A3</option>
                     <option value="A2">A2</option>
                     <option value="A1">A1</option>
+                    <option value="Letter">Letter</option>
+                    <option value="Legal">Legal</option>
+                    <option value="Tabloid">Tabloid</option>
+                    <option value="Ledger">Ledger</option>
                   </select>
                 </label>
+                <div class="settings-wide" style="display:flex; flex-direction:column; align-items:flex-start; gap:4px; width:100%;">
+                  <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px; align-self:flex-start;">
+                    <input id="customPageSizeToggle" type="checkbox">
+                    <span id="customPageSizeToggleLabel">カスタム用紙サイズ</span>
+                  </label>
+                  <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+                    <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+                      <span id="customPageWidthLabel">幅</span>
+                      <input id="customPageWidthInput" type="number" min="1" step="1" value="297" style="width:92px;">
+                      <span id="customPageWidthUnitLabel">(mm)</span>
+                    </label>
+                    <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+                      <span id="customPageHeightLabel">高さ</span>
+                      <input id="customPageHeightInput" type="number" min="1" step="1" value="210" style="width:92px;">
+                      <span id="customPageHeightUnitLabel">(mm)</span>
+                    </label>
+                  </div>
+                </div>
                 <label class="settings-item">向き
                   <select id="pageOrientationSelect">
                     <option value="landscape">横</option>
@@ -1871,6 +1896,14 @@
                     <option value="1000">1000</option>
                   </select>
                 </label>
+                <div class="settings-wide" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+                  <label style="display:flex; align-items:center; gap:6px;">
+                    <input id="customScaleToggle" type="checkbox">
+                    <span id="customScaleToggleLabel">カスタム縮尺</span>
+                  </label>
+                  <span>1:</span>
+                  <input id="customScaleInput" type="number" min="0.0001" step="0.1" value="1" style="width:98px;">
+                </div>
                 <label class="settings-item">単位
                   <select id="pageUnitSelect">
                     <option value="mm">mm</option>
@@ -1879,16 +1912,19 @@
                     <option value="inch">inch</option>
                   </select>
                 </label>
-                <label class="settings-item">用紙枠 <input id="pageShowFrameToggle" type="checkbox" checked></label>
-                <label class="settings-item">内側余白(mm)
-                  <input id="pageInnerMarginInput" type="number" min="0" step="1" value="10">
+                <label class="settings-item"><input id="pageShowFrameToggle" type="checkbox" checked> 用紙枠</label>
+                <label class="settings-item" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+                  <span id="pageInnerMarginLabel">内側余白</span>
+                  <input id="pageInnerMarginInput" type="number" min="0" step="1" value="10" style="width:92px;">
+                  <span id="pageInnerMarginUnitLabel">(mm)</span>
                 </label>
               </div>
             </div>
             <hr style="margin: 10px 0; opacity: 0.1;">
             <div class="section-title" style="margin-top: 5px;">グリッド設定</div>
             <div class="settings-grid">
-              <label class="settings-item">基本グリッドサイズ
+              <label class="settings-item" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+                <span id="baseGridLabel">基本グリッド</span>
                 <select id="gridSizeContextInput">
                   <option value="1">1</option>
                   <option value="5">5</option>
@@ -1898,12 +1934,21 @@
                   <option value="500">500</option>
                   <option value="1000">1000</option>
                 </select>
+                <span id="baseGridUnitLabel">(mm)</span>
               </label>
-              <label class="settings-item">表示
-                <input id="gridShowContextToggle" type="checkbox" checked>
+              <div class="settings-wide" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
+                <label style="display:flex; align-items:center; gap:6px;">
+                  <input id="customGridToggle" type="checkbox">
+                  <span id="customGridToggleLabel">カスタムグリッド</span>
+                </label>
+                <input id="customGridInput" type="number" min="1" step="1" value="10" style="width:98px;">
+                <span id="customGridUnitLabel">(mm)</span>
+              </div>
+              <label class="settings-item">
+                <input id="gridShowContextToggle" type="checkbox" checked> <span id="gridShowContextLabel">表示</span>
               </label>
-              <label class="settings-item">可変グリッド
-                <input id="gridAutoContextToggle" type="checkbox" checked>
+              <label class="settings-item">
+                <input id="gridAutoContextToggle" type="checkbox" checked> <span id="gridAutoContextLabel">可変グリッド</span>
               </label>
               <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
                 <label style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px; font-size:12px;">
@@ -1916,7 +1961,7 @@
             </div>
             <hr style="margin: 10px 0; opacity: 0.1;">
             <div class="settings-grid">
-                <div class="settings-wide" style="font-size:12px; color:var(--muted); font-weight:700;">インターフェース</div>
+                <div id="settingsInterfaceLabel" class="settings-wide" style="font-size:12px; color:var(--muted); font-weight:700;">インターフェース</div>
                 <label class="settings-item"><span id="uiLanguageLabel">言語</span>
                   <select id="uiLanguageSelect">
                     <option value="ja" selected>日本語</option>
@@ -2033,7 +2078,7 @@
                 <input id="groupColorizeToggle" type="checkbox">
               </label>
               <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span>現在レイヤーのみ</span>
+                <span>現在レイヤー所属のみ表示</span>
                 <input id="groupCurrentLayerOnlyToggle" type="checkbox">
               </label>
             </div>

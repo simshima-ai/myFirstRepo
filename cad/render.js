@@ -1,4 +1,4 @@
-import {
+﻿import {
   worldToScreen, screenToWorld, getEffectiveGridSize, mmPerUnit,
   getHatchPitchWorld, getHatchLineShiftWorld, getHatchPaddingWorld, getHatchDashWorld, getHatchGapWorld
 } from "./geom.js";
@@ -150,20 +150,30 @@ function isInActiveGroup(state, shapeId) {
 }
 
 const PAGE_SIZES_MM = {
-  A4: [297, 210],
-  A3: [420, 297],
-  A2: [594, 420],
   A1: [841, 594],
+  A2: [594, 420],
+  A3: [420, 297],
+  A4: [297, 210],
+  Letter: [279.4, 215.9],
+  Legal: [355.6, 215.9],
+  Tabloid: [431.8, 279.4],
+  Ledger: [431.8, 279.4],
 };
 const MM_PER_UNIT = { mm: 1, cm: 10, m: 1000, inch: 25.4 };
 
 function getPageFrameWorldSize(pageSetup) {
+  const useCustomSize = !!pageSetup?.customSizeEnabled;
+  const customW = Math.max(1, Number(pageSetup?.customWidthMm) || 297);
+  const customH = Math.max(1, Number(pageSetup?.customHeightMm) || 210);
   const key = String(pageSetup?.size || "A4");
-  const [w, h] = PAGE_SIZES_MM[key] || PAGE_SIZES_MM.A4;
+  const [w, h] = useCustomSize ? [customW, customH] : (PAGE_SIZES_MM[key] || PAGE_SIZES_MM.A4);
   const isPortrait = String(pageSetup?.orientation || "landscape") === "portrait";
   const mmW = isPortrait ? Math.min(w, h) : Math.max(w, h);
   const mmH = isPortrait ? Math.max(w, h) : Math.min(w, h);
-  const scale = Math.max(0.0001, Number(pageSetup?.scale ?? 1) || 1);
+  const effectiveScale = !!pageSetup?.customScaleEnabled
+    ? Number(pageSetup?.customScale ?? pageSetup?.scale ?? 1)
+    : Number(pageSetup?.scale ?? pageSetup?.presetScale ?? 1);
+  const scale = Math.max(0.0001, effectiveScale || 1);
   const unit = String(pageSetup?.unit || "mm");
   const mpU = MM_PER_UNIT[unit] || 1;
   return { cadW: mmW * scale / mpU, cadH: mmH * scale / mpU, mmW, mmH, scale, unit };
@@ -303,7 +313,10 @@ function drawPageFrame(ctx, canvas, state) {
   }
 
   // Scale label
-  const labelStr = `${String(state.pageSetup?.size || "A4")} ${state.pageSetup?.orientation === "portrait" ? "縦" : "横"} | 1:${scale} | ${unit}`;
+  const pageSizeLabel = !!state.pageSetup?.customSizeEnabled
+    ? `${Number(mmW.toFixed(1)).toString()}x${Number(mmH.toFixed(1)).toString()}mm`
+    : String(state.pageSetup?.size || "A4");
+  const labelStr = `${pageSizeLabel} ${state.pageSetup?.orientation === "portrait" ? "縦" : "横"} | 1:${scale} | ${unit}`;
   ctx.fillStyle = "#94a3b8";
   ctx.font = "11px sans-serif";
   ctx.textAlign = "left";
@@ -429,7 +442,7 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
   if (shape.type === "hatch") {
     drawHatchFill(ctx, state, shape);
     if (selected) {
-      // ハッチ選択時にバウンディングボックスを描画
+      // 繝上ャ繝・∈謚樊凾縺ｫ繝舌え繝ｳ繝・ぅ繝ｳ繧ｰ繝懊ャ繧ｯ繧ｹ繧呈緒逕ｻ
       const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, shape.boundaryIds || [], state.view.scale);
       if (parsed.ok && parsed.bounds) {
         const b = parsed.bounds;
@@ -777,7 +790,7 @@ function drawPreviewMetrics(ctx, state, preview) {
     const len = Math.hypot(dx, dy);
     const ang = Math.atan2(dy, dx) * 180 / Math.PI;
     const mid = worldToScreen(state.view, { x: (x1 + x2) * 0.5, y: (y1 + y2) * 0.5 });
-    drawPreviewLabel(ctx, mid.x + 10, mid.y - 28, `L=${len.toFixed(prec)}  A=${ang.toFixed(1)}°`);
+    drawPreviewLabel(ctx, mid.x + 10, mid.y - 28, `L=${len.toFixed(prec)}  A=${ang.toFixed(1)}ﾂｰ`);
     return;
   }
   if (preview.type === "rect") {
@@ -1090,11 +1103,11 @@ function drawSelectionBox(ctx, state) {
 }
 
 function drawObjectSnapHover(ctx, state) {
-  if (state.tool === "trim") return; // トリムツール時はスナップ候補を表示しない
+  if (state.tool === "trim") return; // 繝医Μ繝繝・・繝ｫ譎ゅ・繧ｹ繝翫ャ繝怜呵｣懊ｒ陦ｨ遉ｺ縺励↑縺・
   const p = state.input?.objectSnapHover;
   if (!p) return;
 
-  // 頂点編集または選択ツール時、何も選択されていない場合は表示しない（ドラッグ中を除く）
+  // 鬆らせ邱ｨ髮・∪縺溘・驕ｸ謚槭ヤ繝ｼ繝ｫ譎ゅ∽ｽ輔ｂ驕ｸ謚槭＆繧後※縺・↑縺・ｴ蜷医・陦ｨ遉ｺ縺励↑縺・ｼ医ラ繝ｩ繝・げ荳ｭ繧帝勁縺擾ｼ・
   const isDragging = state.vertexEdit.drag.active || state.selection.drag.active;
   const hasSelection = (state.selection.ids.length > 0) || (state.tool === "vertex" && (state.vertexEdit.selectedVertices || []).length > 0);
 
@@ -1159,9 +1172,9 @@ function drawTrimHover(ctx, state) {
   if (state.tool !== "trim") return;
   const th = state.input?.trimHover;
   if (!th) return;
-  const s = th.line; // th.line に直接オブジェクトが入っている
+  const s = th.line; // th.line 縺ｫ逶ｴ謗･繧ｪ繝悶ず繧ｧ繧ｯ繝医′蜈･縺｣縺ｦ縺・ｋ
   if (th.targetType === "circle" || th.targetType === "arc") {
-    const csh = th.circle || th.arc; // 直接参照
+    const csh = th.circle || th.arc; // 逶ｴ謗･蜿ら・
     if (!csh || !isLayerVisible(state, csh.layerId) || !isVisibleByCurrentLayerFilter(state, csh)) return;
     const c = worldToScreen(state.view, { x: Number(csh.cx), y: Number(csh.cy) });
     const r = Math.max(1, Number(csh.r) * state.view.scale);
@@ -1461,7 +1474,7 @@ function drawHatchHover(ctx, state) {
   const h = state.input?.hatchHover;
   if (!h) return;
   ctx.save();
-  ctx.strokeStyle = "#8b5cf6"; // 紫系
+  ctx.strokeStyle = "#8b5cf6"; // 邏ｫ邉ｻ
   ctx.lineWidth = 3;
   ctx.setLineDash([5, 5]);
   drawShape(ctx, state, h, null);
@@ -1981,36 +1994,36 @@ function drawHatchFill(ctx, state, s) {
     const u = { x: Math.cos(angleRad), y: Math.sin(angleRad) };
     const n = { x: -u.y, y: u.x };
 
-    // オブジェクトの角（境界ボックスの角）が、線の法線方向 (n) と 接線方向 (u) に
-    // どこまで広がっているかを投影して計算
+    // 繧ｪ繝悶ず繧ｧ繧ｯ繝医・隗抵ｼ亥｢・阜繝懊ャ繧ｯ繧ｹ縺ｮ隗抵ｼ峨′縲∫ｷ壹・豕慕ｷ壽婿蜷・(n) 縺ｨ 謗･邱壽婿蜷・(u) 縺ｫ
+    // 縺ｩ縺薙∪縺ｧ蠎・′縺｣縺ｦ縺・ｋ縺九ｒ謚募ｽｱ縺励※險育ｮ・
     let nMin = Infinity, nMax = -Infinity;
     let uMin = Infinity, uMax = -Infinity;
 
     for (const p of corners) {
       const rx = p.x - hatchOrigin.x;
       const ry = p.y - hatchOrigin.y;
-      const pn = rx * n.x + ry * n.y; // 法線ポジション
-      const pu = rx * u.x + ry * u.y; // 接線ポジション
+      const pn = rx * n.x + ry * n.y; // 豕慕ｷ壹・繧ｸ繧ｷ繝ｧ繝ｳ
+      const pu = rx * u.x + ry * u.y; // 謗･邱壹・繧ｸ繧ｷ繝ｧ繝ｳ
       nMin = Math.min(nMin, pn);
       nMax = Math.max(nMax, pn);
       uMin = Math.min(uMin, pu);
       uMax = Math.max(uMax, pu);
     }
 
-    // 接線方向の長さ L: 
-    // バウンディングボックスの対角線長があれば確実。
-    // ここでは投影した uMin/uMax の最大幅に余裕を持たせる。
+    // 謗･邱壽婿蜷代・髟ｷ縺・L: 
+    // 繝舌え繝ｳ繝・ぅ繝ｳ繧ｰ繝懊ャ繧ｯ繧ｹ縺ｮ蟇ｾ隗堤ｷ夐聞縺後≠繧後・遒ｺ螳溘・
+    // 縺薙％縺ｧ縺ｯ謚募ｽｱ縺励◆ uMin/uMax 縺ｮ譛螟ｧ蟷・↓菴呵｣輔ｒ謖√◆縺帙ｋ縲・
     const L = (Math.max(Math.abs(uMin), Math.abs(uMax)) * 2 + pitch) * 1.5;
 
-    // 法線方向の範囲:
-    // nMin から nMax まで pitch 間隔で線を引く。
-    // 浮動小数点の誤差を考慮して少し広めに。
-    // padding を追加して繰り返し方向の漏れを防止。
+    // 豕慕ｷ壽婿蜷代・遽・峇:
+    // nMin 縺九ｉ nMax 縺ｾ縺ｧ pitch 髢馴囈縺ｧ邱壹ｒ蠑輔￥縲・
+    // 豬ｮ蜍募ｰ乗焚轤ｹ縺ｮ隱､蟾ｮ繧定・・縺励※蟆代＠蠎・ａ縺ｫ縲・
+    // padding 繧定ｿｽ蜉縺励※郢ｰ繧願ｿ斐＠譁ｹ蜷代・貍上ｌ繧帝亟豁｢縲・
     const startN = Math.floor((nMin - padding - pitch * 0.1) / pitch) * pitch;
     const endN = nMax + padding + pitch * 0.1;
 
     let lineIndex = 0;
-    // 無限ループ防止のため最大本数を制限
+    // 辟｡髯舌Ν繝ｼ繝鈴亟豁｢縺ｮ縺溘ａ譛螟ｧ譛ｬ謨ｰ繧貞宛髯・
     let safetyCounter = 0;
     for (let offN = startN; offN <= endN && safetyCounter < 5000; offN += pitch, lineIndex++, safetyCounter++) {
       const shiftU = (lineIndex % 2 === 1) ? lineShift : 0;
@@ -2018,7 +2031,7 @@ function drawHatchFill(ctx, state, s) {
         x: hatchOrigin.x + n.x * offN + u.x * shiftU,
         y: hatchOrigin.y + n.y * offN + u.y * shiftU
       };
-      // cp を中心に、u方向に L 広がった線を描く
+      // cp 繧剃ｸｭ蠢・↓縲「譁ｹ蜷代↓ L 蠎・′縺｣縺溽ｷ壹ｒ謠上￥
       const p1s = worldToScreen(state.view, { x: cp.x - u.x * L, y: cp.y - u.y * L });
       const p2s = worldToScreen(state.view, { x: cp.x + u.x * L, y: cp.y + u.y * L });
       ctx.beginPath();
@@ -2554,9 +2567,12 @@ function drawDimensionCommon(ctx, state, dim, geom, selected, groupActive) {
   const layerColorize = !!state.ui?.layerView?.colorize;
   const groupColorize = !!state.ui?.groupView?.colorize;
   const effectiveGroupId = Number.isFinite(Number(dim?.groupId)) ? Number(dim.groupId) : 0;
+  const dimColor = (typeof dim?.color === "string" && /^#[0-9a-fA-F]{6}$/.test(dim.color))
+    ? dim.color
+    : "#0f172a";
   const normalColor = groupColorize
     ? getGroupColorById(state, effectiveGroupId)
-    : (layerColorize ? getLayerColorById(state, dim?.layerId) : "#0f172a");
+    : (layerColorize ? getLayerColorById(state, dim?.layerId) : dimColor);
   const baseStroke = (selected) ? "#f59e0b" : (groupActive ? "#2563eb" : normalColor);
   const dimStrokePx = lineWidthMmToScreenPx(state, getShapeLineWidthMm(state, dim));
   ctx.strokeStyle = baseStroke;
@@ -2571,7 +2587,7 @@ function drawDimensionCommon(ctx, state, dim, geom, selected, groupActive) {
     if (geom.kind === "circle" || geom.kind === "arc") {
       const c = worldToScreen(state.view, { x: geom.cx, y: geom.cy });
       const p2 = worldToScreen(state.view, { x: dim.x2, y: dim.y2 });
-      const label = (geom.kind === "circle" ? "Ø " : "R ") + geom.len.toFixed(dim.precision ?? 1);
+      const label = (geom.kind === "circle" ? "ﾃ・" : "R ") + geom.len.toFixed(dim.precision ?? 1);
       ctx.beginPath();
       ctx.moveTo(c.x, c.y);
       ctx.lineTo(p2.x, p2.y);

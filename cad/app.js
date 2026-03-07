@@ -13,7 +13,7 @@ import { chooseEndsForLineByKeepEnd, getObjectSnapPoint } from "./solvers.js";
 import {
   ensureUngroupedShapesHaveGroups, selectGroupById, toggleGroupSelectionById,
   getTrimHoverCandidate, hitTestShapes, collectGroupTreeShapeIds, collectDescendantGroupIds,
-  resolveVertexTangentAttribs
+  resolveVertexTangentAttribs, resolveDimensionSnapAttribs
 } from "./app_selection.js";
 
 import {
@@ -160,6 +160,7 @@ const dom = {
   selectionLineWidthInput: document.getElementById("selectionLineWidthInput"),
   selectionLineTypeInput: document.getElementById("selectionLineTypeInput"),
   selectionColorInput: document.getElementById("selectionColorInput"),
+  dimSelectionColorInput: document.getElementById("dimSelectionColorInput"),
   selectionPositionSizeInput: document.getElementById("selectionPositionSizeInput"),
   selectionImageWidthInput: document.getElementById("selectionImageWidthInput"),
   selectionImageHeightInput: document.getElementById("selectionImageHeightInput"),
@@ -240,8 +241,13 @@ const dom = {
   applyDimSettingsBtn: document.getElementById("applyDimSettingsBtn"),
   previewPrecisionSelect: document.getElementById("previewPrecisionSelect"),
   pageSizeSelect: document.getElementById("pageSizeSelect"),
+  customPageSizeToggle: document.getElementById("customPageSizeToggle"),
+  customPageWidthInput: document.getElementById("customPageWidthInput"),
+  customPageHeightInput: document.getElementById("customPageHeightInput"),
   pageOrientationSelect: document.getElementById("pageOrientationSelect"),
   pageScaleInput: document.getElementById("pageScaleInput"),
+  customScaleToggle: document.getElementById("customScaleToggle"),
+  customScaleInput: document.getElementById("customScaleInput"),
   maxZoomInput: document.getElementById("maxZoomInput"),
   uiLanguageSelect: document.getElementById("uiLanguageSelect"),
   menuScaleSelect: document.getElementById("menuScaleSelect"),
@@ -258,6 +264,8 @@ const dom = {
   pageUnitSelect: document.getElementById("pageUnitSelect"),
   pageShowFrameToggle: document.getElementById("pageShowFrameToggle"),
   pageInnerMarginInput: document.getElementById("pageInnerMarginInput"),
+  customGridToggle: document.getElementById("customGridToggle"),
+  customGridInput: document.getElementById("customGridInput"),
   hatchPitchInput: document.getElementById("hatchPitchInput"),
   hatchAngleInput: document.getElementById("hatchAngleInput"),
   hatchPaddingInput: document.getElementById("hatchPaddingInput"),
@@ -302,6 +310,10 @@ const PAGE_SIZES_MM = {
   A3: [420, 297],
   A2: [594, 420],
   A1: [841, 594],
+  Letter: [279.4, 215.9],
+  Legal: [355.6, 215.9],
+  Tabloid: [431.8, 279.4],
+  Ledger: [431.8, 279.4],
 };
 const MM_PER_UNIT = { mm: 1, cm: 10, m: 1000, inch: 25.4, in: 25.4, ft: 304.8 };
 
@@ -313,7 +325,7 @@ const WORLD_NUMERIC_KEYS = new Set([
   "tx", "ty",
   "tdx", "tdy",
   "off1", "off2",
-  "dimOffset", "extOffset", "extOver", "textOffset", "textAlong", "rOverrun",
+  "dimOffset",
   "originX", "originY",
   "arrayDx", "arrayDy",
   "dx", "dy",
@@ -347,6 +359,15 @@ function clearDoubleLineTrimPendingState(state) {
   state.dlineTrimIntersections = null;
 }
 
+function hasAnyVertexSnapBinding(state) {
+  for (const s of (state.shapes || [])) {
+    if (!s) continue;
+    if (s.type === "line" && (s.p1Attrib || s.p2Attrib)) return true;
+    if (s.type === "dim" && (s.p1Attrib || s.p2Attrib)) return true;
+  }
+  return false;
+}
+
 function convertStateUnitKeepingPhysicalSize(state, fromUnit, toUnit) {
   const fromMm = mmPerCadUnit(fromUnit);
   const toMm = mmPerCadUnit(toUnit);
@@ -365,6 +386,8 @@ function convertStateUnitKeepingPhysicalSize(state, fromUnit, toUnit) {
 
   // World-unit based settings/inputs
   if (state.grid && Number.isFinite(Number(state.grid.size))) state.grid.size = Number(state.grid.size) * factor;
+  if (state.grid && Number.isFinite(Number(state.grid.presetSize))) state.grid.presetSize = Number(state.grid.presetSize) * factor;
+  if (state.grid && Number.isFinite(Number(state.grid.customSize))) state.grid.customSize = Number(state.grid.customSize) * factor;
   if (state.lineSettings && Number.isFinite(Number(state.lineSettings.length))) state.lineSettings.length = Number(state.lineSettings.length) * factor;
   if (state.rectSettings) {
     if (Number.isFinite(Number(state.rectSettings.width))) state.rectSettings.width = Number(state.rectSettings.width) * factor;
@@ -378,11 +401,7 @@ function convertStateUnitKeepingPhysicalSize(state, fromUnit, toUnit) {
     if (Number.isFinite(Number(state.patternCopySettings.arrayDx))) state.patternCopySettings.arrayDx = Number(state.patternCopySettings.arrayDx) * factor;
     if (Number.isFinite(Number(state.patternCopySettings.arrayDy))) state.patternCopySettings.arrayDy = Number(state.patternCopySettings.arrayDy) * factor;
   }
-  if (state.dimSettings) {
-    if (Number.isFinite(Number(state.dimSettings.extOffset))) state.dimSettings.extOffset = Number(state.dimSettings.extOffset) * factor;
-    if (Number.isFinite(Number(state.dimSettings.extOver))) state.dimSettings.extOver = Number(state.dimSettings.extOver) * factor;
-    if (Number.isFinite(Number(state.dimSettings.rOvershoot))) state.dimSettings.rOvershoot = Number(state.dimSettings.rOvershoot) * factor;
-  }
+  // NOTE: Keep print-based dimension settings fixed across unit changes.
   if (state.vertexEdit) {
     if (Number.isFinite(Number(state.vertexEdit.moveDx))) state.vertexEdit.moveDx = Number(state.vertexEdit.moveDx) * factor;
     if (Number.isFinite(Number(state.vertexEdit.moveDy))) state.vertexEdit.moveDy = Number(state.vertexEdit.moveDy) * factor;
@@ -422,12 +441,18 @@ function convertStateUnitKeepingPhysicalSize(state, fromUnit, toUnit) {
 }
 
 function getPageFrameWorldSize(pageSetup) {
+  const useCustomSize = !!pageSetup?.customSizeEnabled;
+  const customW = Math.max(1, Number(pageSetup?.customWidthMm) || 297);
+  const customH = Math.max(1, Number(pageSetup?.customHeightMm) || 210);
   const key = String(pageSetup?.size || "A4");
-  const [w, h] = PAGE_SIZES_MM[key] || PAGE_SIZES_MM.A4;
+  const [w, h] = useCustomSize ? [customW, customH] : (PAGE_SIZES_MM[key] || PAGE_SIZES_MM.A4);
   const isPortrait = String(pageSetup?.orientation || "landscape") === "portrait";
   const mmW = isPortrait ? Math.min(w, h) : Math.max(w, h);
   const mmH = isPortrait ? Math.max(w, h) : Math.min(w, h);
-  const scale = Math.max(0.0001, Number(pageSetup?.scale ?? 1) || 1);
+  const effectiveScale = !!pageSetup?.customScaleEnabled
+    ? Number(pageSetup?.customScale ?? pageSetup?.scale ?? 1)
+    : Number(pageSetup?.scale ?? pageSetup?.presetScale ?? 1);
+  const scale = Math.max(0.0001, effectiveScale || 1);
   const unit = String(pageSetup?.unit || "mm");
   const mmPerUnit = MM_PER_UNIT[unit] || 1;
   return { cadW: mmW * scale / mmPerUnit, cadH: mmH * scale / mmPerUnit };
@@ -442,6 +467,9 @@ function buildSettingsSnapshot() {
     pageSetup: { ...(state.pageSetup || {}) },
     grid: {
       size: Number(state.grid?.size ?? 10),
+      presetSize: Number(state.grid?.presetSize ?? state.grid?.size ?? 10),
+      customSizeEnabled: !!state.grid?.customSizeEnabled,
+      customSize: Number(state.grid?.customSize ?? state.grid?.size ?? 10),
       snap: !!state.grid?.snap,
       show: state.grid?.show !== false,
       auto: state.grid?.auto !== false,
@@ -493,14 +521,23 @@ function loadAppSettingsAtStartup() {
 
     if (data.pageSetup && typeof data.pageSetup === "object") {
       state.pageSetup.size = String(data.pageSetup.size || state.pageSetup.size || "A4");
+      state.pageSetup.customSizeEnabled = !!(data.pageSetup.customSizeEnabled ?? state.pageSetup.customSizeEnabled);
+      state.pageSetup.customWidthMm = Math.max(1, Number(data.pageSetup.customWidthMm ?? state.pageSetup.customWidthMm ?? 297) || 297);
+      state.pageSetup.customHeightMm = Math.max(1, Number(data.pageSetup.customHeightMm ?? state.pageSetup.customHeightMm ?? 210) || 210);
       state.pageSetup.orientation = (String(data.pageSetup.orientation || state.pageSetup.orientation || "landscape") === "portrait") ? "portrait" : "landscape";
       state.pageSetup.scale = Math.max(0.0001, Number(data.pageSetup.scale ?? state.pageSetup.scale ?? 1) || 1);
+      state.pageSetup.presetScale = Math.max(0.0001, Number(data.pageSetup.presetScale ?? state.pageSetup.presetScale ?? state.pageSetup.scale ?? 1) || 1);
+      state.pageSetup.customScaleEnabled = !!(data.pageSetup.customScaleEnabled ?? state.pageSetup.customScaleEnabled);
+      state.pageSetup.customScale = Math.max(0.0001, Number(data.pageSetup.customScale ?? state.pageSetup.customScale ?? state.pageSetup.scale ?? 1) || 1);
       state.pageSetup.unit = String(data.pageSetup.unit || state.pageSetup.unit || "mm");
       state.pageSetup.showFrame = data.pageSetup.showFrame !== false;
       state.pageSetup.innerMarginMm = Math.max(0, Number(data.pageSetup.innerMarginMm ?? state.pageSetup.innerMarginMm ?? 10) || 0);
     }
     if (data.grid && typeof data.grid === "object") {
       if (Number.isFinite(Number(data.grid.size))) state.grid.size = Math.max(1, Number(data.grid.size));
+      state.grid.presetSize = Math.max(1, Number(data.grid.presetSize ?? state.grid.presetSize ?? state.grid.size ?? 10) || 10);
+      state.grid.customSizeEnabled = !!(data.grid.customSizeEnabled ?? state.grid.customSizeEnabled);
+      state.grid.customSize = Math.max(1, Number(data.grid.customSize ?? state.grid.customSize ?? state.grid.size ?? 10) || 10);
       state.grid.snap = !!data.grid.snap;
       state.grid.show = data.grid.show !== false;
       state.grid.auto = data.grid.auto !== false;
@@ -957,16 +994,21 @@ function drawNow(opts = null) {
     : Date.now;
   const t0 = perfNow();
   // Resolve tangent constraints only when needed; running this every frame is expensive on huge models.
+  const hasVertexSnapBinding = hasAnyVertexSnapBinding(state);
   const needResolveTangent =
     !!state.vertexEdit?.drag?.active ||
     !!state.ui?._needsTangentResolve ||
-    String(state.tool || "") === "vertex";
+    String(state.tool || "") === "vertex" ||
+    hasVertexSnapBinding;
   if (state.vertexEdit?.drag?.active) {
     // During vertex drag, exclude shapes being directly edited to avoid fighting user input
     const excludeIds = new Set((state.vertexEdit.drag.baseShapeSnapshots || []).map(it => Number(it.id)));
     resolveVertexTangentAttribs(state, excludeIds);
   } else if (needResolveTangent) {
     resolveVertexTangentAttribs(state);
+  }
+  if (needResolveTangent) {
+    resolveDimensionSnapAttribs(state);
   }
   if (state.input?.groupAimPick?.active) {
     const ownerGroupId = Number(state.input.groupAimPick.groupId);
@@ -1462,7 +1504,17 @@ const helpers = {
   chooseEndsForLineByKeepEnd,
   createGroupFromSelection: (st, name) => createGroupFromSelection(st, name),
   setTool: (t) => {
+    const prevTool = String(state.tool || "");
+    const nextTool = String(t || "");
+    const isTouchMode = !!state.ui?.touchMode;
+    const leavingHatchInTouch = isTouchMode && prevTool === "hatch" && nextTool !== "hatch";
     setTool(state, t);
+    if (leavingHatchInTouch) {
+      if (!state.hatchDraft || typeof state.hatchDraft !== "object") state.hatchDraft = { boundaryIds: [] };
+      state.hatchDraft.boundaryIds = [];
+      clearSelection(state);
+      state.activeGroupId = null;
+    }
     // Immediately refresh snap candidate marker when entering dimension tool.
     if (t === "dim") {
       const ms = getMouseScreen(dom.canvas);
@@ -1555,6 +1607,11 @@ const helpers = {
       setTool(state, "select");
       draw();
     }, 1000);
+    draw();
+  },
+  refitViewToPage: () => {
+    // Refit without switching tool; safe for settings panel interactions.
+    resetView();
     draw();
   },
   loadJson: () => {
@@ -2087,7 +2144,36 @@ const helpers = {
   setTrimNoDelete: (v) => { state.trimSettings.noDelete = !!v; draw(); },
   setPageSetup: (patch) => {
     const prevUnit = String(state.pageSetup?.unit || "mm");
-    Object.assign(state.pageSetup, patch);
+    const p = { ...(patch || {}) };
+    if (Object.prototype.hasOwnProperty.call(p, "scale")) {
+      const sc = Math.max(0.0001, Number(p.scale) || 1);
+      p.scale = sc;
+      if (!state.pageSetup?.customScaleEnabled && !Object.prototype.hasOwnProperty.call(p, "presetScale")) {
+        p.presetScale = sc;
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(p, "customScale")) {
+      p.customScale = Math.max(0.0001, Number(p.customScale) || 1);
+    }
+    if (Object.prototype.hasOwnProperty.call(p, "presetScale")) {
+      p.presetScale = Math.max(0.0001, Number(p.presetScale) || 1);
+    }
+    if (Object.prototype.hasOwnProperty.call(p, "customWidthMm")) {
+      p.customWidthMm = Math.max(1, Number(p.customWidthMm) || 1);
+    }
+    if (Object.prototype.hasOwnProperty.call(p, "customHeightMm")) {
+      p.customHeightMm = Math.max(1, Number(p.customHeightMm) || 1);
+    }
+    if (Object.prototype.hasOwnProperty.call(p, "customScaleEnabled")) {
+      const on = !!p.customScaleEnabled;
+      if (on && !Object.prototype.hasOwnProperty.call(p, "scale")) {
+        p.scale = Math.max(0.0001, Number(p.customScale ?? state.pageSetup?.customScale ?? state.pageSetup?.scale ?? 1) || 1);
+      }
+      if (!on && !Object.prototype.hasOwnProperty.call(p, "scale")) {
+        p.scale = Math.max(0.0001, Number(p.presetScale ?? state.pageSetup?.presetScale ?? state.pageSetup?.scale ?? 1) || 1);
+      }
+    }
+    Object.assign(state.pageSetup, p);
     const nextUnit = String(state.pageSetup?.unit || "mm");
     if (patch && Object.prototype.hasOwnProperty.call(patch, "unit") && nextUnit !== prevUnit) {
       convertStateUnitKeepingPhysicalSize(state, prevUnit, nextUnit);
@@ -2237,7 +2323,7 @@ const helpers = {
     const target = String(removed?.target || "");
     const m = /^vertex:(p1|p2)$/.exec(target);
     if (m && (name.startsWith("keep_") || name === "keep_snap")) {
-      if (s.type === "line") {
+      if (s.type === "line" || s.type === "dim") {
         if (m[1] === "p1") s.p1Attrib = null;
         if (m[1] === "p2") s.p2Attrib = null;
       }

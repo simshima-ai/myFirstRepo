@@ -1364,6 +1364,7 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
                 p1: { x: Number(hit.x1), y: Number(hit.y1) },
                 p2: { x: Number(hit.x2), y: Number(hit.y2) },
                 place: { x: world.x, y: world.y },
+                sourceLineId: Number(hit.id),
             };
             return "place";
         }
@@ -1674,6 +1675,25 @@ export function finalizeDimDraft(state, helpers) {
             px: d.place.x, py: d.place.y,
             layerId: state.activeLayerId
         });
+        // Single-mode object-pick from line: bind dim endpoints to source line endpoints.
+        if (Number.isFinite(Number(d.sourceLineId))) {
+            const srcId = Number(d.sourceLineId);
+            dim.p1Attrib = { type: "followPoint", shapeId: srcId, refType: "line_endpoint", refKey: "p1" };
+            dim.p2Attrib = { type: "followPoint", shapeId: srcId, refType: "line_endpoint", refKey: "p2" };
+            if (!Array.isArray(dim.attributes)) dim.attributes = [];
+            dim.attributes.push({
+                id: `attr_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+                name: "keep_snap",
+                value: `follow:line_endpoint:${srcId}:p1`,
+                target: "vertex:p1"
+            });
+            dim.attributes.push({
+                id: `attr_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+                name: "keep_snap",
+                value: `follow:line_endpoint:${srcId}:p2`,
+                target: "vertex:p2"
+            });
+        }
     }
 
     if (dim && state.dimSettings) {

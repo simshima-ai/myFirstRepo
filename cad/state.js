@@ -12,6 +12,7 @@
   "hatch",
   "doubleline",
   "patterncopy",
+  "delete",
 ]);
 
 export const DEFAULT_TOOL_SHORTCUTS = Object.freeze({
@@ -28,11 +29,13 @@ export const DEFAULT_TOOL_SHORTCUTS = Object.freeze({
   hatch: "H",
   doubleline: "B",
   patterncopy: "Y",
+  delete: "DEL",
 });
 
 export function normalizeShortcutKey(v) {
   if (v == null) return "";
   const key = String(v).trim().toUpperCase();
+  if (key === "DELETE" || key === "DEL") return "DEL";
   return /^[A-Z0-9]$/.test(key) ? key : "";
 }
 
@@ -241,6 +244,9 @@ export function createState() {
     },
     grid: {
       size: 10,
+      presetSize: 10,
+      customSizeEnabled: false,
+      customSize: 10,
       snap: true,
       show: true,
       auto: true,
@@ -255,8 +261,14 @@ export function createState() {
     },
     pageSetup: {
       size: "A4",
+      customSizeEnabled: false,
+      customWidthMm: 297,
+      customHeightMm: 210,
       orientation: "landscape",
       scale: 1,
+      presetScale: 1,
+      customScaleEnabled: false,
+      customScale: 1,
       unit: "mm",
       showFrame: true,
       innerMarginMm: 10,
@@ -459,11 +471,21 @@ export function restoreModel(state, snap) {
   const ps = snap.pageSetup || {};
   if (!state.pageSetup) state.pageSetup = {};
   state.pageSetup.size = String(ps.size || state.pageSetup.size || "A4");
+  state.pageSetup.customSizeEnabled = !!(ps.customSizeEnabled ?? state.pageSetup.customSizeEnabled);
+  state.pageSetup.customWidthMm = Math.max(1, Number(ps.customWidthMm ?? state.pageSetup.customWidthMm ?? 297) || 297);
+  state.pageSetup.customHeightMm = Math.max(1, Number(ps.customHeightMm ?? state.pageSetup.customHeightMm ?? 210) || 210);
   state.pageSetup.orientation = (String(ps.orientation || state.pageSetup.orientation || "landscape") === "portrait") ? "portrait" : "landscape";
   state.pageSetup.scale = Math.max(0.0001, Number(ps.scale ?? state.pageSetup.scale ?? 1) || 1);
+  state.pageSetup.presetScale = Math.max(0.0001, Number(ps.presetScale ?? state.pageSetup.presetScale ?? state.pageSetup.scale ?? 1) || 1);
+  state.pageSetup.customScaleEnabled = !!(ps.customScaleEnabled ?? state.pageSetup.customScaleEnabled);
+  state.pageSetup.customScale = Math.max(0.0001, Number(ps.customScale ?? state.pageSetup.customScale ?? state.pageSetup.scale ?? 1) || 1);
   state.pageSetup.unit = String(ps.unit || state.pageSetup.unit || "mm");
   state.pageSetup.showFrame = ps.showFrame !== false;
   state.pageSetup.innerMarginMm = Math.max(0, Number(ps.innerMarginMm ?? state.pageSetup.innerMarginMm ?? 10) || 0);
+  if (!state.grid) state.grid = {};
+  state.grid.presetSize = Math.max(1, Number(snap.grid?.presetSize ?? state.grid.presetSize ?? state.grid.size ?? 10) || 10);
+  state.grid.customSizeEnabled = !!(snap.grid?.customSizeEnabled ?? state.grid.customSizeEnabled);
+  state.grid.customSize = Math.max(1, Number(snap.grid?.customSize ?? state.grid.customSize ?? state.grid.size ?? 10) || 10);
   state.lineWidthMm = Math.max(0.01, Number(snap.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
   for (const s of (state.shapes || [])) {
     if (!Number.isFinite(Number(s?.lineWidthMm))) s.lineWidthMm = state.lineWidthMm;

@@ -225,6 +225,12 @@ function getUiLanguage(state) {
   return String(state?.ui?.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
 }
 
+function normalizePositiveNumber(v, fallback = 1, min = 0.0001) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return Math.max(min, Number(fallback) || min);
+  return Math.max(min, n);
+}
+
 function localizeGridAutoTimingLabelText(timing, lang) {
   const t = clampGridAutoTiming(timing);
   if (lang === "en") {
@@ -235,6 +241,25 @@ function localizeGridAutoTimingLabelText(timing, lang) {
     return "Very Slow";
   }
   return gridAutoTimingLabelText(timing);
+}
+
+function refreshCustomPageSizeUnitLabels(state) {
+  const text = "(mm)";
+  const w = document.getElementById("customPageWidthUnitLabel");
+  const h = document.getElementById("customPageHeightUnitLabel");
+  const m = document.getElementById("pageInnerMarginUnitLabel");
+  if (w) w.textContent = text;
+  if (h) h.textContent = text;
+  if (m) m.textContent = text;
+}
+
+function refreshGridUnitLabels(state) {
+  const unit = String(state?.pageSetup?.unit || "mm").toLowerCase();
+  const text = `(${unit})`;
+  const base = document.getElementById("baseGridUnitLabel");
+  const custom = document.getElementById("customGridUnitLabel");
+  if (base) base.textContent = text;
+  if (custom) custom.textContent = text;
 }
 
 function applyLanguageUi(state, dom) {
@@ -299,6 +324,8 @@ function applyLanguageUi(state, dom) {
       snap: "スナップ",
       attrs: "属性",
       select: "選択",
+      selectToolObject: "オブジェクト選択",
+      selectToolGroup: "グループ選択",
       resetView: "表示リセット",
       line: "線",
       rect: "四角",
@@ -343,7 +370,7 @@ function applyLanguageUi(state, dom) {
       dimPreparePlacement: "配置位置を指定",
       dimFinalize: "寸法確定",
       shortcutSettings: "キーボードショートカット",
-      shortcutHint: "主要ツールの切替キー（英字1文字）",
+      shortcutHint: "主要ツール/削除のキー設定",
       resetShortcuts: "初期値に戻す",
       groups: "グループ",
       layers: "レイヤー",
@@ -352,7 +379,7 @@ function applyLanguageUi(state, dom) {
       layerOps: "レイヤー操作",
       rename: "リネーム",
       colorize: "カラー分け表示",
-      currentLayerOnly: "現在レイヤーのみ",
+      currentLayerOnly: "現在レイヤー所属のみ表示",
       editOnlyActive: "選択レイヤーのみ編集",
       moveObjectsToLayer: "オブジェクトを移動",
       deleteLayer: "レイヤー削除",
@@ -384,23 +411,29 @@ function applyLanguageUi(state, dom) {
       color: "色",
       unit: "単位",
       pageSettings: "用紙設定",
+      interfaceSection: "インターフェース",
       pageSize: "用紙サイズ",
+      customPageSize: "カスタム用紙サイズ",
+      customPageWidth: "幅",
+      customPageHeight: "高さ",
       orientation: "向き",
       landscape: "横",
       portrait: "縦",
       scale: "縮尺 (1:)",
+      customScale: "カスタム縮尺",
       maxZoom: "最大ズーム",
       fps: "フレームレート表示",
       objectCount: "オブジェクト数表示",
       autoBackup: "自動バックアップ",
       backupInterval: "バックアップ間隔",
       paperFrame: "用紙枠",
-      innerMargin: "内側余白(mm)",
+      innerMargin: "内側余白",
       gridSettings: "グリッド設定",
-      baseGrid: "基本グリッドサイズ",
+      baseGrid: "基本グリッド",
+      customGrid: "カスタムグリッド",
       show: "表示",
       autoGrid: "可変グリッド",
-      autoGridTiming: "オードグリッド切替タイミング",
+      autoGridTiming: "可変グリッド切替タイミング",
       preview: "プレビュー",
       precision: "精度",
       hatchApply: "選択境界でハッチング作成",
@@ -514,6 +547,8 @@ function applyLanguageUi(state, dom) {
       snap: "Snap",
       attrs: "Attributes",
       select: "Select",
+      selectToolObject: "Object Select",
+      selectToolGroup: "Group Select",
       resetView: "Reset View",
       line: "Line",
       rect: "Rectangle",
@@ -558,7 +593,7 @@ function applyLanguageUi(state, dom) {
       dimPreparePlacement: "Set Placement",
       dimFinalize: "Finalize Dim",
       shortcutSettings: "Keyboard Shortcuts",
-      shortcutHint: "Tool switch key (single character)",
+      shortcutHint: "Shortcut keys for tools/delete",
       resetShortcuts: "Reset Defaults",
       groups: "Groups",
       layers: "Layers",
@@ -567,7 +602,7 @@ function applyLanguageUi(state, dom) {
       layerOps: "Layer Ops",
       rename: "Rename",
       colorize: "Colorize",
-      currentLayerOnly: "Active Layer Only",
+      currentLayerOnly: "Show Active-Layer Items Only",
       editOnlyActive: "Edit Active Layer Only",
       moveObjectsToLayer: "Move Objects",
       deleteLayer: "Delete Layer",
@@ -599,23 +634,29 @@ function applyLanguageUi(state, dom) {
       color: "Color",
       unit: "Unit",
       pageSettings: "Page Settings",
+      interfaceSection: "Interface",
       pageSize: "Page Size",
+      customPageSize: "Custom Paper Size",
+      customPageWidth: "Width",
+      customPageHeight: "Height",
       orientation: "Orientation",
       landscape: "Landscape",
       portrait: "Portrait",
       scale: "Scale (1:)",
+      customScale: "Custom Scale",
       maxZoom: "Max Zoom",
       fps: "Show FPS",
       objectCount: "Show Object Count",
       autoBackup: "Auto Backup",
       backupInterval: "Backup Interval",
       paperFrame: "Paper Frame",
-      innerMargin: "Inner Margin (mm)",
+      innerMargin: "Inner Margin",
       gridSettings: "Grid Settings",
-      baseGrid: "Base Grid Size",
+      baseGrid: "Base Grid",
+      customGrid: "Custom Grid",
       show: "Show",
-      autoGrid: "Auto Grid",
-      autoGridTiming: "Auto Grid Timing",
+      autoGrid: "Adaptive Grid",
+      autoGridTiming: "Adaptive Grid Switch Timing",
       preview: "Preview",
       precision: "Precision",
       hatchApply: "Create Hatching",
@@ -742,10 +783,11 @@ function applyLanguageUi(state, dom) {
   setText(".left-aux-stack .section[data-panel-id='attrs'] > .panel-toggle", t.attrs);
 
   const leftPanels = [dom.toolButtons, dom.editToolButtons, dom.fileToolButtons].filter(Boolean);
+  const pickMode = String(state.ui?.selectPickMode || "object");
   for (const panel of leftPanels) {
     for (const btn of panel.querySelectorAll("button[data-tool]")) {
       const id = String(btn.dataset.tool || "");
-      if (id === "select") btn.textContent = t.select;
+      if (id === "select") btn.textContent = (pickMode === "group") ? t.selectToolGroup : t.selectToolObject;
       else if (id === "line") btn.textContent = t.line;
       else if (id === "rect") btn.textContent = t.rect;
       else if (id === "circle") btn.textContent = t.circle;
@@ -897,6 +939,7 @@ function applyLanguageUi(state, dom) {
   setPrevSpanByControl("selectionLineWidthInput", t.lineWidth);
   setPrevSpanByControl("selectionLineTypeInput", t.lineType);
   setPrevSpanByControl("selectionColorInput", t.color);
+  setLabelByControl("dimSelectionColorInput", t.color);
   setPrevSpanByControl("positionToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("positionToolLineTypeInput", t.lineType);
   setPrevSpanByControl("textToolLineWidthInput", t.lineWidth);
@@ -987,21 +1030,29 @@ function applyLanguageUi(state, dom) {
 
   // Settings labels
   setLabelByControl("pageSizeSelect", t.pageSize);
+  setText("#customPageSizeToggleLabel", t.customPageSize);
+  setText("#customPageWidthLabel", t.customPageWidth);
+  setText("#customPageHeightLabel", t.customPageHeight);
   setLabelByControl("pageOrientationSelect", t.orientation);
   setLabelByControl("pageScaleInput", t.scale);
+  setText("#customScaleToggleLabel", t.customScale);
   setLabelByControl("maxZoomInput", t.maxZoom);
   setLabelByControl("fpsDisplayToggle", t.fps);
   setLabelByControl("objectCountDisplayToggle", t.objectCount);
   setLabelByControl("autoBackupToggle", t.autoBackup);
   setLabelByControl("autoBackupIntervalSelect", t.backupInterval);
   setLabelByControl("pageUnitSelect", t.unit);
+  refreshCustomPageSizeUnitLabels(state);
   setLabelByControl("pageShowFrameToggle", t.paperFrame);
   setLabelByControl("pageInnerMarginInput", t.innerMargin);
   setLabelByControl("gridSizeContextInput", t.baseGrid);
-  setLabelByControl("gridShowContextToggle", t.show);
-  setLabelByControl("gridAutoContextToggle", t.autoGrid);
+  refreshGridUnitLabels(state);
+  setText("#customGridToggleLabel", t.customGrid);
+  setText("#gridShowContextLabel", t.show);
+  setText("#gridAutoContextLabel", t.autoGrid);
   setText(".section[data-context='settings'] > div > div", t.pageSettings);
   setText(".section[data-context='settings'] .section-title[style]", t.gridSettings);
+  setText("#settingsInterfaceLabel", t.interfaceSection);
   setText("#gridAutoTimingLabel", localizeGridAutoTimingLabelText(Number(dom.gridAutoTimingSlider?.value || 0), lang));
   setText("#filletModeLabel", t.filletMode);
   const autoTimingLabel = document.querySelector("#gridAutoTimingSlider")?.closest("label")?.querySelector("span");
@@ -1770,6 +1821,15 @@ export function initUi(state, dom, actions) {
     if (item.type === "tool") {
       btn.dataset.tool = item.id;
       btn.addEventListener("click", () => {
+        if (item.id === "select") {
+          if (state.tool === "select") {
+            const cur = String(state.ui?.selectPickMode || "object");
+            actions.setSelectPickMode?.(cur === "group" ? "object" : "group");
+          } else {
+            actions.setTool("select");
+          }
+          return;
+        }
         if (item.id === "settings" && state.tool === "settings") {
           actions.setTool("select");
           return;
@@ -1890,18 +1950,53 @@ export function initUi(state, dom, actions) {
 
   const applyGridSizeValue = (raw) => {
     const v = normalizeGridPreset(raw);
+    if (!state.grid) state.grid = {};
+    state.grid.presetSize = v;
     if (dom.gridSizeInput) dom.gridSizeInput.value = String(v);
     if (dom.gridSizeContextInput) dom.gridSizeContextInput.value = String(v);
+    if (!state.grid.customSizeEnabled) {
     actions.setGridSize(v);
-    actions.resetView?.();
+    actions.refitViewToPage?.();
+    }
   };
-  dom.gridSizeInput.value = String(state.grid.size);
+  if (!Number.isFinite(Number(state.grid?.presetSize))) state.grid.presetSize = Number(state.grid?.size) || 10;
+  if (!Number.isFinite(Number(state.grid?.customSize))) state.grid.customSize = Number(state.grid?.size) || 10;
+  if (typeof state.grid?.customSizeEnabled !== "boolean") state.grid.customSizeEnabled = false;
+  dom.gridSizeInput.value = String(state.grid.customSizeEnabled ? state.grid.presetSize : state.grid.size);
   dom.gridSizeInput.addEventListener("change", () => applyGridSizeValue(dom.gridSizeInput.value));
   dom.gridSizeInput.addEventListener("input", () => applyGridSizeValue(dom.gridSizeInput.value));
   if (dom.gridSizeContextInput) {
-    dom.gridSizeContextInput.value = String(state.grid.size);
+    dom.gridSizeContextInput.value = String(state.grid.customSizeEnabled ? state.grid.presetSize : state.grid.size);
     dom.gridSizeContextInput.addEventListener("change", () => applyGridSizeValue(dom.gridSizeContextInput.value));
     dom.gridSizeContextInput.addEventListener("input", () => applyGridSizeValue(dom.gridSizeContextInput.value));
+  }
+  if (dom.customGridInput) {
+    dom.customGridInput.value = String(Math.max(1, Number(state.grid.customSize) || 10));
+    const applyCustomGrid = () => {
+      if (!state.grid) state.grid = {};
+      const v = Math.max(1, Number(normalizePositiveNumber(dom.customGridInput.value, state.grid.customSize ?? 10, 1)));
+      dom.customGridInput.value = String(v);
+      state.grid.customSize = v;
+      if (state.grid.customSizeEnabled) {
+        actions.setGridSize(v);
+        actions.refitViewToPage?.();
+      }
+    };
+    dom.customGridInput.addEventListener("change", applyCustomGrid);
+    dom.customGridInput.addEventListener("input", applyCustomGrid);
+  }
+  if (dom.customGridToggle) {
+    dom.customGridToggle.checked = !!state.grid.customSizeEnabled;
+    dom.customGridToggle.addEventListener("change", () => {
+      if (!state.grid) state.grid = {};
+      state.grid.customSizeEnabled = !!dom.customGridToggle.checked;
+      const v = state.grid.customSizeEnabled
+        ? Math.max(1, Number(state.grid.customSize) || 10)
+        : Math.max(1, Number(state.grid.presetSize ?? state.grid.size ?? 10) || 10);
+      actions.setGridSize(v);
+      actions.refitViewToPage?.();
+      actions.render?.();
+    });
   }
 
   dom.gridSnapToggle.checked = !!state.grid.snap;
@@ -2525,6 +2620,9 @@ export function initUi(state, dom, actions) {
   bindColorInputPalette(dom.selectionColorInput, (c) => {
     actions.setSelectedColor?.(c);
   });
+  bindColorInputPalette(dom.dimSelectionColorInput, (c) => {
+    actions.setSelectedColor?.(c);
+  });
   const runSelectMoveByEnter = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -2969,20 +3067,66 @@ export function initUi(state, dom, actions) {
     });
   }
   if (dom.pageSizeSelect) {
-    dom.pageSizeSelect.addEventListener("change", () => actions.setPageSetup({ size: dom.pageSizeSelect.value }));
+    dom.pageSizeSelect.addEventListener("change", () => {
+      actions.setPageSetup({ size: dom.pageSizeSelect.value });
+      actions.refitViewToPage?.();
+    });
+  }
+  if (dom.customPageSizeToggle || dom.customPageWidthInput || dom.customPageHeightInput) {
+    const applyCustomPageSize = () => {
+      const enabled = !!dom.customPageSizeToggle?.checked;
+      const w = normalizePositiveNumber(dom.customPageWidthInput?.value, state.pageSetup?.customWidthMm ?? 297, 1);
+      const h = normalizePositiveNumber(dom.customPageHeightInput?.value, state.pageSetup?.customHeightMm ?? 210, 1);
+      if (dom.customPageWidthInput) dom.customPageWidthInput.value = String(w);
+      if (dom.customPageHeightInput) dom.customPageHeightInput.value = String(h);
+      actions.setPageSetup({ customSizeEnabled: enabled, customWidthMm: w, customHeightMm: h });
+      actions.refitViewToPage?.();
+    };
+    if (dom.customPageSizeToggle) dom.customPageSizeToggle.addEventListener("change", applyCustomPageSize);
+    if (dom.customPageWidthInput) {
+      dom.customPageWidthInput.addEventListener("change", applyCustomPageSize);
+      dom.customPageWidthInput.addEventListener("input", applyCustomPageSize);
+    }
+    if (dom.customPageHeightInput) {
+      dom.customPageHeightInput.addEventListener("change", applyCustomPageSize);
+      dom.customPageHeightInput.addEventListener("input", applyCustomPageSize);
+    }
   }
   if (dom.pageOrientationSelect) {
-    dom.pageOrientationSelect.addEventListener("change", () => actions.setPageSetup({ orientation: dom.pageOrientationSelect.value }));
+    dom.pageOrientationSelect.addEventListener("change", () => {
+      actions.setPageSetup({ orientation: dom.pageOrientationSelect.value });
+      actions.refitViewToPage?.();
+    });
   }
   if (dom.pageScaleInput) {
     const applyPageScalePreset = () => {
       const v = normalizePageScalePreset(dom.pageScaleInput.value);
       dom.pageScaleInput.value = String(v);
-      actions.setPageSetup({ scale: v });
-      actions.resetView?.();
+      const customOn = !!dom.customScaleToggle?.checked;
+      const patch = { presetScale: v };
+      if (!customOn) patch.scale = v;
+      actions.setPageSetup(patch);
+      if (!customOn) actions.refitViewToPage?.();
     };
     dom.pageScaleInput.addEventListener("change", applyPageScalePreset);
     dom.pageScaleInput.addEventListener("input", applyPageScalePreset);
+  }
+  if (dom.customScaleToggle || dom.customScaleInput) {
+    const applyCustomScale = () => {
+      const enabled = !!dom.customScaleToggle?.checked;
+      const v = normalizePositiveNumber(dom.customScaleInput?.value, state.pageSetup?.customScale ?? state.pageSetup?.scale ?? 1, 0.0001);
+      if (dom.customScaleInput) dom.customScaleInput.value = String(v);
+      const patch = { customScaleEnabled: enabled, customScale: v };
+      if (enabled) patch.scale = v;
+      else patch.scale = normalizePageScalePreset(dom.pageScaleInput?.value ?? state.pageSetup?.presetScale ?? 1);
+      actions.setPageSetup(patch);
+      actions.refitViewToPage?.();
+    };
+    if (dom.customScaleToggle) dom.customScaleToggle.addEventListener("change", applyCustomScale);
+    if (dom.customScaleInput) {
+      dom.customScaleInput.addEventListener("change", applyCustomScale);
+      dom.customScaleInput.addEventListener("input", applyCustomScale);
+    }
   }
   if (dom.maxZoomInput) {
     dom.maxZoomInput.addEventListener("change", () => {
@@ -3406,6 +3550,7 @@ function refreshToolShortcutSettings(state, dom) {
       hatch: "Hatching",
       doubleline: "Double Line",
       patterncopy: "Pattern Copy",
+      delete: "Delete",
       none: "(None)",
     }
     : {
@@ -3422,6 +3567,7 @@ function refreshToolShortcutSettings(state, dom) {
       hatch: "ハッチング",
       doubleline: "二重線",
       patterncopy: "パターンコピー",
+      delete: "削除",
       none: "(なし)",
     };
   const shortcuts = sanitizeToolShortcuts(state?.ui?.toolShortcuts);
@@ -3442,6 +3588,10 @@ function refreshToolShortcutSettings(state, dom) {
     optNone.value = "";
     optNone.textContent = labels.none;
     select.appendChild(optNone);
+    const optDel = document.createElement("option");
+    optDel.value = "DEL";
+    optDel.textContent = "DEL";
+    select.appendChild(optDel);
     for (let code = 65; code <= 90; code++) {
       const k = String.fromCharCode(code);
       const opt = document.createElement("option");
@@ -3911,8 +4061,20 @@ export function refreshUi(state, dom) {
   }
   if (dom.undoBtn) dom.undoBtn.disabled = !(state.history?.past?.length > 0);
   if (dom.redoBtn) dom.redoBtn.disabled = !(state.history?.future?.length > 0);
-  if (dom.gridSizeInput) syncInputValue(dom.gridSizeInput, normalizeGridPreset(state.grid.size));
-  if (dom.gridSizeContextInput) syncInputValue(dom.gridSizeContextInput, normalizeGridPreset(state.grid.size));
+  const customGridOn = !!state.grid?.customSizeEnabled;
+  const gridPreset = normalizeGridPreset(state.grid?.presetSize ?? state.grid?.size ?? 10);
+  const gridCustom = Math.max(1, Number(state.grid?.customSize ?? state.grid?.size ?? 10) || 10);
+  if (dom.gridSizeInput) {
+    syncInputValue(dom.gridSizeInput, gridPreset);
+    dom.gridSizeInput.disabled = customGridOn;
+  }
+  if (dom.gridSizeContextInput) {
+    syncInputValue(dom.gridSizeContextInput, gridPreset);
+    dom.gridSizeContextInput.disabled = customGridOn;
+  }
+  if (dom.customGridToggle) dom.customGridToggle.checked = customGridOn;
+  if (dom.customGridInput) syncInputValue(dom.customGridInput, gridCustom);
+  if (dom.customGridInput) dom.customGridInput.disabled = !customGridOn;
   if (dom.gridSnapToggle) dom.gridSnapToggle.checked = !!state.grid.snap;
   if (dom.gridSnapContextToggle) dom.gridSnapContextToggle.checked = !!state.grid.snap;
   if (dom.gridShowToggle) dom.gridShowToggle.checked = !!state.grid.show;
@@ -4055,8 +4217,8 @@ export function refreshUi(state, dom) {
   if (dom.attrPanel) {
     const selectedWithAttrs = selectedShapes.find(s => {
       const explicit = Array.isArray(s?.attributes) && s.attributes.length > 0;
-      const lineVertexBind = s?.type === "line" && (!!s?.p1Attrib || !!s?.p2Attrib);
-      return explicit || lineVertexBind;
+      const vertexBind = (s?.type === "line" || s?.type === "dim") && (!!s?.p1Attrib || !!s?.p2Attrib);
+      return explicit || vertexBind;
     }) || null;
     if (selectedWithAttrs) {
       if (!state.ui.rightPanelCollapsed) state.ui.rightPanelCollapsed = {};
@@ -4064,7 +4226,7 @@ export function refreshUi(state, dom) {
     }
     const explicitAttrs = Array.isArray(selectedWithAttrs?.attributes) ? selectedWithAttrs.attributes : [];
     const attrs = explicitAttrs.slice();
-    if (selectedWithAttrs?.type === "line") {
+    if (selectedWithAttrs && (selectedWithAttrs.type === "line" || selectedWithAttrs.type === "dim")) {
       const hasP1 = explicitAttrs.some(a => String(a?.target || "") === "vertex:p1");
       const hasP2 = explicitAttrs.some(a => String(a?.target || "") === "vertex:p2");
       if (!hasP1 && selectedWithAttrs.p1Attrib) {
@@ -5044,6 +5206,21 @@ export function refreshUi(state, dom) {
     dom.selectionColorInput.value = /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#0f172a";
     dom.selectionColorInput.disabled = !first;
   }
+  if (dom.dimSelectionColorInput) {
+    const ids = new Set((state.selection?.ids || []).map(Number));
+    let firstDim = null;
+    for (const s of (state.shapes || [])) {
+      if (!ids.has(Number(s.id))) continue;
+      if (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
+      firstDim = s;
+      break;
+    }
+    const color = String(firstDim?.color || "#0f172a");
+    dom.dimSelectionColorInput.value = /^#[0-9a-fA-F]{6}$/.test(color) ? color : "#0f172a";
+    dom.dimSelectionColorInput.disabled = !firstDim;
+    const wrap = document.getElementById("dimSelectionColorWrap");
+    if (wrap) wrap.style.display = firstDim ? "inline-flex" : "none";
+  }
   if (dom.selectionPositionSizeInput) {
     const ids = new Set((state.selection?.ids || []).map(Number));
     let first = null;
@@ -5203,14 +5380,30 @@ export function refreshUi(state, dom) {
   if (dom.pageSizeSelect) {
     const v = String(state.pageSetup?.size || "A4");
     if (dom.pageSizeSelect.value !== v) dom.pageSizeSelect.value = v;
+    dom.pageSizeSelect.disabled = !!state.pageSetup?.customSizeEnabled;
+  }
+  if (dom.customPageSizeToggle) dom.customPageSizeToggle.checked = !!state.pageSetup?.customSizeEnabled;
+  if (dom.customPageWidthInput) {
+    syncInputValue(dom.customPageWidthInput, Math.max(1, Number(state.pageSetup?.customWidthMm ?? 297) || 297));
+    dom.customPageWidthInput.disabled = !state.pageSetup?.customSizeEnabled;
+  }
+  if (dom.customPageHeightInput) {
+    syncInputValue(dom.customPageHeightInput, Math.max(1, Number(state.pageSetup?.customHeightMm ?? 210) || 210));
+    dom.customPageHeightInput.disabled = !state.pageSetup?.customSizeEnabled;
   }
   if (dom.pageOrientationSelect) {
     const v = (String(state.pageSetup?.orientation || "landscape") === "portrait") ? "portrait" : "landscape";
     if (dom.pageOrientationSelect.value !== v) dom.pageOrientationSelect.value = v;
   }
   if (dom.pageScaleInput) {
-    const v = normalizePageScalePreset(state.pageSetup?.scale ?? 1);
+    const v = normalizePageScalePreset(state.pageSetup?.presetScale ?? state.pageSetup?.scale ?? 1);
     syncInputValue(dom.pageScaleInput, v);
+    dom.pageScaleInput.disabled = !!state.pageSetup?.customScaleEnabled;
+  }
+  if (dom.customScaleToggle) dom.customScaleToggle.checked = !!state.pageSetup?.customScaleEnabled;
+  if (dom.customScaleInput) {
+    syncInputValue(dom.customScaleInput, normalizePositiveNumber(state.pageSetup?.customScale ?? state.pageSetup?.scale ?? 1, 1, 0.0001));
+    dom.customScaleInput.disabled = !state.pageSetup?.customScaleEnabled;
   }
   if (dom.maxZoomInput) {
     const v = normalizeMaxZoomPreset(state.view?.maxScale ?? 100);
@@ -5316,6 +5509,8 @@ export function refreshUi(state, dom) {
     const v = String(state.pageSetup?.unit || "mm");
     if (dom.pageUnitSelect.value !== v) dom.pageUnitSelect.value = v;
   }
+  refreshCustomPageSizeUnitLabels(state);
+  refreshGridUnitLabels(state);
   const toolStrokeSync = [
     { cfg: state.lineSettings, width: dom.lineToolLineWidthInput, type: dom.lineToolLineTypeInput },
     { cfg: state.rectSettings, width: dom.rectToolLineWidthInput, type: dom.rectToolLineTypeInput },

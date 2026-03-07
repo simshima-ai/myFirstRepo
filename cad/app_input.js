@@ -72,12 +72,12 @@ function isTypingTarget(target) {
     return false;
 }
 
-function findToolByShortcut(state, keyRaw) {
+function findShortcutAction(state, keyRaw) {
     const key = normalizeShortcutKey(keyRaw);
     if (!key) return null;
     const shortcuts = sanitizeToolShortcuts(state?.ui?.toolShortcuts);
-    for (const [tool, bound] of Object.entries(shortcuts)) {
-        if (normalizeShortcutKey(bound) === key) return tool;
+    for (const [actionId, bound] of Object.entries(shortcuts)) {
+        if (normalizeShortcutKey(bound) === key) return actionId;
     }
     return null;
 }
@@ -414,6 +414,24 @@ export function setupInputListeners(state, dom, helpers) {
         }
 
         if (state.tool === "select") {
+            if (e.button === 0 && Number(e.detail) >= 2) {
+                const pickMode = String(state.ui?.selectPickMode || "object");
+                if (pickMode === "object") {
+                    const hitForChain = hitTestShapes(state, worldRaw, dom);
+                    const canChain = !!hitForChain && (hitForChain.type === "line" || hitForChain.type === "arc" || hitForChain.type === "rect" || hitForChain.type === "bspline");
+                    if (canChain) {
+                        const id = Number(hitForChain.id);
+                        const chain = findConnectedLinesChain(state, id).map(Number).filter(Number.isFinite);
+                        const base = isAppendSelect(e) ? (state.selection?.ids || []).map(Number) : [];
+                        setSelection(Array.from(new Set([...base, ...chain])));
+                        state.activeGroupId = null;
+                        if (setStatus) setStatus("オブジェクトをダブルクリックで連続選択");
+                        if (draw) draw();
+                        e.preventDefault();
+                        return;
+                    }
+                }
+            }
             const rotateHandleHit = hitActiveGroupRotateHandle(state, screen);
             if (rotateHandleHit && !isAppendSelect(e)) {
                 const hitGroupId = Number(rotateHandleHit.id);
@@ -741,6 +759,7 @@ export function setupInputListeners(state, dom, helpers) {
                         p1: { x: Number(hoveredLine.x1), y: Number(hoveredLine.y1) },
                         p2: { x: Number(hoveredLine.x2), y: Number(hoveredLine.y2) },
                         place: { x: world.x, y: world.y },
+                        sourceLineId: Number(hoveredLine.id),
                     };
                     state.input.dimLineDrag.active = true;
                     state.input.dimLineDrag.moved = false;
@@ -1298,7 +1317,8 @@ export function setupInputListeners(state, dom, helpers) {
 
     // Hatch: double-click to auto-select connected chain from clicked line/arc/rect/bspline.
     dom.canvas.addEventListener("dblclick", (e) => {
-        if (state.tool !== "hatch") return;
+        const tool = String(state.tool || "");
+        if (tool !== "hatch") return;
         const worldRaw = getMouseWorld(state, dom, e, false);
         const hit = hitTestShapes(state, worldRaw, dom);
         if (!hit || (hit.type !== "line" && hit.type !== "arc" && hit.type !== "rect" && hit.type !== "bspline")) return;
@@ -1344,11 +1364,17 @@ export function setupInputListeners(state, dom, helpers) {
             return;
         }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(e.target)) {
-            const shortcutTool = findToolByShortcut(state, e.key);
-            if (shortcutTool) {
-                if (setTool) setTool(shortcutTool);
-                else state.tool = shortcutTool;
-                if (setStatus) setStatus(`Tool changed: ${String(shortcutTool).toUpperCase()}`);
+            const shortcutAction = findShortcutAction(state, e.key);
+            if (shortcutAction) {
+                if (shortcutAction === "delete") {
+                    if (helpers.delete) helpers.delete();
+                } else if (setTool) {
+                    setTool(shortcutAction);
+                    if (setStatus) setStatus(`Tool changed: ${String(shortcutAction).toUpperCase()}`);
+                } else {
+                    state.tool = shortcutAction;
+                    if (setStatus) setStatus(`Tool changed: ${String(shortcutAction).toUpperCase()}`);
+                }
                 if (draw) draw();
                 e.preventDefault();
                 return;

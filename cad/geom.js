@@ -63,15 +63,25 @@ export function getHatchGapWorld(state, hatchShape) {
 export function getPaperWorldRect(state) {
   const ps = state.pageSetup;
   if (!ps?.showFrame) return null;
-  // A4 landscape: 297x210
   const sizes = {
+    "A1": { w: 841, h: 594 },
+    "A2": { w: 594, h: 420 },
     "A3": { w: 420, h: 297 },
     "A4": { w: 297, h: 210 },
+    "Letter": { w: 279.4, h: 215.9 },
+    "Legal": { w: 355.6, h: 215.9 },
+    "Tabloid": { w: 431.8, h: 279.4 },
+    "Ledger": { w: 431.8, h: 279.4 },
   };
-  const base = sizes[ps.size] || sizes["A4"];
+  const base = !!ps.customSizeEnabled
+    ? { w: Math.max(1, Number(ps.customWidthMm) || 297), h: Math.max(1, Number(ps.customHeightMm) || 210) }
+    : (sizes[ps.size] || sizes["A4"]);
   const w = ps.orientation === "landscape" ? base.w : base.h;
   const h = ps.orientation === "landscape" ? base.h : base.w;
-  const sc = Math.max(1, Number(ps.scale) || 1);
+  const effectiveScale = !!ps.customScaleEnabled
+    ? Number(ps.customScale ?? ps.scale ?? 1)
+    : Number(ps.scale ?? ps.presetScale ?? 1);
+  const sc = Math.max(0.0001, effectiveScale || 1);
   const unitMm = mmPerUnit(ps.unit || "mm");
   const wr = (w * sc) / unitMm;
   const hr = (h * sc) / unitMm;

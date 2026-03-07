@@ -62,6 +62,25 @@ function leftMenuItemKey(item) {
   return `${String(item?.type || "")}:${String(item?.id || "")}`;
 }
 
+function getViewportSizeForUi() {
+  const vv = window.visualViewport;
+  const width = Math.max(
+    1,
+    Number(vv?.width)
+    || Number(window.innerWidth)
+    || Number(document.documentElement?.clientWidth)
+    || 1
+  );
+  const height = Math.max(
+    1,
+    Number(vv?.height)
+    || Number(window.innerHeight)
+    || Number(document.documentElement?.clientHeight)
+    || 1
+  );
+  return { width, height };
+}
+
 function isLeftMenuItemVisible(state, key) {
   if (key === "tool:settings") return true;
   const map = (state.ui && typeof state.ui.leftMenuVisibility === "object") ? state.ui.leftMenuVisibility : null;
@@ -1391,8 +1410,9 @@ export function initUi(state, dom, actions) {
     if (!sameInput) {
       const r = inputEl.getBoundingClientRect();
       const popup = dom.colorPalettePopup;
-      const left = Math.max(8, Math.min(window.innerWidth - 170, Math.round(r.left)));
-      const top = Math.max(8, Math.min(window.innerHeight - 120, Math.round(r.bottom + 6)));
+      const vp = getViewportSizeForUi();
+      const left = Math.max(8, Math.min(vp.width - 170, Math.round(r.left)));
+      const top = Math.max(8, Math.min(vp.height - 120, Math.round(r.bottom + 6)));
       popup.style.left = `${left}px`;
       popup.style.top = `${top}px`;
     }
@@ -1474,7 +1494,8 @@ export function initUi(state, dom, actions) {
     if (!main || !menu) return;
     const gap = 6;
     const pad = 8;
-    const maxMenuH = Math.max(80, window.innerHeight - pad * 2);
+    const vp = getViewportSizeForUi();
+    const maxMenuH = Math.max(80, vp.height - pad * 2);
     menu.style.maxHeight = `${Math.round(maxMenuH)}px`;
     const br = main.getBoundingClientRect();
     const mr = menu.getBoundingClientRect();
@@ -1482,8 +1503,8 @@ export function initUi(state, dom, actions) {
     const menuH = Math.min(maxMenuH, Math.max(0, Number(mr.height || 0), Number(menu.scrollHeight || 0)));
     let x = br.right + gap;
     let y = br.top;
-    if ((x + menuW + pad) > window.innerWidth) x = Math.max(pad, br.left - gap - menuW);
-    if ((y + menuH + pad) > window.innerHeight) y = Math.max(pad, window.innerHeight - menuH - pad);
+    if ((x + menuW + pad) > vp.width) x = Math.max(pad, br.left - gap - menuW);
+    if ((y + menuH + pad) > vp.height) y = Math.max(pad, vp.height - menuH - pad);
     y = Math.max(pad, y);
     menu.style.left = `${Math.round(x)}px`;
     menu.style.top = `${Math.round(y)}px`;
@@ -1509,7 +1530,7 @@ export function initUi(state, dom, actions) {
     el.style.boxShadow = "var(--shadow-soft)";
     el.style.zIndex = "1200";
     el.style.minWidth = "82px";
-    el.style.maxHeight = "calc(100vh - 16px)";
+    el.style.maxHeight = "calc(var(--app-vh) - 16px)";
     el.style.overflowY = "auto";
     el.style.overscrollBehavior = "contain";
     el.addEventListener("mousedown", (e) => e.stopPropagation());
@@ -1535,11 +1556,12 @@ export function initUi(state, dom, actions) {
     const br = anchorBtn.getBoundingClientRect();
     const pr = pop.getBoundingClientRect();
     const popW = Math.max(82, Number(pr.width || 0), Number(pop.scrollWidth || 0));
-    const popH = Math.max(0, Math.min(window.innerHeight - pad * 2, Number(pr.height || 0), Number(pop.scrollHeight || 0)));
+    const vp = getViewportSizeForUi();
+    const popH = Math.max(0, Math.min(vp.height - pad * 2, Number(pr.height || 0), Number(pop.scrollHeight || 0)));
     let x = br.right + gap;
     let y = br.top;
-    if ((x + popW + pad) > window.innerWidth) x = Math.max(pad, br.left - gap - popW);
-    if ((y + popH + pad) > window.innerHeight) y = Math.max(pad, window.innerHeight - popH - pad);
+    if ((x + popW + pad) > vp.width) x = Math.max(pad, br.left - gap - popW);
+    if ((y + popH + pad) > vp.height) y = Math.max(pad, vp.height - popH - pad);
     y = Math.max(pad, y);
     pop.style.left = `${Math.round(x)}px`;
     pop.style.top = `${Math.round(y)}px`;
@@ -1601,6 +1623,16 @@ export function initUi(state, dom, actions) {
       positionOpenedLeftFlyouts();
       if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
     });
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", () => {
+        positionOpenedLeftFlyouts();
+        if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+      });
+      window.visualViewport.addEventListener("scroll", () => {
+        positionOpenedLeftFlyouts();
+        if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+      });
+    }
     window.addEventListener("scroll", () => {
       positionOpenedLeftFlyouts();
       if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
@@ -3517,8 +3549,9 @@ export function refreshUi(state, dom) {
   const rightStackEl = document.querySelector(".right-stack");
   const getMaxGroupPanelHeight = (groupsSectionEl) => {
     const stackEl = rightStackEl || groupsSectionEl?.closest?.(".right-stack");
-    if (!stackEl || !groupsSectionEl) return Math.max(120, Math.floor(window.innerHeight - 20));
-    const availableTotal = Math.max(120, Math.floor(window.innerHeight - 20));
+    const vp = getViewportSizeForUi();
+    if (!stackEl || !groupsSectionEl) return Math.max(120, Math.floor(vp.height - 20));
+    const availableTotal = Math.max(120, Math.floor(vp.height - 20));
     const gap = Math.max(0, parseFloat(window.getComputedStyle(stackEl).gap || "0") || 0);
     const sections = Array.from(stackEl.querySelectorAll(":scope > .section[data-panel-id]"))
       .filter(el => window.getComputedStyle(el).display !== "none");
@@ -4319,8 +4352,8 @@ export function refreshUi(state, dom) {
         desiredListH = Math.max(40, Math.min(maxListH, Math.round(desiredListH)));
         state.ui.panelLayout.layerPanelListHeight = desiredListH;
         const targetH = chromeH + desiredListH + 8;
-        layersSectionEl.style.height = `min(calc(100vh - 20px), ${targetH}px)`;
-        layersSectionEl.style.maxHeight = `min(calc(100vh - 20px), ${targetH}px)`;
+        layersSectionEl.style.height = `min(calc(var(--app-vh) - 20px), ${targetH}px)`;
+        layersSectionEl.style.maxHeight = `min(calc(var(--app-vh) - 20px), ${targetH}px)`;
       } else {
         layersSectionEl.style.removeProperty("height");
         layersSectionEl.style.removeProperty("max-height");

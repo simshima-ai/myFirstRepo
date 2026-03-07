@@ -33,19 +33,27 @@ powershell -ExecutionPolicy Bypass -File .\deploy-web.ps1 -Message "your update 
 
 What it does:
 
-1. Copy root `index.html` -> `web/cad.html`
-2. Sync `cad/` -> `web/cad/`
-3. Sync `favicon.svg` -> `web/favicon.svg`
-4. Commit and push `main`
-5. Rebuild and force-push `web-only-deploy`
+1. Stage and commit `web/*` changes only
+2. Push `main`
+3. Rebuild and force-push `web-only-deploy`
+
+## Source of truth
+
+- Edit files under `D:\開発\s-cad\web` only.
+- Do not rely on root `index.html` or `cad/` as deploy sources.
+- Cloudflare reflects the `web-only-deploy` branch (which is generated from `web/`).
 
 ## How to ask Codex
 
 You can send either of these:
 
 - `deploy-web.ps1 実行して。メッセージは "fix snap bug"`  
-- `cadの変更をwebへ同期して、mainとweb-only-deployまで反映して`
+- `webだけコミットして、mainとweb-only-deployまで反映して`
 
 If you want commit only (no push):
 
 - `deploy-web.ps1 を NoPush で実行して`
+
+If you intentionally want to include non-web changes:
+
+- `deploy-web.ps1 を IncludeAllChanges 付きで実行して`

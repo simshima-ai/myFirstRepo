@@ -285,6 +285,8 @@ const dom = {
   statusText: document.getElementById("statusText"),
   touchConfirmOverlay: document.getElementById("touchConfirmOverlay"),
   touchConfirmBtn: document.getElementById("touchConfirmBtn"),
+  touchMultiSelectOverlay: document.getElementById("touchMultiSelectOverlay"),
+  touchMultiSelectBtn: document.getElementById("touchMultiSelectBtn"),
   touchSelectBackOverlay: document.getElementById("touchSelectBackOverlay"),
   touchSelectBackBtn: document.getElementById("touchSelectBackBtn"),
   gridScaleIndicator: document.getElementById("gridScaleIndicator"),
@@ -449,6 +451,7 @@ function buildSettingsSnapshot() {
       language: String(state.ui?.language || "ja"),
       menuScalePct: Number(state.ui?.menuScalePct ?? 100),
       touchMode: !!state.ui?.touchMode,
+      touchMultiSelect: !!state.ui?.touchMultiSelect,
       groupCurrentLayerOnly: !!state.ui?.groupView?.currentLayerOnly,
       leftMenuVisibility: (state.ui?.leftMenuVisibility && typeof state.ui.leftMenuVisibility === "object")
         ? { ...state.ui.leftMenuVisibility }
@@ -512,6 +515,7 @@ function loadAppSettingsAtStartup() {
       state.ui.groupView.currentLayerOnly = !!(data.ui.groupCurrentLayerOnly ?? state.ui.groupView.currentLayerOnly);
       state.ui.menuScalePct = Math.max(50, Math.min(200, Math.round(Number(data.ui.menuScalePct ?? state.ui.menuScalePct ?? 100) / 5) * 5));
       state.ui.touchMode = !!(data.ui.touchMode ?? state.ui.touchMode);
+      state.ui.touchMultiSelect = !!(data.ui.touchMultiSelect ?? state.ui.touchMultiSelect);
       state.ui.leftMenuVisibility = (data.ui.leftMenuVisibility && typeof data.ui.leftMenuVisibility === "object")
         ? { ...data.ui.leftMenuVisibility }
         : (state.ui.leftMenuVisibility || {});
@@ -2129,6 +2133,13 @@ const helpers = {
   setTouchMode: (on) => {
     if (!state.ui) state.ui = {};
     state.ui.touchMode = !!on;
+    if (!state.ui.touchMode) state.ui.touchMultiSelect = false;
+    scheduleSaveAppSettings();
+    draw();
+  },
+  setTouchMultiSelect: (on) => {
+    if (!state.ui) state.ui = {};
+    state.ui.touchMultiSelect = !!on;
     scheduleSaveAppSettings();
     draw();
   },

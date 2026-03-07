@@ -133,6 +133,8 @@ export function setupInputListeners(state, dom, helpers) {
         if (!(distance > 0)) return null;
         return { center: { x: cx, y: cy }, distance };
     };
+    const isTouchMultiSelect = (e) => !!(state.ui?.touchMode && state.ui?.touchMultiSelect && e?.pointerType === "touch");
+    const isAppendSelect = (e) => !!(e?.shiftKey || isTouchMultiSelect(e));
     const beginOrExtendBsplineDraft = (world) => {
         const x = Number(world?.x), y = Number(world?.y);
         if (!Number.isFinite(x) || !Number.isFinite(y)) return;
@@ -413,7 +415,7 @@ export function setupInputListeners(state, dom, helpers) {
 
         if (state.tool === "select") {
             const rotateHandleHit = hitActiveGroupRotateHandle(state, screen);
-            if (rotateHandleHit && !e.shiftKey) {
+            if (rotateHandleHit && !isAppendSelect(e)) {
                 const hitGroupId = Number(rotateHandleHit.id);
                 const selectedGroupIds = Array.isArray(state.selection?.groupIds)
                     ? state.selection.groupIds.map(Number).filter(Number.isFinite)
@@ -428,7 +430,7 @@ export function setupInputListeners(state, dom, helpers) {
                 return;
             }
             const groupHandleHit = hitActiveGroupOriginHandle(state, screen);
-            if (groupHandleHit && !e.shiftKey) {
+            if (groupHandleHit && !isAppendSelect(e)) {
                 const hitGroupId = Number(groupHandleHit.id);
                 const selectedGroupIds = Array.isArray(state.selection?.groupIds)
                     ? state.selection.groupIds.map(Number).filter(Number.isFinite)
@@ -459,7 +461,7 @@ export function setupInputListeners(state, dom, helpers) {
                 const pickMode = String(state.ui?.selectPickMode || "object");
                 if (pickMode === "group" && hit.groupId != null) {
                     toggleGroupSelectionById(state, hit.groupId);
-                } else if (e.shiftKey) {
+                } else if (isAppendSelect(e)) {
                     const cur = new Set(state.selection.ids.map(Number));
                     if (cur.has(Number(hit.id))) cur.delete(Number(hit.id)); else cur.add(Number(hit.id));
                     setSelection(Array.from(cur));
@@ -483,11 +485,11 @@ export function setupInputListeners(state, dom, helpers) {
                 if (draw) draw();
                 return;
             } else {
-                if (!e.shiftKey) {
+                if (!isAppendSelect(e)) {
                     clearSelection();
                     state.activeGroupId = null;
                 }
-                beginSelectionBox(state, screen, e.shiftKey);
+                beginSelectionBox(state, screen, isAppendSelect(e));
                 if (draw) draw();
             }
             return;
@@ -541,7 +543,7 @@ export function setupInputListeners(state, dom, helpers) {
                         if (draw) draw();
                         return;
                     }
-                    if (e.shiftKey) {
+                    if (isAppendSelect(e)) {
                         const cur = new Set((state.selection?.ids || []).map(Number));
                         const hid = Number(hit.id);
                         if (cur.has(hid)) cur.delete(hid); else cur.add(hid);
@@ -842,11 +844,11 @@ export function setupInputListeners(state, dom, helpers) {
                 if (cur.has(Number(hit.id))) cur.delete(Number(hit.id)); else cur.add(Number(hit.id));
                 setSelection(Array.from(cur));
             } else {
-                if (!e.shiftKey) {
+                if (!isAppendSelect(e)) {
                     clearSelection();
                     state.activeGroupId = null;
                 }
-                beginSelectionBox(state, screen, e.shiftKey);
+                beginSelectionBox(state, screen, isAppendSelect(e));
             }
             state.dlinePreview = buildDoubleLinePreview(state, worldRaw);
             if (draw) draw();
@@ -860,7 +862,7 @@ export function setupInputListeners(state, dom, helpers) {
                 const pickMode = String(state.ui?.selectPickMode || "object");
                 if (pickMode === "group" && hit.groupId != null) {
                     toggleGroupSelectionById(state, hit.groupId);
-                } else if (e.shiftKey) {
+                } else if (isAppendSelect(e)) {
                     const cur = new Set(state.selection.ids.map(Number));
                     if (cur.has(Number(hit.id))) cur.delete(Number(hit.id)); else cur.add(Number(hit.id));
                     setSelection(Array.from(cur));
@@ -870,11 +872,11 @@ export function setupInputListeners(state, dom, helpers) {
                     state.activeGroupId = null;
                 }
             } else {
-                if (!e.shiftKey) {
+                if (!isAppendSelect(e)) {
                     clearSelection();
                     state.activeGroupId = null;
                 }
-                beginSelectionBox(state, screen, e.shiftKey);
+                beginSelectionBox(state, screen, isAppendSelect(e));
             }
             if (draw) draw();
             return;

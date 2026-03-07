@@ -1120,7 +1120,7 @@
 <body>
   <div id="app">
     <aside class="sidebar">
-      <a id="cadHomeLink" class="cad-home-link" href="/index.html" title="S-CAD トップへ">
+      <a id="cadHomeLink" class="cad-home-link" href="./index.html" title="S-CAD トップへ">
         <div class="cad-home-logo"><span class="logo-s">S-</span>CAD</div>
       </a>
       <div class="left-aux-stack">
@@ -1159,7 +1159,7 @@
       <div class="section" data-panel-id="fileTools">
         <button class="section-title panel-toggle" type="button">ファイル</button>
         <div id="fileToolButtons" class="tool-buttons"></div>
-        <a id="openManualBtn" class="menu-link-btn" href="/manual.html">使い方ガイド</a>
+        <a id="openManualBtn" class="menu-link-btn" href="./manual.html">使い方ガイド</a>
       </div>
       <div class="section utilities" style="display:none;">
         <div class="section-title">View</div>
@@ -2075,13 +2075,13 @@
     (function () {
       const a = document.getElementById("cadHomeLink");
       if (!a) return;
-      a.href = "/index.html";
+      a.href = "./index.html";
     })();
     (function () {
       const a = document.getElementById("openManualBtn");
       if (!a) return;
       const l = String(localStorage.getItem("scad-lang") || "en").toLowerCase();
-      a.href = l.startsWith("en") ? "/manual_en.html" : "/manual.html";
+      a.href = l.startsWith("en") ? "./manual_en.html" : "./manual.html";
     })();
   </script>
   <script type="module" src="./cad/app.js"></script>

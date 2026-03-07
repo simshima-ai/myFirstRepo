@@ -3,7 +3,7 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
   <title>s-cad (scaffold)</title>
@@ -17,6 +17,8 @@
       --accent: #0ea5e9;
       --shadow-soft: 0 6px 18px rgba(15, 23, 42, 0.08);
       --menu-scale: 1;
+      --app-vw: 100vw;
+      --app-vh: 100vh;
     }
 
     * {
@@ -38,7 +40,7 @@
     #app {
       display: grid;
       grid-template-columns: 1fr;
-      height: 100%;
+      height: var(--app-vh);
       gap: 0;
       overflow: visible;
     }
@@ -56,7 +58,7 @@
       display: flex;
       flex-direction: column;
       gap: 1px;
-      max-height: calc(100vh - 20px);
+      max-height: calc(var(--app-vh) - 20px);
       overflow-y: hidden;
       overflow-x: hidden;
       scrollbar-gutter: stable;
@@ -240,7 +242,7 @@
       transition: opacity 150ms ease, transform 170ms ease;
       z-index: 1200;
       min-width: 82px;
-      max-height: calc(100vh - 16px);
+      max-height: calc(var(--app-vh) - 16px);
       overflow-y: auto;
       overscroll-behavior: contain;
     }
@@ -645,7 +647,7 @@
     .touch-confirm-overlay {
       position: absolute;
       left: 50%;
-      bottom: 44px;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
       transform: translateX(-50%);
       z-index: 120;
       pointer-events: auto;
@@ -676,7 +678,7 @@
     .touch-select-back-overlay {
       position: absolute;
       left: 14px;
-      bottom: 44px;
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
       z-index: 120;
       pointer-events: auto;
       display: none;
@@ -894,7 +896,7 @@
     }
 
     #topContext .section[data-context="settings"] {
-      max-height: min(72vh, calc(100vh - 72px));
+      max-height: min(72vh, calc(var(--app-vh) - 72px));
       overflow-y: auto;
       overflow-x: hidden;
       scrollbar-gutter: stable;
@@ -973,7 +975,7 @@
     .right-stack .section[data-panel-id="groups"] {
       display: flex;
       flex-direction: column;
-      max-height: calc(100vh - 20px);
+      max-height: calc(var(--app-vh) - 20px);
       min-height: 0;
       position: relative;
     }

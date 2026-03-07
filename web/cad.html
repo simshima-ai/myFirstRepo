@@ -29,6 +29,7 @@
     body {
       margin: 0;
       height: 100%;
+      overflow: hidden;
     }
 
     body {
@@ -645,11 +646,11 @@
     }
 
     .touch-confirm-overlay {
-      position: absolute;
+      position: fixed;
       left: 50%;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
       transform: translateX(-50%);
-      z-index: 120;
+      z-index: 2200;
       pointer-events: auto;
       display: none;
     }
@@ -676,10 +677,10 @@
     }
 
     .touch-select-back-overlay {
-      position: absolute;
+      position: fixed;
       left: 14px;
       bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
-      z-index: 120;
+      z-index: 2200;
       pointer-events: auto;
       display: none;
     }

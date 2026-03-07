@@ -238,8 +238,11 @@
       transform: translateX(-8px);
       pointer-events: none;
       transition: opacity 150ms ease, transform 170ms ease;
-      z-index: 20;
+      z-index: 1200;
       min-width: 82px;
+      max-height: calc(100vh - 16px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
     }
 
     .tool-buttons .left-flyout>.left-flyout-menu.floating {

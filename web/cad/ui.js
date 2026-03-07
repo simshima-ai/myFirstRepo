@@ -1474,10 +1474,12 @@ export function initUi(state, dom, actions) {
     if (!main || !menu) return;
     const gap = 6;
     const pad = 8;
+    const maxMenuH = Math.max(80, window.innerHeight - pad * 2);
+    menu.style.maxHeight = `${Math.round(maxMenuH)}px`;
     const br = main.getBoundingClientRect();
     const mr = menu.getBoundingClientRect();
     const menuW = Math.max(82, Number(mr.width || 0), Number(menu.scrollWidth || 0));
-    const menuH = Math.max(0, Number(mr.height || 0), Number(menu.scrollHeight || 0));
+    const menuH = Math.min(maxMenuH, Math.max(0, Number(mr.height || 0), Number(menu.scrollHeight || 0)));
     let x = br.right + gap;
     let y = br.top;
     if ((x + menuW + pad) > window.innerWidth) x = Math.max(pad, br.left - gap - menuW);
@@ -1489,6 +1491,87 @@ export function initUi(state, dom, actions) {
   const positionOpenedLeftFlyouts = () => {
     const opened = document.querySelectorAll(".tool-buttons .left-flyout.open");
     opened.forEach((el) => positionOneLeftFlyout(el));
+  };
+  let actionPopoverEl = null;
+  let actionPopoverOwner = null;
+  const ensureActionPopover = () => {
+    if (actionPopoverEl) return actionPopoverEl;
+    const el = document.createElement("div");
+    el.className = "left-action-popover";
+    el.style.position = "fixed";
+    el.style.display = "none";
+    el.style.flexDirection = "column";
+    el.style.gap = "6px";
+    el.style.padding = "6px";
+    el.style.border = "1px solid var(--line)";
+    el.style.borderRadius = "8px";
+    el.style.background = "rgba(255,255,255,0.98)";
+    el.style.boxShadow = "var(--shadow-soft)";
+    el.style.zIndex = "1200";
+    el.style.minWidth = "82px";
+    el.style.maxHeight = "calc(100vh - 16px)";
+    el.style.overflowY = "auto";
+    el.style.overscrollBehavior = "contain";
+    el.addEventListener("mousedown", (e) => e.stopPropagation());
+    el.addEventListener("click", (e) => e.stopPropagation());
+    document.body.appendChild(el);
+    actionPopoverEl = el;
+    return el;
+  };
+  const closeActionPopover = () => {
+    if (actionPopoverOwner) actionPopoverOwner.setAttribute("aria-expanded", "false");
+    actionPopoverOwner = null;
+    if (!actionPopoverEl) return;
+    actionPopoverEl.style.display = "none";
+    actionPopoverEl.innerHTML = "";
+    actionPopoverEl.style.left = "";
+    actionPopoverEl.style.top = "";
+  };
+  const positionActionPopover = (anchorBtn) => {
+    if (!anchorBtn) return;
+    const pop = ensureActionPopover();
+    const gap = 6;
+    const pad = 8;
+    const br = anchorBtn.getBoundingClientRect();
+    const pr = pop.getBoundingClientRect();
+    const popW = Math.max(82, Number(pr.width || 0), Number(pop.scrollWidth || 0));
+    const popH = Math.max(0, Math.min(window.innerHeight - pad * 2, Number(pr.height || 0), Number(pop.scrollHeight || 0)));
+    let x = br.right + gap;
+    let y = br.top;
+    if ((x + popW + pad) > window.innerWidth) x = Math.max(pad, br.left - gap - popW);
+    if ((y + popH + pad) > window.innerHeight) y = Math.max(pad, window.innerHeight - popH - pad);
+    y = Math.max(pad, y);
+    pop.style.left = `${Math.round(x)}px`;
+    pop.style.top = `${Math.round(y)}px`;
+  };
+  const openActionPopover = (anchorBtn, item) => {
+    const pop = ensureActionPopover();
+    pop.innerHTML = "";
+    const opts = Array.isArray(item?.options) ? item.options : [];
+    for (const opt of opts) {
+      const optBtn = document.createElement("button");
+      optBtn.type = "button";
+      optBtn.textContent = opt.label;
+      optBtn.dataset.action = opt.id;
+      const fn = actions[opt.id];
+      if (typeof fn === "function") {
+        optBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          fn();
+          closeActionPopover();
+        });
+      } else {
+        optBtn.disabled = true;
+      }
+      pop.appendChild(optBtn);
+    }
+    pop.style.display = "flex";
+    pop.style.visibility = "hidden";
+    positionActionPopover(anchorBtn);
+    pop.style.visibility = "";
+    actionPopoverOwner = anchorBtn;
+    anchorBtn.setAttribute("aria-expanded", "true");
   };
   const closeLeftFlyouts = (exceptEl = null) => {
     const opened = document.querySelectorAll(".tool-buttons .left-flyout.open");
@@ -1509,10 +1592,25 @@ export function initUi(state, dom, actions) {
     document.addEventListener("click", (e) => {
       const t = e.target;
       if (t?.closest?.(".tool-buttons .left-flyout")) return;
+      if (t?.closest?.(".left-action-popover")) return;
+      if (t?.closest?.("[data-action-popover-trigger='1']")) return;
       closeLeftFlyouts();
+      closeActionPopover();
     });
-    window.addEventListener("resize", positionOpenedLeftFlyouts);
-    window.addEventListener("scroll", positionOpenedLeftFlyouts, true);
+    window.addEventListener("resize", () => {
+      positionOpenedLeftFlyouts();
+      if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+    });
+    window.addEventListener("scroll", () => {
+      positionOpenedLeftFlyouts();
+      if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+    }, true);
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") {
+        closeLeftFlyouts();
+        closeActionPopover();
+      }
+    });
     state.ui._leftFlyoutGlobalCloseBound = true;
   }
   for (const el of [toolTargets.tools, toolTargets.edit, toolTargets.files]) {
@@ -1540,17 +1638,44 @@ export function initUi(state, dom, actions) {
       continue;
     }
     lastTarget = target;
+    if (item.type === "action-flyout" && String(item.id) === "export") {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = item.label;
+      btn.dataset.action = item.id;
+      btn.dataset.menuItemKey = leftMenuItemKey(item);
+      if (item.group) btn.dataset.menuGroup = item.group;
+      btn.dataset.actionPopoverTrigger = "1";
+      btn.setAttribute("aria-expanded", "false");
+      btn.addEventListener("mousedown", (e) => e.stopPropagation());
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const opened = actionPopoverOwner === btn && actionPopoverEl && actionPopoverEl.style.display !== "none";
+        closeLeftFlyouts();
+        if (opened) {
+          closeActionPopover();
+          return;
+        }
+        openActionPopover(btn, item);
+      });
+      target?.appendChild(btn);
+      continue;
+    }
     if (item.type === "action-flyout") {
       const wrap = document.createElement("div");
       wrap.className = "left-flyout";
       wrap.dataset.menuItemKey = leftMenuItemKey(item);
       if (item.group) wrap.dataset.menuGroup = item.group;
+      wrap.addEventListener("mousedown", (e) => e.stopPropagation());
+      wrap.addEventListener("click", (e) => e.stopPropagation());
       const mainBtn = document.createElement("button");
       mainBtn.type = "button";
       mainBtn.textContent = item.label;
       mainBtn.dataset.action = item.id;
       mainBtn.className = "left-flyout-main";
       mainBtn.setAttribute("aria-expanded", "false");
+      mainBtn.addEventListener("mousedown", (e) => e.stopPropagation());
       mainBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1572,6 +1697,8 @@ export function initUi(state, dom, actions) {
       });
       const menu = document.createElement("div");
       menu.className = "left-flyout-menu";
+      menu.addEventListener("mousedown", (e) => e.stopPropagation());
+      menu.addEventListener("click", (e) => e.stopPropagation());
       for (const opt of (item.options || [])) {
         const optBtn = document.createElement("button");
         optBtn.type = "button";

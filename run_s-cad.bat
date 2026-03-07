@@ -4,7 +4,7 @@ setlocal
 cd /d "%~dp0"
 
 set PORT=8000
-set URL=http://127.0.0.1:%PORT%/index.html
+set URL=http://127.0.0.1:%PORT%/web/index.html
 set HOST=127.0.0.1
 
 set PORT_IN_USE=

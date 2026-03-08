@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>s-cad 3D dependency graph</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #050510; overflow: hidden; font-family: monospace; color: #e0e0e0; }
+#graph { width: 100vw; height: 100vh; }
+
+#tooltip {
+  position: fixed; pointer-events: none; display: none;
+  background: #080d20ee; border: 1px solid #3a6aaa;
+  border-radius: 8px; padding: 10px 14px; font-size: 12px;
+  line-height: 1.65; z-index: 20; max-width: 340px;
+  box-shadow: 0 4px 24px #000a;
+}
+
+#legend {
+  position: fixed; bottom: 18px; left: 18px;
+  background: #080d20dd; border: 1px solid #3a6aaa;
+  border-radius: 8px; padding: 11px 15px; font-size: 11px;
+}
+#legend h4 { color: #9ecaed; margin-bottom: 8px; font-size: 11px; letter-spacing: .5px; }
+.crow { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.cdot { width: 11px; height: 11px; border-radius: 50%; flex-shrink: 0; }
+
+#size-legend {
+  position: fixed; bottom: 18px; right: 18px;
+  background: #080d20dd; border: 1px solid #3a6aaa;
+  border-radius: 8px; padding: 11px 15px; font-size: 11px;
+}
+#size-legend h4 { color: #9ecaed; margin-bottom: 8px; font-size: 11px; }
+.srow { display: flex; align-items: center; gap: 9px; margin-bottom: 5px; }
+.scirc { border-radius: 50%; background: #888; flex-shrink: 0; }
+
+#info {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  background: #080d20cc; border: 1px solid #3a6aaa; border-radius: 7px;
+  padding: 5px 18px; font-size: 11.5px; color: #9ecaed; white-space: nowrap;
+}
+#controls {
+  position: fixed; top: 14px; right: 14px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+#controls button {
+  background: #080d20; border: 1px solid #3a6aaa; color: #9ecaed;
+  padding: 5px 12px; border-radius: 5px; cursor: pointer; font-size: 11px;
+}
+#controls button:hover { background: #1a2a4a; }
+#controls button.active { background: #1a3a6a; border-color: #5a9adf; }
+</style>
+</head>
+<body>
+<div id="graph"></div>
+<div id="tooltip"></div>
+<div id="info">
+  左ドラッグ: 回転 &nbsp;|&nbsp; 右ドラッグ: パン &nbsp;|&nbsp; スクロール: ズーム &nbsp;|&nbsp; クリック: 依存ハイライト
+</div>
+
+<div id="legend">
+  <h4>Cluster groups</h4>
+  <div class="crow"><div class="cdot" style="background:#2ecc71"></div><span>Core / Geometry</span></div>
+  <div class="crow"><div class="cdot" style="background:#e74c3c"></div><span>App Core</span></div>
+  <div class="crow"><div class="cdot" style="background:#e07b54"></div><span>Input</span></div>
+  <div class="crow"><div class="cdot" style="background:#f1c40f"></div><span>Selection</span></div>
+  <div class="crow"><div class="cdot" style="background:#00d4ff"></div><span>Tools</span></div>
+  <div class="crow"><div class="cdot" style="background:#9b59b6"></div><span>App Ops / Runtime</span></div>
+  <div class="crow"><div class="cdot" style="background:#3498db"></div><span>UI</span></div>
+  <div class="crow"><div class="cdot" style="background:#1abc9c"></div><span>Render</span></div>
+</div>
+<div id="size-legend">
+  <h4>Node size = file size</h4>
+  <div class="srow"><div class="scirc" style="width:8px;height:8px"></div>&lt; 5 KB</div>
+  <div class="srow"><div class="scirc" style="width:13px;height:13px"></div>5–15 KB</div>
+  <div class="srow"><div class="scirc" style="width:18px;height:18px"></div>15–35 KB</div>
+  <div class="srow"><div class="scirc" style="width:24px;height:24px"></div>35–70 KB</div>
+  <div class="srow"><div class="scirc" style="width:30px;height:30px"></div>&gt; 70 KB</div>
+</div>
+<div id="controls">
+  <button id="btnAutoRotate" onclick="toggleAutoRotate()">Auto rotate</button>
+  <button onclick="resetCamera()">Reset camera</button>
+  <button id="btnParticles" onclick="toggleParticles()" class="active">Particles ON</button>
+  <button onclick="resetHighlight()">Clear highlight</button>
+</div>
+
+<script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
+<script src="https://unpkg.com/3d-force-graph@1"></script>
+<script>
+// ── Text sprite factory ──────────────────────────────────────────────────────
+function makeTextSprite(text, color) {
+  const canvas = document.createElement('canvas');
+  const fontSize = 28;
+  const padding  = 8;
+  const ctx = canvas.getContext('2d');
+  ctx.font = `${fontSize}px monospace`;
+  const tw = ctx.measureText(text).width;
+  canvas.width  = tw + padding * 2;
+  canvas.height = fontSize + padding * 2;
+  ctx.font = `${fontSize}px monospace`;
+  ctx.fillStyle = color;
+  ctx.globalAlpha = 0.92;
+  ctx.fillText(text, padding, fontSize + padding * 0.5);
+  const tex = new THREE.CanvasTexture(canvas);
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const sprite = new THREE.Sprite(mat);
+  // world units: scale so font looks ~right relative to node size
+  const scale = canvas.width / 18;
+  sprite.scale.set(scale, canvas.height / 18, 1);
+  return sprite;
+}
+const nodes   = [{"id": 0, "name": "app.js", "size": 29933, "cluster": "app_core"}, {"id": 1, "name": "app_aim_utils.js", "size": 4860, "cluster": "app_ops"}, {"id": 2, "name": "app_attribute_ops.js", "size": 2038, "cluster": "app_ops"}, {"id": 3, "name": "app_circle3p.js", "size": 2839, "cluster": "app_ops"}, {"id": 4, "name": "app_clipboard_ops.js", "size": 3511, "cluster": "app_core"}, {"id": 5, "name": "app_document_ops.js", "size": 2704, "cluster": "app_core"}, {"id": 6, "name": "app_dom.js", "size": 17366, "cluster": "app_ops"}, {"id": 7, "name": "app_doubleline_ops.js", "size": 3244, "cluster": "app_ops"}, {"id": 8, "name": "app_draw_runtime.js", "size": 4308, "cluster": "app_ops"}, {"id": 9, "name": "app_duplicate_utils.js", "size": 8513, "cluster": "app_ops"}, {"id": 10, "name": "app_file_ops.js", "size": 4205, "cluster": "app_core"}, {"id": 11, "name": "app_group_aim_ops.js", "size": 4145, "cluster": "app_ops"}, {"id": 12, "name": "app_group_aim_runtime.js", "size": 4885, "cluster": "app_ops"}, {"id": 13, "name": "app_group_structure_ops.js", "size": 1922, "cluster": "app_ops"}, {"id": 14, "name": "app_history_view_ops.js", "size": 1457, "cluster": "app_ops"}, {"id": 15, "name": "app_input.js", "size": 414, "cluster": "input"}, {"id": 16, "name": "app_input_anchor_utils.js", "size": 1776, "cluster": "input"}, {"id": 17, "name": "app_input_bspline.js", "size": 2122, "cluster": "input"}, {"id": 18, "name": "app_input_coords.js", "size": 1204, "cluster": "input"}, {"id": 19, "name": "app_input_fillet.js", "size": 4711, "cluster": "input"}, {"id": 20, "name": "app_input_keyboard.js", "size": 9090, "cluster": "input"}, {"id": 21, "name": "app_input_mode_utils.js", "size": 777, "cluster": "input"}, {"id": 22, "name": "app_input_pointer_draw.js", "size": 8215, "cluster": "input"}, {"id": 23, "name": "app_input_pointer_select.js", "size": 4987, "cluster": "input"}, {"id": 24, "name": "app_input_setup.js", "size": 39309, "cluster": "input"}, {"id": 25, "name": "app_input_shortcuts.js", "size": 884, "cluster": "input"}, {"id": 26, "name": "app_input_snap.js", "size": 955, "cluster": "input"}, {"id": 27, "name": "app_input_tail_events.js", "size": 2956, "cluster": "input"}, {"id": 28, "name": "app_input_touch.js", "size": 3422, "cluster": "input"}, {"id": 29, "name": "app_input_viewport.js", "size": 1731, "cluster": "input"}, {"id": 30, "name": "app_layer_group_ops.js", "size": 4288, "cluster": "app_ops"}, {"id": 31, "name": "app_persistence.js", "size": 10500, "cluster": "app_core"}, {"id": 32, "name": "app_selection.js", "size": 37673, "cluster": "selection"}, {"id": 33, "name": "app_selection_box_ops.js", "size": 14764, "cluster": "selection"}, {"id": 34, "name": "app_selection_dim_handles.js", "size": 14755, "cluster": "selection"}, {"id": 35, "name": "app_selection_group_transform_ops.js", "size": 14171, "cluster": "selection"}, {"id": 36, "name": "app_selection_group_tree.js", "size": 4084, "cluster": "selection"}, {"id": 37, "name": "app_selection_hit_test.js", "size": 9993, "cluster": "selection"}, {"id": 38, "name": "app_selection_trim_fillet_hover.js", "size": 13460, "cluster": "selection"}, {"id": 39, "name": "app_selection_vertex_ops.js", "size": 28577, "cluster": "selection"}, {"id": 40, "name": "app_selection_visibility_ops.js", "size": 4410, "cluster": "selection"}, {"id": 41, "name": "app_tool_switch_ops.js", "size": 1745, "cluster": "app_ops"}, {"id": 42, "name": "app_tools.js", "size": 2425, "cluster": "tools"}, {"id": 43, "name": "app_tools_export.js", "size": 39810, "cluster": "tools"}, {"id": 44, "name": "app_tools_fillet.js", "size": 36270, "cluster": "tools"}, {"id": 45, "name": "app_tools_misc.js", "size": 18831, "cluster": "tools"}, {"id": 46, "name": "app_tools_patterncopy.js", "size": 19765, "cluster": "tools"}, {"id": 47, "name": "app_tools_settings.js", "size": 19215, "cluster": "tools"}, {"id": 48, "name": "app_tools_structure.js", "size": 7786, "cluster": "tools"}, {"id": 49, "name": "app_tools_trim_dim.js", "size": 32293, "cluster": "tools"}, {"id": 50, "name": "app_ui_prefs_ops.js", "size": 2863, "cluster": "app_ops"}, {"id": 51, "name": "app_unit_page.js", "size": 7219, "cluster": "app_core"}, {"id": 52, "name": "app_view_runtime.js", "size": 2608, "cluster": "app_ops"}, {"id": 53, "name": "bspline_utils.js", "size": 1509, "cluster": "core"}, {"id": 54, "name": "dim_geom.js", "size": 14847, "cluster": "core"}, {"id": 55, "name": "dline_geom.js", "size": 34856, "cluster": "core"}, {"id": 56, "name": "geom.js", "size": 6142, "cluster": "core"}, {"id": 57, "name": "hatch_geom.js", "size": 14312, "cluster": "core"}, {"id": 58, "name": "modify.js", "size": 7777, "cluster": "core"}, {"id": 59, "name": "render.js", "size": 25281, "cluster": "render"}, {"id": 60, "name": "render_bounds.js", "size": 5476, "cluster": "render"}, {"id": 61, "name": "render_dimension.js", "size": 15830, "cluster": "render"}, {"id": 62, "name": "render_doubleline_overlay.js", "size": 2823, "cluster": "render"}, {"id": 63, "name": "render_grid.js", "size": 2417, "cluster": "render"}, {"id": 64, "name": "render_group_overlay.js", "size": 2179, "cluster": "render"}, {"id": 65, "name": "render_handles.js", "size": 15900, "cluster": "render"}, {"id": 66, "name": "render_hatch.js", "size": 6454, "cluster": "render"}, {"id": 67, "name": "render_helpers.js", "size": 5058, "cluster": "render"}, {"id": 68, "name": "render_overlay.js", "size": 14867, "cluster": "render"}, {"id": 69, "name": "render_preview.js", "size": 12626, "cluster": "render"}, {"id": 70, "name": "render_view_helpers.js", "size": 4547, "cluster": "render"}, {"id": 71, "name": "solvers.js", "size": 41830, "cluster": "core"}, {"id": 72, "name": "state.js", "size": 31487, "cluster": "core"}, {"id": 73, "name": "ui.js", "size": 863, "cluster": "ui"}, {"id": 74, "name": "ui_attr_panel.js", "size": 4334, "cluster": "ui"}, {"id": 75, "name": "ui_bindings.js", "size": 16506, "cluster": "ui"}, {"id": 76, "name": "ui_color_palette.js", "size": 13975, "cluster": "ui"}, {"id": 77, "name": "ui_context_help.js", "size": 5147, "cluster": "ui"}, {"id": 78, "name": "ui_context_panels.js", "size": 3041, "cluster": "ui"}, {"id": 79, "name": "ui_group_context.js", "size": 5711, "cluster": "ui"}, {"id": 80, "name": "ui_group_list_panel.js", "size": 19360, "cluster": "ui"}, {"id": 81, "name": "ui_i18n.js", "size": 38221, "cluster": "ui"}, {"id": 82, "name": "ui_init_group_list_events.js", "size": 14599, "cluster": "ui"}, {"id": 83, "name": "ui_init_main.js", "size": 33279, "cluster": "ui"}, {"id": 84, "name": "ui_init_tail_events.js", "size": 14328, "cluster": "ui"}, {"id": 85, "name": "ui_layout_context.js", "size": 4892, "cluster": "ui"}, {"id": 86, "name": "ui_left_menu_core.js", "size": 4013, "cluster": "ui"}, {"id": 87, "name": "ui_menu_visibility.js", "size": 2849, "cluster": "ui"}, {"id": 88, "name": "ui_numeric.js", "size": 2978, "cluster": "ui"}, {"id": 89, "name": "ui_refresh_layers.js", "size": 10580, "cluster": "ui"}, {"id": 90, "name": "ui_refresh_main.js", "size": 6538, "cluster": "ui"}, {"id": 91, "name": "ui_refresh_selection_group.js", "size": 18565, "cluster": "ui"}, {"id": 92, "name": "ui_refresh_settings.js", "size": 15672, "cluster": "ui"}, {"id": 93, "name": "ui_refresh_tool_panels.js", "size": 11770, "cluster": "ui"}, {"id": 94, "name": "ui_shortcuts_panel.js", "size": 2292, "cluster": "ui"}, {"id": 95, "name": "ui_status_bar.js", "size": 4032, "cluster": "ui"}, {"id": 96, "name": "ui_tool_param_events.js", "size": 12957, "cluster": "ui"}];
+const links   = [{"source": 0, "target": 72}, {"source": 0, "target": 59}, {"source": 0, "target": 73}, {"source": 0, "target": 57}, {"source": 0, "target": 71}, {"source": 0, "target": 32}, {"source": 0, "target": 42}, {"source": 0, "target": 15}, {"source": 0, "target": 56}, {"source": 0, "target": 51}, {"source": 0, "target": 1}, {"source": 0, "target": 9}, {"source": 0, "target": 3}, {"source": 0, "target": 12}, {"source": 0, "target": 31}, {"source": 0, "target": 10}, {"source": 0, "target": 8}, {"source": 0, "target": 52}, {"source": 0, "target": 4}, {"source": 0, "target": 5}, {"source": 0, "target": 11}, {"source": 0, "target": 13}, {"source": 0, "target": 50}, {"source": 0, "target": 40}, {"source": 0, "target": 2}, {"source": 0, "target": 7}, {"source": 0, "target": 41}, {"source": 0, "target": 14}, {"source": 0, "target": 30}, {"source": 0, "target": 6}, {"source": 9, "target": 1}, {"source": 15, "target": 18}, {"source": 15, "target": 24}, {"source": 18, "target": 56}, {"source": 19, "target": 42}, {"source": 24, "target": 72}, {"source": 24, "target": 18}, {"source": 24, "target": 32}, {"source": 24, "target": 42}, {"source": 24, "target": 71}, {"source": 24, "target": 55}, {"source": 24, "target": 29}, {"source": 24, "target": 25}, {"source": 24, "target": 21}, {"source": 24, "target": 28}, {"source": 24, "target": 20}, {"source": 24, "target": 17}, {"source": 24, "target": 16}, {"source": 24, "target": 19}, {"source": 24, "target": 26}, {"source": 24, "target": 27}, {"source": 24, "target": 23}, {"source": 24, "target": 22}, {"source": 25, "target": 72}, {"source": 32, "target": 72}, {"source": 32, "target": 71}, {"source": 32, "target": 56}, {"source": 32, "target": 54}, {"source": 32, "target": 57}, {"source": 32, "target": 36}, {"source": 32, "target": 53}, {"source": 32, "target": 34}, {"source": 32, "target": 33}, {"source": 32, "target": 38}, {"source": 32, "target": 39}, {"source": 32, "target": 37}, {"source": 32, "target": 35}, {"source": 34, "target": 72}, {"source": 34, "target": 71}, {"source": 34, "target": 56}, {"source": 34, "target": 54}, {"source": 36, "target": 72}, {"source": 42, "target": 55}, {"source": 42, "target": 44}, {"source": 42, "target": 45}, {"source": 42, "target": 49}, {"source": 42, "target": 47}, {"source": 42, "target": 48}, {"source": 42, "target": 43}, {"source": 42, "target": 46}, {"source": 43, "target": 72}, {"source": 43, "target": 56}, {"source": 43, "target": 54}, {"source": 43, "target": 57}, {"source": 44, "target": 72}, {"source": 44, "target": 71}, {"source": 44, "target": 32}, {"source": 45, "target": 72}, {"source": 45, "target": 32}, {"source": 46, "target": 72}, {"source": 46, "target": 71}, {"source": 46, "target": 32}, {"source": 47, "target": 32}, {"source": 48, "target": 72}, {"source": 48, "target": 32}, {"source": 49, "target": 71}, {"source": 49, "target": 56}, {"source": 49, "target": 72}, {"source": 49, "target": 45}, {"source": 54, "target": 56}, {"source": 55, "target": 72}, {"source": 55, "target": 71}, {"source": 55, "target": 56}, {"source": 57, "target": 56}, {"source": 57, "target": 53}, {"source": 58, "target": 72}, {"source": 58, "target": 57}, {"source": 59, "target": 56}, {"source": 59, "target": 54}, {"source": 59, "target": 57}, {"source": 59, "target": 42}, {"source": 59, "target": 63}, {"source": 59, "target": 70}, {"source": 59, "target": 69}, {"source": 59, "target": 61}, {"source": 59, "target": 68}, {"source": 59, "target": 65}, {"source": 59, "target": 66}, {"source": 59, "target": 62}, {"source": 59, "target": 60}, {"source": 59, "target": 64}, {"source": 59, "target": 53}, {"source": 61, "target": 56}, {"source": 63, "target": 56}, {"source": 70, "target": 56}, {"source": 73, "target": 83}, {"source": 73, "target": 90}, {"source": 83, "target": 75}, {"source": 83, "target": 76}, {"source": 83, "target": 96}, {"source": 83, "target": 86}, {"source": 83, "target": 81}, {"source": 83, "target": 88}, {"source": 83, "target": 90}, {"source": 83, "target": 84}, {"source": 83, "target": 82}, {"source": 84, "target": 96}, {"source": 90, "target": 72}, {"source": 90, "target": 74}, {"source": 90, "target": 78}, {"source": 90, "target": 77}, {"source": 90, "target": 95}, {"source": 90, "target": 79}, {"source": 90, "target": 81}, {"source": 90, "target": 87}, {"source": 90, "target": 93}, {"source": 90, "target": 85}, {"source": 90, "target": 94}, {"source": 90, "target": 92}, {"source": 90, "target": 80}, {"source": 90, "target": 91}, {"source": 90, "target": 89}, {"source": 90, "target": 86}, {"source": 90, "target": 88}];
+const cluster = {"core": {"label": "Core / Geometry", "color": "#2ecc71", "x": 0, "y": -320, "z": 0}, "app_core": {"label": "App Core", "color": "#e74c3c", "x": 0, "y": -160, "z": 0}, "input": {"label": "Input", "color": "#e07b54", "x": -300, "y": 0, "z": 60}, "selection": {"label": "Selection", "color": "#f1c40f", "x": 300, "y": 0, "z": 60}, "tools": {"label": "Tools", "color": "#00d4ff", "x": 280, "y": 200, "z": -80}, "app_ops": {"label": "App Ops / Runtime", "color": "#9b59b6", "x": 0, "y": 80, "z": 0}, "ui": {"label": "UI", "color": "#3498db", "x": -280, "y": 260, "z": -80}, "render": {"label": "Render", "color": "#1abc9c", "x": 160, "y": 120, "z": -200}};
+
+const clusterColor = Object.fromEntries(Object.entries(cluster).map(([k,v]) => [k, v.color]));
+const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+// ── Node radius by size ────────────────────────────────────────────────────
+function nodeRadius(size) {
+  const kb = size / 1024;
+  if (kb < 3)   return 3;
+  if (kb < 5)   return 4;
+  if (kb < 10)  return 5.5;
+  if (kb < 20)  return 7;
+  if (kb < 35)  return 9;
+  if (kb < 70)  return 12;
+  return 16;
+}
+
+// ── 3D Graph setup ──────────────────────────────────────────────────────────
+let particlesOn = true;
+
+const Graph = ForceGraph3D()
+  (document.getElementById('graph'))
+  .backgroundColor('#050510')
+  .showNavInfo(false)
+  .graphData({ nodes, links })
+  .nodeId('id')
+  .nodeLabel(() => '')                       // use custom tooltip instead
+  .nodeVal(d => Math.pow(nodeRadius(d.size), 2))
+  .nodeColor(d => clusterColor[d.cluster] ?? '#888')
+  .nodeOpacity(0.88)
+  .nodeResolution(16)
+  .nodeThreeObjectExtend(true)
+  .nodeThreeObject(node => {
+    const label = node.name.replace('.js', '');
+    const color = clusterColor[node.cluster] ?? '#ffffff';
+    const sprite = makeTextSprite(label, color);
+    const r = Math.sqrt(nodeRadius(node.size) ** 2); // approx nodeVal radius
+    sprite.position.set(0, Math.sqrt(nodeRadius(node.size)) * 2.5 + 4, 0);
+    return sprite;
+  })
+  // Links
+  .linkColor(l => {
+    const sc = clusterColor[nodeById.get(l.source.id ?? l.source)?.cluster] ?? '#4a7ac0';
+    return sc + '88';
+  })
+  .linkOpacity(0.4)
+  .linkWidth(0.5)
+  .linkDirectionalArrowLength(4)
+  .linkDirectionalArrowRelPos(1)
+  .linkDirectionalArrowColor(() => '#ffffff55')
+  .linkDirectionalParticles(particlesOn ? 1 : 0)
+  .linkDirectionalParticleWidth(1.2)
+  .linkDirectionalParticleColor(l => {
+    return clusterColor[nodeById.get(l.source.id ?? l.source)?.cluster] ?? '#ffd700';
+  })
+  .linkDirectionalParticleSpeed(0.006);
+
+// ── Custom cluster force ─────────────────────────────────────────────────────
+Graph.d3Force('cluster', alpha => {
+  const strength = 0.12;
+  nodes.forEach(d => {
+    const cp = cluster[d.cluster];
+    if (!cp) return;
+    d.vx += (cp.x - d.x) * strength * alpha;
+    d.vy += (cp.y - d.y) * strength * alpha;
+    d.vz += (cp.z - d.z) * strength * alpha;
+  });
+});
+
+// Adjust default forces
+Graph.d3Force('charge').strength(-120);
+Graph.d3Force('link').distance(70).strength(0.3);
+
+// ── Initial camera position ──────────────────────────────────────────────────
+Graph.cameraPosition({ x: 0, y: 0, z: 800 });
+
+// ── Tooltip ──────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById('tooltip');
+Graph.onNodeHover(node => {
+  document.body.style.cursor = node ? 'pointer' : 'default';
+  if (!node) { tooltip.style.display = 'none'; return; }
+  const outs = links.filter(l => (l.source.id ?? l.source) === node.id)
+    .map(l => nodeById.get(l.target.id ?? l.target)?.name ?? '?');
+  const ins  = links.filter(l => (l.target.id ?? l.target) === node.id)
+    .map(l => nodeById.get(l.source.id ?? l.source)?.name ?? '?');
+  tooltip.style.display = 'block';
+  tooltip.innerHTML = `
+    <b style="color:#9ecaed">${node.name}</b>
+    &nbsp;<span style="color:#888">[${cluster[node.cluster]?.label}]</span><br>
+    Size: <b>${(node.size/1024).toFixed(1)} KB</b><br>
+    Imports (${outs.length}): ${outs.length ? outs.map(n=>n.replace('.js','')).join(', ') : '<i style="color:#666">none</i>'}<br>
+    Used by (${ins.length}): ${ins.length ? ins.map(n=>n.replace('.js','')).join(', ') : '<i style="color:#666">none</i>'}
+  `;
+});
+document.addEventListener('mousemove', e => {
+  tooltip.style.left = (e.clientX + 16) + 'px';
+  tooltip.style.top  = (e.clientY - 12) + 'px';
+});
+
+// ── Click: highlight deps ────────────────────────────────────────────────────
+let highlighted = null;
+
+function resetHighlight() {
+  highlighted = null;
+  Graph
+    .nodeColor(d => clusterColor[d.cluster] ?? '#888')
+    .nodeOpacity(0.88)
+    .linkColor(l => {
+      const sc = clusterColor[nodeById.get(l.source.id ?? l.source)?.cluster] ?? '#4a7ac0';
+      return sc + '88';
+    })
+    .linkOpacity(0.4)
+    .linkWidth(0.5);
+}
+
+Graph.onNodeClick(node => {
+  if (highlighted === node.id) { resetHighlight(); return; }
+  highlighted = node.id;
+
+  const relNodes = new Set([node.id]);
+  const relLinks = new Set();
+  links.forEach(l => {
+    const s = l.source.id ?? l.source, t = l.target.id ?? l.target;
+    if (s === node.id || t === node.id) { relLinks.add(l); relNodes.add(s); relNodes.add(t); }
+  });
+
+  Graph
+    .nodeColor(d  => relNodes.has(d.id)  ? (clusterColor[d.cluster] ?? '#888') : '#333')
+    .nodeOpacity(d => relNodes.has(d.id) ? 1.0 : 0.08)
+    .linkColor(l  => relLinks.has(l) ? '#ffd700' : '#1a1a2a')
+    .linkOpacity(l => relLinks.has(l) ? 1.0 : 0.05)
+    .linkWidth(l  => relLinks.has(l) ? 1.5 : 0.3);
+
+  // Fly camera toward clicked node
+  const { x, y, z } = node;
+  const dist = 180;
+  Graph.cameraPosition({ x: x, y: y, z: z + dist }, node, 800);
+});
+
+// ── Cluster label sprites ─────────────────────────────────────────────────────
+// Add after sim settles
+setTimeout(() => {
+  const THREE = Graph.renderer().domElement.__three_scene ? THREE : window.THREE;
+  if (!window.THREE) return; // not available
+  const scene = Graph.scene();
+
+  Object.entries(cluster).forEach(([id, c]) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 256; canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    ctx.font = 'bold 22px monospace';
+    ctx.fillStyle = c.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(c.label, 128, 32);
+    const tex = new window.THREE.CanvasTexture(canvas);
+    const mat = new window.THREE.SpriteMaterial({ map: tex, transparent: true, opacity: 0.85 });
+    const sprite = new window.THREE.Sprite(mat);
+    sprite.scale.set(120, 30, 1);
+    sprite.position.set(c.x, c.y - 80, c.z);
+    scene.add(sprite);
+  });
+}, 4000);
+
+// ── Auto rotate ──────────────────────────────────────────────────────────────
+let autoRotate = false;
+function toggleAutoRotate() {
+  autoRotate = !autoRotate;
+  document.getElementById('btnAutoRotate').classList.toggle('active', autoRotate);
+  Graph.controls().autoRotate = autoRotate;
+  Graph.controls().autoRotateSpeed = 0.5;
+}
+
+function resetCamera() {
+  resetHighlight();
+  Graph.cameraPosition({ x: 0, y: 0, z: 800 }, { x: 0, y: 0, z: 0 }, 800);
+}
+
+function toggleParticles() {
+  particlesOn = !particlesOn;
+  Graph.linkDirectionalParticles(particlesOn ? 1 : 0);
+  const btn = document.getElementById('btnParticles');
+  btn.textContent = particlesOn ? 'Particles ON' : 'Particles OFF';
+  btn.classList.toggle('active', particlesOn);
+}
+</script>
+</body>
+</html>

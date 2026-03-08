@@ -827,13 +827,66 @@ export function pruneEmptyGroups(state) {
 }
 
 export function createGroupFromSelection(state, name) {
-  const ids = Array.from(new Set((state.selection.ids || []).map(Number)));
-  if (!ids.length) return null;
+  let ids = Array.from(new Set((state.selection.ids || []).map(Number).filter(Number.isFinite)));
+  if (!ids.length) {
+    const selectedGroupIds = Array.from(new Set((state.selection.groupIds || []).map(Number).filter(Number.isFinite)));
+    if (selectedGroupIds.length) {
+      const byParent = new Map();
+      for (const g of (state.groups || [])) {
+        const pid = g.parentId == null ? null : Number(g.parentId);
+        if (!byParent.has(pid)) byParent.set(pid, []);
+        byParent.get(pid).push(Number(g.id));
+      }
+      const byGroupId = new Map((state.groups || []).map(g => [Number(g.id), g]));
+      const groupSeen = new Set();
+      const shapeSet = new Set();
+      const stack = selectedGroupIds.slice();
+      while (stack.length) {
+        const gid = Number(stack.pop());
+        if (!Number.isFinite(gid) || groupSeen.has(gid)) continue;
+        groupSeen.add(gid);
+        const g = byGroupId.get(gid);
+        if (g) {
+          for (const sid of (g.shapeIds || [])) {
+            const n = Number(sid);
+            if (Number.isFinite(n)) shapeSet.add(n);
+          }
+        }
+        for (const cid of (byParent.get(gid) || [])) stack.push(Number(cid));
+      }
+      ids = Array.from(shapeSet);
+      if (ids.length) {
+        state.selection.ids = ids.slice();
+        state.selection.groupIds = [];
+      }
+    }
+  }
+  if (!ids.length) {
+    const id = state.nextGroupId++;
+    const cx = (Number(state.view?.offsetX) || 0) / Math.max(1e-9, Number(state.view?.scale) || 1);
+    const cy = (Number(state.view?.offsetY) || 0) / Math.max(1e-9, Number(state.view?.scale) || 1);
+    const gridStep = Math.max(1e-9, Number(state.grid?.size) || 10);
+    const group = {
+      id,
+      name: String(name || `Group ${id}`),
+      shapeIds: [],
+      visible: true,
+      parentId: null,
+      originX: Math.round(cx / gridStep) * gridStep,
+      originY: Math.round(cy / gridStep) * gridStep,
+      rotationDeg: 0,
+      aimConstraint: normalizeGroupAimConstraint(null),
+    };
+    state.groups.unshift(group);
+    state.activeGroupId = id;
+    state.selection.ids = [];
+    state.selection.groupIds = [id];
+    return group;
+  }
   const idSet = new Set(ids);
   for (const g of (state.groups || [])) {
     g.shapeIds = (g.shapeIds || []).filter((sid) => !ids.includes(Number(sid)));
   }
-  pruneEmptyGroups(state);
   const id = state.nextGroupId++;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const shapeIdSet = new Set(ids);

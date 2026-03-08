@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>s-cad Extrude Tool</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { display: flex; height: 100vh; background: #0e0e1a; color: #e0e0e0; font-family: monospace; overflow: hidden; }
+
+/* ── Sidebar ── */
+#sidebar {
+  width: 280px; min-width: 280px; background: #12121e;
+  border-right: 1px solid #2a2a4a; display: flex; flex-direction: column;
+  overflow: hidden;
+}
+#sidebar-header {
+  padding: 12px 14px; border-bottom: 1px solid #2a2a4a;
+  background: #0a0a18;
+}
+#sidebar-header h2 { font-size: 13px; color: #9ecaed; letter-spacing: .5px; margin-bottom: 8px; }
+#load-btn {
+  width: 100%; padding: 7px; background: #1a2a4a; border: 1px solid #3a6aaa;
+  color: #9ecaed; border-radius: 5px; cursor: pointer; font-size: 12px; font-family: monospace;
+}
+#load-btn:hover { background: #1e3a5a; }
+#file-input { display: none; }
+
+/* ── Global settings ── */
+#global-settings {
+  padding: 10px 14px; border-bottom: 1px solid #2a2a4a; font-size: 11.5px;
+}
+#global-settings .row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; }
+#global-settings label { color: #9ecaed; min-width: 80px; }
+#global-settings input[type=range] { flex: 1; accent-color: #3a8adf; }
+#global-settings input[type=number] { width: 58px; background: #1a1a2e; border: 1px solid #2a4a6a; color: #e0e0e0; padding: 3px 6px; border-radius: 4px; font-size: 11px; font-family: monospace; }
+.toggle-row { display: flex; gap: 5px; }
+.toggle-btn {
+  flex: 1; padding: 5px; background: #1a1a2e; border: 1px solid #2a4a6a;
+  color: #9ecaed; border-radius: 4px; cursor: pointer; font-size: 10.5px; font-family: monospace; text-align: center;
+}
+.toggle-btn.active { background: #1a3a6a; border-color: #5a9adf; }
+
+/* ── Shape list ── */
+#shape-list-header {
+  padding: 7px 14px; font-size: 10.5px; color: #666; border-bottom: 1px solid #1a1a2e;
+  display: flex; justify-content: space-between; align-items: center;
+}
+#shape-list-header span { color: #5a9adf; cursor: pointer; }
+#shape-list { flex: 1; overflow-y: auto; }
+#shape-list::-webkit-scrollbar { width: 5px; }
+#shape-list::-webkit-scrollbar-thumb { background: #2a2a4a; border-radius: 3px; }
+
+.shape-item {
+  padding: 8px 14px; border-bottom: 1px solid #1a1a2e;
+  display: flex; align-items: center; gap: 8px; cursor: pointer;
+}
+.shape-item:hover { background: #1a1a2e; }
+.shape-item.selected { background: #1a2a3a; }
+.shape-check { accent-color: #3a8adf; cursor: pointer; width: 14px; height: 14px; flex-shrink: 0; }
+.shape-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+.shape-info { flex: 1; min-width: 0; }
+.shape-label { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shape-sub { font-size: 10px; color: #666; }
+.shape-height {
+  width: 46px; background: #1a1a2e; border: 1px solid #2a4a6a; color: #e0e0e0;
+  padding: 2px 5px; border-radius: 3px; font-size: 10px; font-family: monospace;
+  text-align: right;
+}
+
+#empty-msg { padding: 40px 20px; text-align: center; color: #444; font-size: 12px; line-height: 1.8; }
+#status-bar { padding: 6px 14px; font-size: 10.5px; color: #666; border-top: 1px solid #1a1a2e; }
+
+/* ── Viewport ── */
+#viewport { flex: 1; position: relative; }
+#viewport canvas { display: block; width: 100% !important; height: 100% !important; }
+
+#drop-overlay {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 12px;
+  background: #0e0e1a; z-index: 5;
+}
+#drop-overlay.hidden { display: none; }
+#drop-zone {
+  border: 2px dashed #3a5a8a; border-radius: 12px; padding: 50px 60px;
+  text-align: center; color: #5a8a9a; transition: border-color .15s, background .15s;
+}
+#drop-zone.drag-over { border-color: #5a9adf; background: #1a2a3a; }
+#drop-zone h3 { font-size: 16px; margin-bottom: 8px; color: #9ecaed; }
+#drop-zone p { font-size: 12px; margin-bottom: 16px; }
+#drop-load-btn {
+  padding: 8px 20px; background: #1a2a4a; border: 1px solid #3a6aaa;
+  color: #9ecaed; border-radius: 5px; cursor: pointer; font-size: 12px; font-family: monospace;
+}
+#drop-load-btn:hover { background: #1e3a5a; }
+
+/* hud */
+#hud {
+  position: absolute; bottom: 14px; right: 14px; font-size: 10.5px;
+  color: #444; text-align: right; pointer-events: none;
+}
+</style>
+</head>
+<body>
+
+<!-- ── Sidebar ── -->
+<div id="sidebar">
+  <div id="sidebar-header">
+    <h2>s-cad Extrude Tool</h2>
+    <button id="load-btn" onclick="document.getElementById('file-input').click()">📂 JSONを開く</button>
+    <input type="file" id="file-input" accept=".json,application/json">
+  </div>
+
+  <div id="global-settings">
+    <div class="row">
+      <label>全体高さ</label>
+      <input type="range" id="global-height-range" min="1" max="500" value="30" oninput="onGlobalHeight(this.value)">
+      <input type="number" id="global-height-num" value="30" min="1" max="9999" onchange="onGlobalHeight(this.value)">
+    </div>
+    <div class="toggle-row">
+      <div class="toggle-btn active" id="btn-solid"     onclick="setMaterial('solid')">Solid</div>
+      <div class="toggle-btn"        id="btn-wireframe" onclick="setMaterial('wireframe')">Wire</div>
+      <div class="toggle-btn"        id="btn-both"      onclick="setMaterial('both')">Both</div>
+    </div>
+  </div>
+
+  <div id="shape-list-header">
+    <span id="shape-count">0 shapes</span>
+    <span onclick="toggleAllShapes()">全選択/解除</span>
+  </div>
+  <div id="shape-list">
+    <div id="empty-msg">ここにs-cad JSONを<br>ドロップするか<br>「JSONを開く」で<br>ファイルを選択</div>
+  </div>
+  <div id="status-bar">Ready</div>
+</div>
+
+<!-- ── Viewport ── -->
+<div id="viewport">
+  <div id="drop-overlay">
+    <div id="drop-zone">
+      <h3>s-cad JSON をドロップ</h3>
+      <p>または</p>
+      <button id="drop-load-btn" onclick="document.getElementById('file-input').click()">📂 ファイルを選択</button>
+    </div>
+  </div>
+  <div id="hud">左ドラッグ: 回転 | 右ドラッグ: パン | ホイール: ズーム</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+// ═══════════════════════════════════════════════════════════
+// Three.js Setup
+// ═══════════════════════════════════════════════════════════
+const viewport = document.getElementById('viewport');
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+viewport.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0e0e1a);
+scene.fog = new THREE.Fog(0x0e0e1a, 2000, 8000);
+
+const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 20000);
+camera.position.set(0, 300, 600);
+
+const controls = new THREE.OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+// Lights
+scene.add(new THREE.AmbientLight(0x8080c0, 0.6));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+dirLight.position.set(300, 500, 300);
+dirLight.castShadow = true;
+dirLight.shadow.mapSize.set(2048, 2048);
+scene.add(dirLight);
+const dirLight2 = new THREE.DirectionalLight(0x6090ff, 0.4);
+dirLight2.position.set(-200, 200, -200);
+scene.add(dirLight2);
+
+// Grid
+const gridHelper = new THREE.GridHelper(2000, 40, 0x1a1a3a, 0x1a1a3a);
+scene.add(gridHelper);
+
+// Resize
+function resizeRenderer() {
+  const w = viewport.clientWidth, h = viewport.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+resizeRenderer();
+new ResizeObserver(resizeRenderer).observe(viewport);
+
+// Animate
+(function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+
+// ═══════════════════════════════════════════════════════════
+// State
+// ═══════════════════════════════════════════════════════════
+let extrudableItems = [];  // { id, type, label, sub, color, pts|cx,cy,r, height, enabled, mesh }
+let materialMode = 'solid';
+let globalHeight = 30;
+let cadModel = null;
+
+const meshGroup = new THREE.Group();
+scene.add(meshGroup);
+
+// ═══════════════════════════════════════════════════════════
+// File loading
+// ═══════════════════════════════════════════════════════════
+document.getElementById('file-input').addEventListener('change', e => {
+  const file = e.target.files[0];
+  if (file) loadFile(file);
+  e.target.value = '';
+});
+
+// Drag & drop on viewport
+const dropOverlay = document.getElementById('drop-overlay');
+const dropZone = document.getElementById('drop-zone');
+
+document.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+document.addEventListener('dragleave', e => { if (!e.relatedTarget) dropZone.classList.remove('drag-over'); });
+document.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) loadFile(file);
+});
+
+function loadFile(file) {
+  setStatus('読み込み中...');
+  const reader = new FileReader();
+  reader.onload = ev => {
+    try {
+      const data = JSON.parse(ev.target.result);
+      if (data.format !== 's-cad') throw new Error('s-cad JSONではありません');
+      parseAndBuild(data);
+      dropOverlay.classList.add('hidden');
+    } catch(err) {
+      setStatus('Error: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Parse s-cad data
+// ═══════════════════════════════════════════════════════════
+function parseAndBuild(data) {
+  cadModel = data;
+  const model = data.model || {};
+  const shapes = model.shapes || [];
+  const layers = {};
+  for (const l of (model.layers || [])) layers[l.id] = l;
+
+  extrudableItems = [];
+
+  // ── rect shapes ──
+  for (const s of shapes) {
+    if (s.type !== 'rect') continue;
+    const x1 = Math.min(s.x1, s.x2), y1 = Math.min(s.y1, s.y2);
+    const x2 = Math.max(s.x1, s.x2), y2 = Math.max(s.y1, s.y2);
+    const w = Math.round(x2 - x1), h = Math.round(y2 - y1);
+    const color = resolveColor(s, layers);
+    extrudableItems.push({
+      id: `rect_${s.id}`, type: 'polygon', label: `Rect ${w}×${h}`,
+      sub: layerName(s, layers), color,
+      pts: [{x:x1,y:y1},{x:x2,y:y1},{x:x2,y:y2},{x:x1,y:y2}],
+      height: globalHeight, enabled: true, mesh: null,
+    });
+  }
+
+  // ── circle shapes ──
+  for (const s of shapes) {
+    if (s.type !== 'circle') continue;
+    const color = resolveColor(s, layers);
+    extrudableItems.push({
+      id: `circle_${s.id}`, type: 'circle', label: `Circle r=${Math.round(s.r)}`,
+      sub: layerName(s, layers), color,
+      cx: s.cx, cy: s.cy, r: s.r,
+      height: globalHeight, enabled: true, mesh: null,
+    });
+  }
+
+  // ── line → closed polygons ──
+  const lines = shapes.filter(s => s.type === 'line');
+  const polygons = detectClosedPolygons(lines);
+  for (const poly of polygons) {
+    const color = poly.color || '#e74c3c';
+    extrudableItems.push({
+      id: `poly_${Math.random().toString(36).slice(2)}`, type: 'polygon',
+      label: `Polygon ${poly.pts.length}pts`,
+      sub: poly.layerName, color,
+      pts: poly.pts,
+      height: globalHeight, enabled: true, mesh: null,
+    });
+  }
+
+  setStatus(`${extrudableItems.length} 個の押し出し対象を検出`);
+  document.getElementById('shape-count').textContent = `${extrudableItems.length} shapes`;
+  renderSidebar();
+  rebuildMeshes();
+  fitCamera();
+}
+
+function resolveColor(shape, layers) {
+  if (shape.color && shape.color !== '#0f172a' && shape.color !== '#000000') return shape.color;
+  const layer = layers[shape.layerId];
+  if (layer?.color) return layer.color;
+  return '#4a9adf';
+}
+
+function layerName(shape, layers) {
+  return layers[shape.layerId]?.name || 'Default Layer';
+}
+
+// ═══════════════════════════════════════════════════════════
+// Closed polygon detection from line segments
+// ═══════════════════════════════════════════════════════════
+function detectClosedPolygons(lines, eps = 0.5) {
+  if (!lines.length) return [];
+
+  // Snap key for a point
+  const key = (x, y) => `${Math.round(x/eps)},${Math.round(y/eps)}`;
+
+  // Collect unique vertices
+  const vertexMap = new Map(); // key → {x, y, id}
+  let nextId = 0;
+  function vertex(x, y) {
+    const k = key(x, y);
+    if (!vertexMap.has(k)) vertexMap.set(k, { x, y, id: nextId++, lines: [] });
+    return vertexMap.get(k);
+  }
+
+  // Build edges
+  const edges = [];
+  for (const line of lines) {
+    const a = vertex(line.x1, line.y1);
+    const b = vertex(line.x2, line.y2);
+    if (a.id === b.id) continue;
+    a.lines.push({ other: b, srcLine: line });
+    b.lines.push({ other: a, srcLine: line });
+    edges.push({ a, b, line });
+  }
+
+  const vertices = [...vertexMap.values()];
+
+  // Find connected components where every vertex has degree 2
+  const visited = new Set();
+  const polygons = [];
+
+  for (const startV of vertices) {
+    if (visited.has(startV.id)) continue;
+
+    // BFS to find connected component
+    const component = [];
+    const queue = [startV];
+    const seen = new Set([startV.id]);
+    while (queue.length) {
+      const v = queue.shift();
+      component.push(v);
+      for (const { other } of v.lines) {
+        if (!seen.has(other.id)) { seen.add(other.id); queue.push(other); }
+      }
+    }
+    for (const v of component) visited.add(v.id);
+
+    // Valid closed polygon: every vertex has exactly degree 2
+    if (component.length < 3) continue;
+    if (!component.every(v => v.lines.length === 2)) continue;
+
+    // Trace the polygon in order
+    const traced = [];
+    const usedV = new Set();
+    let curr = component[0];
+    let prev = null;
+    while (true) {
+      traced.push(curr);
+      usedV.add(curr.id);
+      const next = curr.lines.find(e => e.other.id !== (prev?.id ?? -1) && !usedV.has(e.other.id));
+      if (!next) break;
+      prev = curr;
+      curr = next.other;
+    }
+
+    if (traced.length !== component.length) continue;
+
+    // Get layer color from first line in component
+    const srcLine = component[0].lines[0]?.srcLine;
+    polygons.push({
+      pts: traced.map(v => ({ x: v.x, y: v.y })),
+      color: '#e07b54',  // lines don't carry individual colors easily; use default
+      layerName: 'Line group',
+    });
+  }
+
+  return polygons;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Mesh building
+// ═══════════════════════════════════════════════════════════
+function rebuildMeshes() {
+  // Remove old meshes
+  while (meshGroup.children.length) {
+    const m = meshGroup.children[0];
+    m.geometry?.dispose();
+    meshGroup.remove(m);
+  }
+
+  for (const item of extrudableItems) {
+    item.mesh = null;
+    if (!item.enabled) continue;
+    const mesh = buildMesh(item);
+    if (mesh) { meshGroup.add(mesh); item.mesh = mesh; }
+  }
+}
+
+function buildMesh(item) {
+  const h = Math.max(0.5, Number(item.height) || globalHeight);
+  const color = new THREE.Color(item.color);
+  const extrudeSettings = { depth: h, bevelEnabled: false };
+
+  let geometry = null;
+
+  if (item.type === 'circle') {
+    // Use THREE.Shape with circle
+    const shape = new THREE.Shape();
+    shape.absarc(item.cx, -item.cy, item.r, 0, Math.PI * 2, false);
+    geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+
+  } else if (item.type === 'polygon' && item.pts?.length >= 3) {
+    const shape = new THREE.Shape();
+    // s-cad Y is down, Three.js Y is up → flip Y
+    shape.moveTo(item.pts[0].x, -item.pts[0].y);
+    for (let i = 1; i < item.pts.length; i++) {
+      shape.lineTo(item.pts[i].x, -item.pts[i].y);
+    }
+    shape.closePath();
+    try {
+      geometry = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+    } catch(e) {
+      return null;
+    }
+  }
+
+  if (!geometry) return null;
+
+  const group = new THREE.Group();
+
+  if (materialMode === 'solid' || materialMode === 'both') {
+    const mat = new THREE.MeshPhongMaterial({
+      color, transparent: true, opacity: 0.82,
+      shininess: 60, specular: 0x222244,
+    });
+    const mesh = new THREE.Mesh(geometry, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
+
+  if (materialMode === 'wireframe' || materialMode === 'both') {
+    const wMat = new THREE.MeshBasicMaterial({ color, wireframe: true, opacity: 0.4, transparent: true });
+    const wMesh = new THREE.Mesh(geometry, wMat);
+    group.add(wMesh);
+  }
+
+  // Edges outline
+  const edgesGeo = new THREE.EdgesGeometry(geometry);
+  const edgeMat = new THREE.LineBasicMaterial({ color: new THREE.Color(item.color).multiplyScalar(1.5) });
+  group.add(new THREE.LineSegments(edgesGeo, edgeMat));
+
+  group.position.z = 0;
+  return group;
+}
+
+// ═══════════════════════════════════════════════════════════
+// Camera fit
+// ═══════════════════════════════════════════════════════════
+function fitCamera() {
+  if (!meshGroup.children.length) return;
+  const box = new THREE.Box3().setFromObject(meshGroup);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const dist = maxDim * 1.8;
+  controls.target.copy(center);
+  camera.position.set(center.x + dist * 0.6, center.y + dist * 0.5, center.z + dist * 0.8);
+  camera.lookAt(center);
+  controls.update();
+  gridHelper.position.set(center.x, box.min.y, center.z);
+}
+
+// ═══════════════════════════════════════════════════════════
+// Sidebar rendering
+// ═══════════════════════════════════════════════════════════
+function renderSidebar() {
+  const list = document.getElementById('shape-list');
+  if (!extrudableItems.length) {
+    list.innerHTML = '<div id="empty-msg">押し出し対象が見つかりませんでした</div>';
+    return;
+  }
+  list.innerHTML = extrudableItems.map((item, i) => `
+    <div class="shape-item" id="si_${i}" onclick="selectShape(${i})">
+      <input type="checkbox" class="shape-check" ${item.enabled ? 'checked' : ''}
+             onclick="event.stopPropagation(); toggleShape(${i}, this.checked)">
+      <div class="shape-dot" style="background:${item.color}"></div>
+      <div class="shape-info">
+        <div class="shape-label">${item.label}</div>
+        <div class="shape-sub">${item.sub}</div>
+      </div>
+      <input type="number" class="shape-height" value="${item.height}" min="0.1" max="9999"
+             onclick="event.stopPropagation()"
+             onchange="setItemHeight(${i}, this.value)"
+             title="押し出し高さ">
+    </div>
+  `).join('');
+}
+
+function selectShape(i) {
+  document.querySelectorAll('.shape-item').forEach((el, j) => {
+    el.classList.toggle('selected', j === i);
+  });
+  // Flash the mesh
+  const item = extrudableItems[i];
+  if (item?.mesh) {
+    const origPos = item.mesh.position.z;
+    item.mesh.position.z = 10;
+    setTimeout(() => { if (item.mesh) item.mesh.position.z = origPos; }, 200);
+  }
+}
+
+function toggleShape(i, checked) {
+  extrudableItems[i].enabled = checked;
+  rebuildMeshes();
+  setStatus(checked ? `${extrudableItems[i].label} を表示` : `${extrudableItems[i].label} を非表示`);
+}
+
+function setItemHeight(i, val) {
+  extrudableItems[i].height = Math.max(0.1, Number(val) || 1);
+  rebuildMeshes();
+}
+
+function toggleAllShapes() {
+  const anyEnabled = extrudableItems.some(it => it.enabled);
+  extrudableItems.forEach(it => it.enabled = !anyEnabled);
+  renderSidebar();
+  rebuildMeshes();
+}
+
+// ═══════════════════════════════════════════════════════════
+// Global controls
+// ═══════════════════════════════════════════════════════════
+function onGlobalHeight(val) {
+  globalHeight = Math.max(0.1, Number(val) || 1);
+  document.getElementById('global-height-range').value = Math.min(500, globalHeight);
+  document.getElementById('global-height-num').value = globalHeight;
+  // Apply to all items that haven't been individually overridden
+  extrudableItems.forEach(it => it.height = globalHeight);
+  renderSidebar();
+  rebuildMeshes();
+}
+
+function setMaterial(mode) {
+  materialMode = mode;
+  ['solid','wireframe','both'].forEach(m => {
+    document.getElementById(`btn-${m}`).classList.toggle('active', m === mode);
+  });
+  rebuildMeshes();
+}
+
+function setStatus(msg) {
+  document.getElementById('status-bar').textContent = msg;
+}
+</script>
+</body>
+</html>

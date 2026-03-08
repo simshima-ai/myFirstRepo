@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>s-cad dependency graph</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #0e0e1a; color: #e0e0e0; font-family: monospace; overflow: hidden; }
+svg { width: 100vw; height: 100vh; display: block; }
+.hull { fill-opacity: 0.18; stroke-width: 2; stroke-opacity: 0.7; stroke-dasharray: 6 3; }
+.cluster-label { font-size: 13px; font-weight: bold; fill-opacity: 0.85; pointer-events: none; letter-spacing: 0.5px; }
+.link { stroke-opacity: 0.45; fill: none; }
+.node circle { stroke-width: 1.2; cursor: pointer; transition: stroke-width 0.1s; }
+.node text {
+  font-size: 9px; fill: #ddd; pointer-events: none;
+  paint-order: stroke; stroke: #0a0a18; stroke-width: 3.5px; stroke-linejoin: round;
+}
+.node:hover circle { stroke-width: 3; }
+#tooltip {
+  position: fixed; background: #0a0f1e; border: 1px solid #3a5a8a;
+  padding: 9px 13px; border-radius: 7px; font-size: 12px; pointer-events: none;
+  display: none; z-index: 20; max-width: 340px; line-height: 1.6;
+  box-shadow: 0 4px 16px #0008;
+}
+#legend-size {
+  position: fixed; bottom: 16px; left: 16px; background: #0a0f1ecc;
+  border: 1px solid #3a5a8a; border-radius: 7px; padding: 10px 14px; font-size: 11px;
+}
+#legend-size h4 { margin-bottom: 7px; color: #9ecaed; font-size: 11px; }
+.lrow { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+.lcirc { border-radius: 50%; background: #888; border: 1px solid #fff9; flex-shrink: 0; }
+#legend-cluster {
+  position: fixed; bottom: 16px; right: 16px; background: #0a0f1ecc;
+  border: 1px solid #3a5a8a; border-radius: 7px; padding: 10px 14px; font-size: 11px;
+  max-width: 200px;
+}
+#legend-cluster h4 { margin-bottom: 7px; color: #9ecaed; font-size: 11px; }
+.crow { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.cswatch { width: 12px; height: 12px; border-radius: 3px; flex-shrink: 0; }
+#info {
+  position: fixed; top: 14px; left: 50%; transform: translateX(-50%);
+  background: #0a0f1ecc; border: 1px solid #3a5a8a; border-radius: 7px;
+  padding: 5px 18px; font-size: 11.5px; color: #9ecaed; white-space: nowrap;
+}
+#controls {
+  position: fixed; top: 14px; right: 14px;
+  display: flex; flex-direction: column; gap: 5px;
+}
+#controls button {
+  background: #0a0f1e; border: 1px solid #3a5a8a; color: #9ecaed;
+  padding: 5px 11px; border-radius: 5px; cursor: pointer; font-size: 11px;
+}
+#controls button:hover { background: #1a2a4a; }
+</style>
+</head>
+<body>
+<svg id="svg"></svg>
+<div id="tooltip"></div>
+<div id="info">Scroll: zoom &nbsp;|&nbsp; Drag: pan / move node &nbsp;|&nbsp; Click node: highlight deps</div>
+<div id="legend-size">
+  <h4>Node size = file size</h4>
+  <div class="lrow"><div class="lcirc" style="width:8px;height:8px"></div>&lt; 5 KB</div>
+  <div class="lrow"><div class="lcirc" style="width:12px;height:12px"></div>5–15 KB</div>
+  <div class="lrow"><div class="lcirc" style="width:18px;height:18px"></div>15–35 KB</div>
+  <div class="lrow"><div class="lcirc" style="width:24px;height:24px"></div>35–70 KB</div>
+  <div class="lrow"><div class="lcirc" style="width:30px;height:30px"></div>&gt; 70 KB</div>
+</div>
+<div id="legend-cluster">
+  <h4>Cluster groups</h4>
+  <div class="crow"><div class="cswatch" style="background:#2ecc71"></div><span>Core / Geometry</span></div>
+  <div class="crow"><div class="cswatch" style="background:#e74c3c"></div><span>App Core</span></div>
+  <div class="crow"><div class="cswatch" style="background:#e07b54"></div><span>Input</span></div>
+  <div class="crow"><div class="cswatch" style="background:#e0b554"></div><span>Selection</span></div>
+  <div class="crow"><div class="cswatch" style="background:#54c8e0"></div><span>Tools</span></div>
+  <div class="crow"><div class="cswatch" style="background:#9b59b6"></div><span>App Ops / Runtime</span></div>
+  <div class="crow"><div class="cswatch" style="background:#3498db"></div><span>UI</span></div>
+  <div class="crow"><div class="cswatch" style="background:#1abc9c"></div><span>Render</span></div>
+</div>
+<div id="controls">
+  <button onclick="resetZoom()">Reset view</button>
+  <button onclick="toggleLabels()">Toggle labels</button>
+  <button onclick="toggleHulls()">Toggle groups</button>
+  <button onclick="reheat()">Reheat sim</button>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+const nodes   = [{"id": 0, "name": "app.js", "size": 29933, "cluster": "app_core"}, {"id": 1, "name": "app_aim_utils.js", "size": 4860, "cluster": "app_ops"}, {"id": 2, "name": "app_attribute_ops.js", "size": 2038, "cluster": "app_ops"}, {"id": 3, "name": "app_circle3p.js", "size": 2839, "cluster": "app_ops"}, {"id": 4, "name": "app_clipboard_ops.js", "size": 3511, "cluster": "app_core"}, {"id": 5, "name": "app_document_ops.js", "size": 2704, "cluster": "app_core"}, {"id": 6, "name": "app_dom.js", "size": 17366, "cluster": "app_ops"}, {"id": 7, "name": "app_doubleline_ops.js", "size": 3244, "cluster": "app_ops"}, {"id": 8, "name": "app_draw_runtime.js", "size": 4308, "cluster": "app_ops"}, {"id": 9, "name": "app_duplicate_utils.js", "size": 8513, "cluster": "app_ops"}, {"id": 10, "name": "app_file_ops.js", "size": 4205, "cluster": "app_core"}, {"id": 11, "name": "app_group_aim_ops.js", "size": 4145, "cluster": "app_ops"}, {"id": 12, "name": "app_group_aim_runtime.js", "size": 4885, "cluster": "app_ops"}, {"id": 13, "name": "app_group_structure_ops.js", "size": 1922, "cluster": "app_ops"}, {"id": 14, "name": "app_history_view_ops.js", "size": 1457, "cluster": "app_ops"}, {"id": 15, "name": "app_input.js", "size": 414, "cluster": "input"}, {"id": 16, "name": "app_input_anchor_utils.js", "size": 1776, "cluster": "input"}, {"id": 17, "name": "app_input_bspline.js", "size": 2122, "cluster": "input"}, {"id": 18, "name": "app_input_coords.js", "size": 1204, "cluster": "input"}, {"id": 19, "name": "app_input_fillet.js", "size": 4711, "cluster": "input"}, {"id": 20, "name": "app_input_keyboard.js", "size": 9090, "cluster": "input"}, {"id": 21, "name": "app_input_mode_utils.js", "size": 777, "cluster": "input"}, {"id": 22, "name": "app_input_pointer_draw.js", "size": 8215, "cluster": "input"}, {"id": 23, "name": "app_input_pointer_select.js", "size": 4987, "cluster": "input"}, {"id": 24, "name": "app_input_setup.js", "size": 39309, "cluster": "input"}, {"id": 25, "name": "app_input_shortcuts.js", "size": 884, "cluster": "input"}, {"id": 26, "name": "app_input_snap.js", "size": 955, "cluster": "input"}, {"id": 27, "name": "app_input_tail_events.js", "size": 2956, "cluster": "input"}, {"id": 28, "name": "app_input_touch.js", "size": 3422, "cluster": "input"}, {"id": 29, "name": "app_input_viewport.js", "size": 1731, "cluster": "input"}, {"id": 30, "name": "app_layer_group_ops.js", "size": 4288, "cluster": "app_ops"}, {"id": 31, "name": "app_persistence.js", "size": 10500, "cluster": "app_core"}, {"id": 32, "name": "app_selection.js", "size": 37673, "cluster": "selection"}, {"id": 33, "name": "app_selection_box_ops.js", "size": 14764, "cluster": "selection"}, {"id": 34, "name": "app_selection_dim_handles.js", "size": 14755, "cluster": "selection"}, {"id": 35, "name": "app_selection_group_transform_ops.js", "size": 14171, "cluster": "selection"}, {"id": 36, "name": "app_selection_group_tree.js", "size": 4084, "cluster": "selection"}, {"id": 37, "name": "app_selection_hit_test.js", "size": 9993, "cluster": "selection"}, {"id": 38, "name": "app_selection_trim_fillet_hover.js", "size": 13460, "cluster": "selection"}, {"id": 39, "name": "app_selection_vertex_ops.js", "size": 28577, "cluster": "selection"}, {"id": 40, "name": "app_selection_visibility_ops.js", "size": 4410, "cluster": "selection"}, {"id": 41, "name": "app_tool_switch_ops.js", "size": 1745, "cluster": "app_ops"}, {"id": 42, "name": "app_tools.js", "size": 2425, "cluster": "tools"}, {"id": 43, "name": "app_tools_export.js", "size": 39810, "cluster": "tools"}, {"id": 44, "name": "app_tools_fillet.js", "size": 36270, "cluster": "tools"}, {"id": 45, "name": "app_tools_misc.js", "size": 18831, "cluster": "tools"}, {"id": 46, "name": "app_tools_patterncopy.js", "size": 19765, "cluster": "tools"}, {"id": 47, "name": "app_tools_settings.js", "size": 19215, "cluster": "tools"}, {"id": 48, "name": "app_tools_structure.js", "size": 7786, "cluster": "tools"}, {"id": 49, "name": "app_tools_trim_dim.js", "size": 32293, "cluster": "tools"}, {"id": 50, "name": "app_ui_prefs_ops.js", "size": 2863, "cluster": "app_ops"}, {"id": 51, "name": "app_unit_page.js", "size": 7219, "cluster": "app_core"}, {"id": 52, "name": "app_view_runtime.js", "size": 2608, "cluster": "app_ops"}, {"id": 53, "name": "bspline_utils.js", "size": 1509, "cluster": "core"}, {"id": 54, "name": "dim_geom.js", "size": 14847, "cluster": "core"}, {"id": 55, "name": "dline_geom.js", "size": 34856, "cluster": "core"}, {"id": 56, "name": "geom.js", "size": 6142, "cluster": "core"}, {"id": 57, "name": "hatch_geom.js", "size": 14312, "cluster": "core"}, {"id": 58, "name": "modify.js", "size": 7777, "cluster": "core"}, {"id": 59, "name": "render.js", "size": 25281, "cluster": "render"}, {"id": 60, "name": "render_bounds.js", "size": 5476, "cluster": "render"}, {"id": 61, "name": "render_dimension.js", "size": 15830, "cluster": "render"}, {"id": 62, "name": "render_doubleline_overlay.js", "size": 2823, "cluster": "render"}, {"id": 63, "name": "render_grid.js", "size": 2417, "cluster": "render"}, {"id": 64, "name": "render_group_overlay.js", "size": 2179, "cluster": "render"}, {"id": 65, "name": "render_handles.js", "size": 15900, "cluster": "render"}, {"id": 66, "name": "render_hatch.js", "size": 6454, "cluster": "render"}, {"id": 67, "name": "render_helpers.js", "size": 5058, "cluster": "render"}, {"id": 68, "name": "render_overlay.js", "size": 14867, "cluster": "render"}, {"id": 69, "name": "render_preview.js", "size": 12626, "cluster": "render"}, {"id": 70, "name": "render_view_helpers.js", "size": 4547, "cluster": "render"}, {"id": 71, "name": "solvers.js", "size": 41830, "cluster": "core"}, {"id": 72, "name": "state.js", "size": 31487, "cluster": "core"}, {"id": 73, "name": "ui.js", "size": 863, "cluster": "ui"}, {"id": 74, "name": "ui_attr_panel.js", "size": 4334, "cluster": "ui"}, {"id": 75, "name": "ui_bindings.js", "size": 16506, "cluster": "ui"}, {"id": 76, "name": "ui_color_palette.js", "size": 13975, "cluster": "ui"}, {"id": 77, "name": "ui_context_help.js", "size": 5147, "cluster": "ui"}, {"id": 78, "name": "ui_context_panels.js", "size": 3041, "cluster": "ui"}, {"id": 79, "name": "ui_group_context.js", "size": 5711, "cluster": "ui"}, {"id": 80, "name": "ui_group_list_panel.js", "size": 19360, "cluster": "ui"}, {"id": 81, "name": "ui_i18n.js", "size": 38221, "cluster": "ui"}, {"id": 82, "name": "ui_init_group_list_events.js", "size": 14599, "cluster": "ui"}, {"id": 83, "name": "ui_init_main.js", "size": 33279, "cluster": "ui"}, {"id": 84, "name": "ui_init_tail_events.js", "size": 14328, "cluster": "ui"}, {"id": 85, "name": "ui_layout_context.js", "size": 4892, "cluster": "ui"}, {"id": 86, "name": "ui_left_menu_core.js", "size": 4013, "cluster": "ui"}, {"id": 87, "name": "ui_menu_visibility.js", "size": 2849, "cluster": "ui"}, {"id": 88, "name": "ui_numeric.js", "size": 2978, "cluster": "ui"}, {"id": 89, "name": "ui_refresh_layers.js", "size": 10580, "cluster": "ui"}, {"id": 90, "name": "ui_refresh_main.js", "size": 6538, "cluster": "ui"}, {"id": 91, "name": "ui_refresh_selection_group.js", "size": 18565, "cluster": "ui"}, {"id": 92, "name": "ui_refresh_settings.js", "size": 15672, "cluster": "ui"}, {"id": 93, "name": "ui_refresh_tool_panels.js", "size": 11770, "cluster": "ui"}, {"id": 94, "name": "ui_shortcuts_panel.js", "size": 2292, "cluster": "ui"}, {"id": 95, "name": "ui_status_bar.js", "size": 4032, "cluster": "ui"}, {"id": 96, "name": "ui_tool_param_events.js", "size": 12957, "cluster": "ui"}];
+const links   = [{"source": 0, "target": 72}, {"source": 0, "target": 59}, {"source": 0, "target": 73}, {"source": 0, "target": 57}, {"source": 0, "target": 71}, {"source": 0, "target": 32}, {"source": 0, "target": 42}, {"source": 0, "target": 15}, {"source": 0, "target": 56}, {"source": 0, "target": 51}, {"source": 0, "target": 1}, {"source": 0, "target": 9}, {"source": 0, "target": 3}, {"source": 0, "target": 12}, {"source": 0, "target": 31}, {"source": 0, "target": 10}, {"source": 0, "target": 8}, {"source": 0, "target": 52}, {"source": 0, "target": 4}, {"source": 0, "target": 5}, {"source": 0, "target": 11}, {"source": 0, "target": 13}, {"source": 0, "target": 50}, {"source": 0, "target": 40}, {"source": 0, "target": 2}, {"source": 0, "target": 7}, {"source": 0, "target": 41}, {"source": 0, "target": 14}, {"source": 0, "target": 30}, {"source": 0, "target": 6}, {"source": 9, "target": 1}, {"source": 15, "target": 18}, {"source": 15, "target": 24}, {"source": 18, "target": 56}, {"source": 19, "target": 42}, {"source": 24, "target": 72}, {"source": 24, "target": 18}, {"source": 24, "target": 32}, {"source": 24, "target": 42}, {"source": 24, "target": 71}, {"source": 24, "target": 55}, {"source": 24, "target": 29}, {"source": 24, "target": 25}, {"source": 24, "target": 21}, {"source": 24, "target": 28}, {"source": 24, "target": 20}, {"source": 24, "target": 17}, {"source": 24, "target": 16}, {"source": 24, "target": 19}, {"source": 24, "target": 26}, {"source": 24, "target": 27}, {"source": 24, "target": 23}, {"source": 24, "target": 22}, {"source": 25, "target": 72}, {"source": 32, "target": 72}, {"source": 32, "target": 71}, {"source": 32, "target": 56}, {"source": 32, "target": 54}, {"source": 32, "target": 57}, {"source": 32, "target": 36}, {"source": 32, "target": 53}, {"source": 32, "target": 34}, {"source": 32, "target": 33}, {"source": 32, "target": 38}, {"source": 32, "target": 39}, {"source": 32, "target": 37}, {"source": 32, "target": 35}, {"source": 34, "target": 72}, {"source": 34, "target": 71}, {"source": 34, "target": 56}, {"source": 34, "target": 54}, {"source": 36, "target": 72}, {"source": 42, "target": 55}, {"source": 42, "target": 44}, {"source": 42, "target": 45}, {"source": 42, "target": 49}, {"source": 42, "target": 47}, {"source": 42, "target": 48}, {"source": 42, "target": 43}, {"source": 42, "target": 46}, {"source": 43, "target": 72}, {"source": 43, "target": 56}, {"source": 43, "target": 54}, {"source": 43, "target": 57}, {"source": 44, "target": 72}, {"source": 44, "target": 71}, {"source": 44, "target": 32}, {"source": 45, "target": 72}, {"source": 45, "target": 32}, {"source": 46, "target": 72}, {"source": 46, "target": 71}, {"source": 46, "target": 32}, {"source": 47, "target": 32}, {"source": 48, "target": 72}, {"source": 48, "target": 32}, {"source": 49, "target": 71}, {"source": 49, "target": 56}, {"source": 49, "target": 72}, {"source": 49, "target": 45}, {"source": 54, "target": 56}, {"source": 55, "target": 72}, {"source": 55, "target": 71}, {"source": 55, "target": 56}, {"source": 57, "target": 56}, {"source": 57, "target": 53}, {"source": 58, "target": 72}, {"source": 58, "target": 57}, {"source": 59, "target": 56}, {"source": 59, "target": 54}, {"source": 59, "target": 57}, {"source": 59, "target": 42}, {"source": 59, "target": 63}, {"source": 59, "target": 70}, {"source": 59, "target": 69}, {"source": 59, "target": 61}, {"source": 59, "target": 68}, {"source": 59, "target": 65}, {"source": 59, "target": 66}, {"source": 59, "target": 62}, {"source": 59, "target": 60}, {"source": 59, "target": 64}, {"source": 59, "target": 53}, {"source": 61, "target": 56}, {"source": 63, "target": 56}, {"source": 70, "target": 56}, {"source": 73, "target": 83}, {"source": 73, "target": 90}, {"source": 83, "target": 75}, {"source": 83, "target": 76}, {"source": 83, "target": 96}, {"source": 83, "target": 86}, {"source": 83, "target": 81}, {"source": 83, "target": 88}, {"source": 83, "target": 90}, {"source": 83, "target": 84}, {"source": 83, "target": 82}, {"source": 84, "target": 96}, {"source": 90, "target": 72}, {"source": 90, "target": 74}, {"source": 90, "target": 78}, {"source": 90, "target": 77}, {"source": 90, "target": 95}, {"source": 90, "target": 79}, {"source": 90, "target": 81}, {"source": 90, "target": 87}, {"source": 90, "target": 93}, {"source": 90, "target": 85}, {"source": 90, "target": 94}, {"source": 90, "target": 92}, {"source": 90, "target": 80}, {"source": 90, "target": 91}, {"source": 90, "target": 89}, {"source": 90, "target": 86}, {"source": 90, "target": 88}];
+const cluster = {"core": {"label": "Core / Geometry", "color": "#1a4a2e", "border": "#2ecc71", "cx": 0.5, "cy": 0.82}, "app_core": {"label": "App Core", "color": "#4a1a1a", "border": "#e74c3c", "cx": 0.5, "cy": 0.58}, "input": {"label": "Input", "color": "#3a1a10", "border": "#e07b54", "cx": 0.15, "cy": 0.52}, "selection": {"label": "Selection", "color": "#3a300a", "border": "#e0b554", "cx": 0.78, "cy": 0.5}, "tools": {"label": "Tools", "color": "#0a2a3a", "border": "#54c8e0", "cx": 0.82, "cy": 0.22}, "app_ops": {"label": "App Ops / Runtime", "color": "#2a1a4a", "border": "#9b59b6", "cx": 0.45, "cy": 0.35}, "ui": {"label": "UI", "color": "#1a1a4a", "border": "#3498db", "cx": 0.18, "cy": 0.2}, "render": {"label": "Render", "color": "#0a2a2a", "border": "#1abc9c", "cx": 0.78, "cy": 0.78}};
+
+const W = window.innerWidth, H = window.innerHeight;
+const svg = d3.select("#svg");
+
+// ── Arrow marker ────────────────────────────────────────────────────────────
+svg.append("defs").append("marker")
+  .attr("id", "arrow")
+  .attr("viewBox", "0 -4 8 8")
+  .attr("refX", 8).attr("refY", 0)
+  .attr("markerWidth", 6).attr("markerHeight", 6)
+  .attr("orient", "auto")
+  .append("path")
+    .attr("d", "M0,-4L8,0L0,4")
+    .attr("fill", "#5a8ac0")
+    .attr("fill-opacity", 0.7);
+
+const g = svg.append("g");
+svg.call(d3.zoom().scaleExtent([0.08, 5]).on("zoom", e => g.attr("transform", e.transform)));
+
+// ── Cluster positions (absolute px) ─────────────────────────────────────────
+const clusterPx = {};
+Object.entries(cluster).forEach(([id, c]) => {
+  clusterPx[id] = { x: c.cx * W, y: c.cy * H, color: c.color, border: c.border, label: c.label };
+});
+
+// ── Initial node positions near cluster centers ──────────────────────────────
+const rng = (min, max) => min + Math.random() * (max - min);
+nodes.forEach(d => {
+  const cp = clusterPx[d.cluster] ?? { x: W/2, y: H/2 };
+  d.x = cp.x + rng(-60, 60);
+  d.y = cp.y + rng(-60, 60);
+});
+
+// ── Node radius by file size ─────────────────────────────────────────────────
+function radius(size) {
+  const kb = size / 1024;
+  if (kb < 3)  return 5;
+  if (kb < 5)  return 7;
+  if (kb < 10) return 9;
+  if (kb < 20) return 12;
+  if (kb < 35) return 15;
+  if (kb < 70) return 20;
+  return 26;
+}
+
+// ── Custom cluster force ─────────────────────────────────────────────────────
+function forceCluster(strength) {
+  return function(alpha) {
+    nodes.forEach(d => {
+      const cp = clusterPx[d.cluster];
+      if (!cp) return;
+      d.vx += (cp.x - d.x) * strength * alpha;
+      d.vy += (cp.y - d.y) * strength * alpha;
+    });
+  };
+}
+
+// ── Convex hull layer ────────────────────────────────────────────────────────
+const hullLayer = g.append("g").attr("class", "hulls");
+const hullPaths = {};
+Object.entries(clusterPx).forEach(([id, cp]) => {
+  hullPaths[id] = hullLayer.append("path")
+    .attr("class", "hull")
+    .attr("fill", cp.color)
+    .attr("stroke", cp.border);
+});
+
+// Cluster labels layer (on top of hulls, below nodes)
+const labelLayer = g.append("g").attr("class", "clabels");
+const clusterLabels = {};
+Object.entries(clusterPx).forEach(([id, cp]) => {
+  clusterLabels[id] = labelLayer.append("text")
+    .attr("class", "cluster-label")
+    .attr("fill", cp.border)
+    .attr("text-anchor", "middle")
+    .text(cp.label);
+});
+
+// ── Link layer ───────────────────────────────────────────────────────────────
+const linkLayer = g.append("g");
+const link = linkLayer.selectAll("path")
+  .data(links).join("path")
+  .attr("class", "link")
+  .attr("stroke", "#4a7ac0")
+  .attr("stroke-width", 1.2)
+  .attr("marker-end", "url(#arrow)");
+
+// ── Node layer ───────────────────────────────────────────────────────────────
+const nodeGroup = g.append("g").selectAll("g")
+  .data(nodes).join("g").attr("class", "node");
+
+nodeGroup.append("circle")
+  .attr("r", d => radius(d.size))
+  .attr("fill", d => clusterPx[d.cluster]?.border ?? "#888")
+  .attr("fill-opacity", 0.8)
+  .attr("stroke", d => clusterPx[d.cluster]?.border ?? "#888")
+  .attr("stroke-opacity", 1);
+
+// ── Short label (strip common prefix) ────────────────────────────────────────
+function shortName(name) {
+  const n = name.replace(".js", "");
+  if (n.startsWith("app_input_"))     return "in_"  + n.slice("app_input_".length);
+  if (n.startsWith("app_selection_")) return "sel_" + n.slice("app_selection_".length);
+  if (n.startsWith("app_tools_"))     return "tl_"  + n.slice("app_tools_".length);
+  if (n.startsWith("ui_refresh_"))    return "rf_"  + n.slice("ui_refresh_".length);
+  if (n.startsWith("ui_init_"))       return "ui_"  + n.slice("ui_init_".length);
+  if (n.startsWith("render_"))        return "rn_"  + n.slice("render_".length);
+  if (n.startsWith("app_"))           return "a_"   + n.slice("app_".length);
+  if (n.startsWith("ui_"))            return "ui_"  + n.slice("ui_".length);
+  return n;
+}
+
+let labelsVisible = true;
+const labels = nodeGroup.append("text")
+  .attr("dy", d => radius(d.size) + 10)
+  .attr("text-anchor", "middle")
+  .text(d => shortName(d.name))
+  .append("title").text(d => d.name); // フルネームをtitleで保持
+
+// ── Drag ─────────────────────────────────────────────────────────────────────
+nodeGroup.call(d3.drag()
+  .on("start", (e, d) => { if (!e.active) sim.alphaTarget(0.3).restart(); d.fx = d.x; d.fy = d.y; })
+  .on("drag",  (e, d) => { d.fx = e.x; d.fy = e.y; })
+  .on("end",   (e, d) => { if (!e.active) sim.alphaTarget(0); d.fx = null; d.fy = null; })
+);
+
+// ── Tooltip ───────────────────────────────────────────────────────────────────
+const tooltip = document.getElementById("tooltip");
+const nodeById = new Map(nodes.map(n => [n.id, n]));
+
+nodeGroup
+  .on("mousemove", (e, d) => {
+    const outs = links.filter(l => (l.source.id ?? l.source) === d.id)
+      .map(l => nodeById.get(l.target.id ?? l.target)?.name ?? "?");
+    const ins  = links.filter(l => (l.target.id ?? l.target) === d.id)
+      .map(l => nodeById.get(l.source.id ?? l.source)?.name ?? "?");
+    tooltip.style.display = "block";
+    tooltip.style.left = (e.clientX + 16) + "px";
+    tooltip.style.top  = (e.clientY - 12) + "px";
+    tooltip.innerHTML = `
+      <b style="color:#9ecaed">${d.name}</b> &nbsp;<span style="color:#aaa">[${cluster[d.cluster]?.label}]</span><br>
+      Size: <b>${(d.size/1024).toFixed(1)} KB</b><br>
+      Imports (${outs.length}): ${outs.length ? outs.map(n=>n.replace(".js","")).join(", ") : "<i>none</i>"}<br>
+      Used by (${ins.length}): ${ins.length ? ins.map(n=>n.replace(".js","")).join(", ") : "<i>none</i>"}
+    `;
+  })
+  .on("mouseleave", () => { tooltip.style.display = "none"; });
+
+// ── Click highlight ───────────────────────────────────────────────────────────
+let highlighted = null;
+function resetHighlight() {
+  highlighted = null;
+  link.attr("stroke", "#4a7ac0").attr("stroke-opacity", 0.45).attr("stroke-width", 1.2)
+      .attr("marker-end", "url(#arrow)");
+  nodeGroup.select("circle").attr("fill-opacity", 0.8);
+}
+nodeGroup.on("click", (e, d) => {
+  e.stopPropagation();
+  if (highlighted === d.id) { resetHighlight(); return; }
+  highlighted = d.id;
+  const relLinks = new Set(), relNodes = new Set([d.id]);
+  links.forEach(l => {
+    const s = l.source.id ?? l.source, t = l.target.id ?? l.target;
+    if (s === d.id || t === d.id) { relLinks.add(l); relNodes.add(s); relNodes.add(t); }
+  });
+  link
+    .attr("stroke", l => relLinks.has(l) ? "#ffd700" : "#4a7ac0")
+    .attr("stroke-opacity", l => relLinks.has(l) ? 1 : 0.1)
+    .attr("stroke-width", l => relLinks.has(l) ? 2.5 : 1.2)
+    .attr("marker-end", "url(#arrow)");
+  nodeGroup.select("circle")
+    .attr("fill-opacity", d2 => relNodes.has(d2.id) ? 1 : 0.12);
+});
+svg.on("click", resetHighlight);
+
+// ── Curved path for links ─────────────────────────────────────────────────────
+function linkPath(d) {
+  const sx = d.source.x, sy = d.source.y;
+  const tx = d.target.x, ty = d.target.y;
+  const r  = radius(d.target.size ?? 8) + 7; // stop before node edge
+  const dx = tx - sx, dy = ty - sy;
+  const dist = Math.sqrt(dx*dx + dy*dy) || 1;
+  const ex = tx - dx/dist * r, ey = ty - dy/dist * r;
+  // gentle curve
+  const mx = (sx+tx)/2 - dy*0.1, my = (sy+ty)/2 + dx*0.1;
+  return `M${sx},${sy} Q${mx},${my} ${ex},${ey}`;
+}
+
+// ── Force simulation ──────────────────────────────────────────────────────────
+const sim = d3.forceSimulation(nodes)
+  .force("link",      d3.forceLink(links).id(d => d.id).distance(75).strength(0.35))
+  .force("charge",    d3.forceManyBody().strength(-220))
+  .force("collision", d3.forceCollide(d => radius(d.size) + 5))
+  .force("cluster",   forceCluster(0.18))
+  .alphaDecay(0.02);
+
+// ── Tick ──────────────────────────────────────────────────────────────────────
+const HULL_PAD = 28;
+function paddedHull(pts) {
+  if (pts.length < 3) {
+    // degenerate: circle or line — just pad each point outward from centroid
+    const cx = d3.mean(pts, p => p[0]), cy = d3.mean(pts, p => p[1]);
+    const extra = pts.flatMap(([x, y]) => {
+      const dx = x-cx || 1, dy = y-cy || 0, d = Math.sqrt(dx*dx+dy*dy)||1;
+      return [[x + dx/d*HULL_PAD*2, y + dy/d*HULL_PAD*2]];
+    });
+    pts = pts.concat(extra);
+  }
+  const hull = d3.polygonHull(pts);
+  if (!hull) return null;
+  // expand hull outward from centroid
+  const cx = d3.mean(hull, p => p[0]), cy = d3.mean(hull, p => p[1]);
+  return hull.map(([x, y]) => {
+    const dx = x-cx, dy = y-cy, d = Math.sqrt(dx*dx+dy*dy)||1;
+    return [x + dx/d*HULL_PAD, y + dy/d*HULL_PAD];
+  });
+}
+
+sim.on("tick", () => {
+  // Update hulls
+  const byCluster = d3.group(nodes, d => d.cluster);
+  Object.entries(hullPaths).forEach(([id, path]) => {
+    const pts = (byCluster.get(id) ?? []).map(n => [n.x, n.y]);
+    if (pts.length === 0) { path.attr("d", ""); return; }
+    if (pts.length === 1) {
+      const [x, y] = pts[0];
+      path.attr("d", `M${x},${y} m-${HULL_PAD*2},0 a${HULL_PAD*2},${HULL_PAD*2} 0 1,0 ${HULL_PAD*4},0 a${HULL_PAD*2},${HULL_PAD*2} 0 1,0 -${HULL_PAD*4},0`);
+      return;
+    }
+    const expanded = paddedHull(pts);
+    if (!expanded) { path.attr("d", ""); return; }
+    path.attr("d", "M" + expanded.join("L") + "Z");
+  });
+
+  // Update cluster labels (centroid of hull)
+  Object.entries(clusterLabels).forEach(([id, lbl]) => {
+    const ns = (byCluster.get(id) ?? []);
+    if (!ns.length) return;
+    const cx = d3.mean(ns, n => n.x);
+    const minY = d3.min(ns, n => n.y);
+    lbl.attr("x", cx).attr("y", minY - HULL_PAD - 6);
+  });
+
+  // Update links
+  link.attr("d", linkPath);
+
+  // Update nodes
+  nodeGroup.attr("transform", d => `translate(${d.x},${d.y})`);
+});
+
+// ── Utility buttons ───────────────────────────────────────────────────────────
+function resetZoom() {
+  svg.transition().duration(500).call(
+    d3.zoom().scaleExtent([0.08, 5]).on("zoom", e => g.attr("transform", e.transform)),
+    d3.zoomIdentity
+  );
+}
+function toggleLabels() {
+  labelsVisible = !labelsVisible;
+  labels.style("display", labelsVisible ? null : "none");
+}
+let hullsVisible = true;
+function toggleHulls() {
+  hullsVisible = !hullsVisible;
+  hullLayer.style("display", hullsVisible ? null : "none");
+  labelLayer.style("display", hullsVisible ? null : "none");
+}
+function reheat() { sim.alpha(0.5).restart(); }
+</script>
+</body>
+</html>

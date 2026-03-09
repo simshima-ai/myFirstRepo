@@ -350,6 +350,12 @@ export function createState() {
       },
       circleThreePointRefs: [], // [{ x, y, r, shapeId, type }]
       dragStartWorld: null,
+      touchRectDraft: {
+        stage: 0, // 0: waiting first confirm, 1: waiting second confirm
+        p1: null,
+        candidateStart: null,
+        candidateEnd: null,
+      },
       dragStartScreen: null,
       hoverWorld: { x: 0, y: 0 },
       objectSnapHover: null,
@@ -551,6 +557,10 @@ export function setTool(state, tool) {
   if (tool !== "circle" && state.input) {
     state.input.circleThreePointRefs = [];
     state.input.dragStartWorld = null;
+  }
+  if (tool !== "rect" && state.input) {
+    state.input.dragStartWorld = null;
+    state.input.touchRectDraft = { stage: 0, p1: null, candidateStart: null, candidateEnd: null };
   }
   if (tool !== "dim") {
     state.input.dimSessionGroupId = null;

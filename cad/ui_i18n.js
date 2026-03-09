@@ -152,6 +152,7 @@ export function applyLanguageUi(state, dom) {
       touchMode: "タッチモード",
       leftMenuVisibleItems: "左メニュー表示項目",
       touchConfirmCommon: "決定",
+      touchCancelCommon: "キャンセル",
       touchBackToSelect: "選択に戻る",
       touchMultiSelectOn: "複数選択 ON",
       touchMultiSelectOff: "複数選択 OFF",
@@ -375,6 +376,7 @@ export function applyLanguageUi(state, dom) {
       touchMode: "Touch Mode",
       leftMenuVisibleItems: "Left Menu Items",
       touchConfirmCommon: "Confirm",
+      touchCancelCommon: "Cancel",
       touchBackToSelect: "Back to Select",
       touchMultiSelectOn: "Multi-Select ON",
       touchMultiSelectOff: "Multi-Select OFF",
@@ -640,6 +642,7 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("touchModeToggle", t.touchMode);
   setText("#leftMenuVisibilityLabel", t.leftMenuVisibleItems);
   setButtonById("touchConfirmBtn", t.touchConfirmCommon);
+  setButtonById("touchCancelBtn", t.touchCancelCommon);
   setButtonById("touchSelectBackBtn", t.touchBackToSelect);
   if (dom.touchMultiSelectBtn) {
     const on = !!state.ui?.touchMultiSelect;

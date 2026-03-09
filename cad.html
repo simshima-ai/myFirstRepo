@@ -647,12 +647,13 @@
 
     .touch-confirm-overlay {
       position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
-      transform: translateX(-50%);
+      left: 14px;
+      top: calc(env(safe-area-inset-top, 0px) + 14px);
       z-index: 2200;
       pointer-events: auto;
       display: none;
+      gap: 8px;
+      align-items: center;
     }
 
     .touch-confirm-btn {
@@ -674,6 +675,25 @@
       color: #eff6ff;
       box-shadow: none;
       cursor: default;
+    }
+
+    .touch-cancel-btn {
+      min-width: 96px;
+      min-height: 40px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      border: 1px solid #64748b;
+      background: rgba(255, 255, 255, 0.95);
+      color: #0f172a;
+      font-size: 13px;
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+    }
+
+    .touch-cancel-btn:disabled {
+      opacity: 0.55;
+      cursor: default;
+      box-shadow: none;
     }
 
     .touch-select-back-overlay {
@@ -2136,6 +2156,7 @@
         <div id="statusText" class="status"></div>
       </div>
       <div id="touchConfirmOverlay" class="touch-confirm-overlay">
+        <button id="touchCancelBtn" class="touch-cancel-btn" type="button">キャンセル</button>
         <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">決定</button>
       </div>
       <div id="touchMultiSelectOverlay" class="touch-multiselect-overlay">

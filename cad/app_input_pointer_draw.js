@@ -10,6 +10,8 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         setSelection,
         pushHistory,
         createCircle,
+        createRect,
+        createPosition,
         nextShapeId,
         applyToolStrokeToShape,
         addShape,
@@ -25,6 +27,25 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
     if (!(state.tool === "line" || state.tool === "rect" || state.tool === "circle")) return false;
     const isPrimaryPress = e.pointerType === "touch" || e.button === 0;
     if (!isPrimaryPress) return true;
+    const isTouchRectFlow = (state.tool === "rect") && !!state.ui?.touchMode;
+    if (isTouchRectFlow) {
+        if (!state.input.touchRectDraft || typeof state.input.touchRectDraft !== "object") {
+            state.input.touchRectDraft = { stage: 0, p1: null, candidateStart: null, candidateEnd: null };
+        }
+        const draft = state.input.touchRectDraft;
+        if (draft.stage === 1 && draft.p1) {
+            draft.candidateEnd = { x: world.x, y: world.y };
+            state.preview = createRect(draft.p1, draft.candidateEnd);
+            if (setStatus) setStatus("四角: 2点目候補を更新。左上の「決定」で作成");
+        } else {
+            draft.candidateStart = { x: world.x, y: world.y };
+            state.preview = createPosition(world);
+            state.preview.positionPreviewMode = "marker";
+            if (setStatus) setStatus("四角: 1点目候補を更新。左上の「決定」で確定");
+        }
+        if (draw) draw();
+        return true;
+    }
 
     {
         const hitForDrag = hitTestShapes(state, worldRaw, dom);
@@ -90,7 +111,7 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         if (setStatus) {
             const touchMode = !!state.ui?.touchMode;
             setStatus(touchMode
-                ? "Bスプライン: 制御点を追加（下中央の「確定」で作成）"
+                ? "Bスプライン: 制御点を追加（左上の「確定」で作成）"
                 : "Bスプライン: 制御点を追加（Enter/ダブルクリックで確定）");
         }
         if (draw) draw();
@@ -144,7 +165,7 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         if (setStatus) {
             const touchMode = !!state.ui?.touchMode;
             setStatus(touchMode
-                ? "クリックで頂点追加  下中央の「確定」で作成"
+                ? "クリックで頂点追加  左上の「確定」で作成"
                 : "クリックで頂点追加  Enterキーで決定");
         }
         if (draw) draw();

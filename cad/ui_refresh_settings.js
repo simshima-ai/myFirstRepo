@@ -1,4 +1,4 @@
-export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
+﻿export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
   const {
     syncInputValue,
     normalizePageScalePreset,
@@ -165,41 +165,65 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     const canFillet = (tool === "fillet" && (state.selection?.ids || []).length >= 2);
     const canDline = (tool === "doubleline" && Array.isArray(state.dlinePreview) && state.dlinePreview.length > 0);
     const canHatch = (tool === "hatch" && (state.hatchDraft?.boundaryIds || []).length > 0);
-    const show = touchMode && (hasLinearDraft || canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy");
+    const rectDraft = state.input?.touchRectDraft || {};
+    const isTouchRect = (tool === "rect" && touchMode);
+    const canRectConfirm = !!(isTouchRect && (
+      (Number(rectDraft.stage) !== 1 && rectDraft.candidateStart) ||
+      (Number(rectDraft.stage) === 1 && rectDraft.p1 && rectDraft.candidateEnd)
+    ));
+    const show = touchMode && (hasLinearDraft || canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy" || tool === "rect");
     let enabled = false;
-    let label = panelLang === "en" ? "Confirm" : "決定";
+    let label = panelLang === "en" ? "Confirm" : "豎ｺ螳・;
     if (hasLinearDraft) {
       enabled = true;
-      label = panelLang === "en" ? "Finish Continuous Line" : "連続線を確定";
+      label = panelLang === "en" ? "Finish Continuous Line" : "騾｣邯夂ｷ壹ｒ遒ｺ螳・;
     } else if (canLineFinalize) {
       enabled = !!(state.polylineDraft && (state.polylineDraft.points || []).length >= 2);
       label = (lineMode === "freehand")
-        ? (panelLang === "en" ? "Finalize B-Spline" : "Bスプライン確定")
-        : (panelLang === "en" ? "Finish Continuous Line" : "連続線を確定");
+        ? (panelLang === "en" ? "Finalize B-Spline" : "B繧ｹ繝励Λ繧､繝ｳ遒ｺ螳・)
+        : (panelLang === "en" ? "Finish Continuous Line" : "騾｣邯夂ｷ壹ｒ遒ｺ螳・);
     } else if (isChainDim) {
       enabled = canPrepareDim || canFinalizeDim;
       label = canFinalizeDim
-        ? (panelLang === "en" ? "Finalize Dim" : "寸法確定")
-        : (panelLang === "en" ? "Set Placement" : "配置位置を指定");
+        ? (panelLang === "en" ? "Finalize Dim" : "蟇ｸ豕慕｢ｺ螳・)
+        : (panelLang === "en" ? "Set Placement" : "驟咲ｽｮ菴咲ｽｮ繧呈欠螳・);
     } else if (tool === "circle" && circleMode === "threepoint") {
       enabled = canCircleThreePoint;
-      label = panelLang === "en" ? "Create 3-Point Circle" : "三点円を作成";
+      label = panelLang === "en" ? "Create 3-Point Circle" : "荳臥せ蜀・ｒ菴懈・";
     } else if (tool === "fillet") {
       enabled = canFillet;
-      label = panelLang === "en" ? "Apply Fillet" : "フィレット実行";
+      label = panelLang === "en" ? "Apply Fillet" : "繝輔ぅ繝ｬ繝・ヨ螳溯｡・;
     } else if (tool === "doubleline") {
       enabled = canDline;
-      label = panelLang === "en" ? "Apply Double Line" : "二重線を適用";
+      label = panelLang === "en" ? "Apply Double Line" : "莠碁㍾邱壹ｒ驕ｩ逕ｨ";
     } else if (tool === "hatch") {
       enabled = canHatch;
-      label = panelLang === "en" ? "Apply Hatch" : "ハッチング実行";
+      label = panelLang === "en" ? "Apply Hatch" : "繝上ャ繝√Φ繧ｰ螳溯｡・;
     } else if (tool === "patterncopy") {
       enabled = canPatternCopy;
-      label = panelLang === "en" ? "Run Pattern Copy" : "パターンコピー実行";
+      label = panelLang === "en" ? "Run Pattern Copy" : "繝代ち繝ｼ繝ｳ繧ｳ繝斐・螳溯｡・;
     }
-    dom.touchConfirmOverlay.style.display = show ? "block" : "none";
+    if (tool === "rect") {
+      enabled = canRectConfirm;
+      label = (Number(rectDraft.stage) === 1)
+        ? (panelLang === "en" ? "Create Rectangle" : "四角を作成")
+        : (panelLang === "en" ? "Confirm 1st Point" : "1点目を確定");
+    }
+    dom.touchConfirmOverlay.style.display = show ? "flex" : "none";
     dom.touchConfirmBtn.disabled = !enabled;
     dom.touchConfirmBtn.textContent = label;
+    if (dom.touchCancelBtn) {
+      const hasRectPending = !!(isTouchRect && (rectDraft.candidateStart || rectDraft.p1 || rectDraft.candidateEnd));
+      const hasPending = !!(
+        hasRectPending ||
+        hasLinearDraft ||
+        state.polylineDraft ||
+        state.dimDraft ||
+        (state.hatchDraft?.boundaryIds || []).length ||
+        (state.input?.circleThreePointRefs || []).length
+      );
+      dom.touchCancelBtn.disabled = !hasPending;
+    }
   }
   if (dom.touchSelectBackOverlay && dom.touchSelectBackBtn) {
     const touchMode = !!state.ui?.touchMode;
@@ -218,8 +242,8 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     dom.touchMultiSelectOverlay.style.display = (touchMode && needsMultiSelect) ? "block" : "none";
     dom.touchMultiSelectBtn.classList.toggle("is-active", on);
     dom.touchMultiSelectBtn.textContent = on
-      ? (panelLang === "en" ? "Multi-Select ON" : "複数選択 ON")
-      : (panelLang === "en" ? "Multi-Select OFF" : "複数選択 OFF");
+      ? (panelLang === "en" ? "Multi-Select ON" : "隍・焚驕ｸ謚・ON")
+      : (panelLang === "en" ? "Multi-Select OFF" : "隍・焚驕ｸ謚・OFF");
   }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.checked = !!state.ui?.showFps;

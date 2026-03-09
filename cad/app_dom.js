@@ -240,6 +240,7 @@
   statusText: document.getElementById("statusText"),
   touchConfirmOverlay: document.getElementById("touchConfirmOverlay"),
   touchConfirmBtn: document.getElementById("touchConfirmBtn"),
+  touchCancelBtn: document.getElementById("touchCancelBtn"),
   touchMultiSelectOverlay: document.getElementById("touchMultiSelectOverlay"),
   touchMultiSelectBtn: document.getElementById("touchMultiSelectBtn"),
   touchSelectBackOverlay: document.getElementById("touchSelectBackOverlay"),

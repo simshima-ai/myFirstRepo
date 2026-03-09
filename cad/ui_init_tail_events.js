@@ -259,6 +259,10 @@ export function bindInitTailEvents(params) {
         return;
       }
       const tool = String(state.tool || "");
+      if (tool === "rect") {
+        actions.confirmTouchRectStep?.();
+        return;
+      }
       const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
       const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
       if (tool === "line" && (lineMode === "continuous" || lineMode === "freehand")) {
@@ -313,6 +317,16 @@ export function bindInitTailEvents(params) {
     };
     dom.touchConfirmBtn.addEventListener("click", runTouchConfirm);
     dom.touchConfirmBtn.addEventListener("pointerup", runTouchConfirm);
+  }
+  if (dom.touchCancelBtn) {
+    const runTouchCancel = (e = null) => {
+      if (e?.cancelable) e.preventDefault();
+      if (e?.stopPropagation) e.stopPropagation();
+      if (!state.ui?.touchMode) return;
+      actions.cancelTouchPending?.();
+    };
+    dom.touchCancelBtn.addEventListener("click", runTouchCancel);
+    dom.touchCancelBtn.addEventListener("pointerup", runTouchCancel);
   }
   if (dom.touchSelectBackBtn) {
     dom.touchSelectBackBtn.addEventListener("click", () => {

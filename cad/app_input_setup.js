@@ -197,6 +197,8 @@ export function setupInputListenersImpl(state, dom, helpers) {
                 setSelection,
                 pushHistory,
                 createCircle,
+                createRect,
+                createPosition,
                 nextShapeId,
                 applyToolStrokeToShape,
                 addShape,
@@ -333,7 +335,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
                     if (state.selection.ids.length >= 2) {
                         const touchMode = !!state.ui?.touchMode;
                         setStatus(touchMode
-                            ? "Fillet: candidate ready. Tap the bottom-center Confirm button to apply."
+                            ? "Fillet: candidate ready. Tap the top-left Confirm button to apply."
                             : "Fillet: candidate ready. Click or press Enter to apply, Esc to cancel.");
                     }
                     else setStatus("Fillet: select 2 objects.");

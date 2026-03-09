@@ -5,11 +5,11 @@ export function getTopContextHelpText(state, tool, lang) {
   const lineHelp = (tool === "line" && lineMode === "continuous")
     ? (lang === "en"
       ? (isTouchMode ? "Click to add vertices, then tap Confirm." : "Click to add vertices. Press Enter to confirm.")
-      : (isTouchMode ? "クリックで頂点追加後、下中央の「確定」を押します。" : "クリックで頂点追加  Enterキーで決定"))
+      : (isTouchMode ? "クリックで頂点追加後、左上の「確定」を押します。" : "クリックで頂点追加  Enterキーで決定"))
     : ((tool === "line" && lineMode === "freehand")
       ? (lang === "en"
         ? (isTouchMode ? "Click to add control points, then tap Confirm to finalize B-Spline." : "Click to add control points. Press Enter or double-click to finalize B-Spline.")
-        : (isTouchMode ? "クリックで制御点を追加し、下中央の「確定」でBスプラインを確定します。" : "クリックで制御点を追加。EnterまたはダブルクリックでBスプライン確定。"))
+        : (isTouchMode ? "クリックで制御点を追加し、左上の「確定」でBスプラインを確定します。" : "クリックで制御点を追加。EnterまたはダブルクリックでBスプライン確定。"))
       : (lang === "en" ? "Click first point, then second point. You can also input Length / Angle." : "1点目クリック後、2点目をクリック。Length / Angle の数値入力も使えます。"));
   const helpMap = (lang === "en")
     ? {
@@ -40,9 +40,9 @@ export function getTopContextHelpText(state, tool, lang) {
       trim: "図形をクリックしてトリムを実行。削除せずに分割のみ行うことも可能です。",
       settings: "用紙サイズ、方位、縮尺、およびグリッド設定を行います。",
       text: "キャンバスをクリックしてテキストを配置。配置後、上部パネルで内容、サイズ、色などを変更できます。",
-      hatch: isTouchMode ? "境界をクリックして選択後、下中央の「確定」でハッチングを実行します。" : "境界をクリックして選択。Enter または Apply でハッチングを実行します。",
-      patterncopy: isTouchMode ? "モードを選択し、必要なら中心点や軸線を指定して、下中央の「確定」を押してください。" : "パターンコピーを実行します。モードを選択し、必要であれば中心点や軸線をキャンバス上でクリックしてから Apply を押してください。",
-      doubleline: isTouchMode ? "選択した線分から二重線を生成します。Offset値やModeを調整後、下中央の「確定」で実行します。" : "選択した線分から二重線（オフセット線）を生成します。Offset値やMode（片側/両側）を調整し、ApplyまたはEnterで確定します。",
+      hatch: isTouchMode ? "境界をクリックして選択後、左上の「確定」でハッチングを実行します。" : "境界をクリックして選択。Enter または Apply でハッチングを実行します。",
+      patterncopy: isTouchMode ? "モードを選択し、必要なら中心点や軸線を指定して、左上の「確定」を押してください。" : "パターンコピーを実行します。モードを選択し、必要であれば中心点や軸線をキャンバス上でクリックしてから Apply を押してください。",
+      doubleline: isTouchMode ? "選択した線分から二重線を生成します。Offset値やModeを調整後、左上の「確定」で実行します。" : "選択した線分から二重線（オフセット線）を生成します。Offset値やMode（片側/両側）を調整し、ApplyまたはEnterで確定します。",
     };
   return helpMap[tool] || "";
 }

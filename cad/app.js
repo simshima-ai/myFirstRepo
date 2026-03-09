@@ -163,6 +163,15 @@ function getPrimarySelectedShape() {
   return null;
 }
 
+function buildRectAsLines(p1, p2) {
+  return [
+    { type: "line", x1: p1.x, y1: p1.y, x2: p2.x, y2: p1.y },
+    { type: "line", x1: p2.x, y1: p1.y, x2: p2.x, y2: p2.y },
+    { type: "line", x1: p2.x, y1: p2.y, x2: p1.x, y2: p2.y },
+    { type: "line", x1: p1.x, y1: p2.y, x2: p1.x, y2: p1.y }
+  ];
+}
+
 const clipboardOps = createClipboardOps({
   state,
   pushHistory,
@@ -565,6 +574,79 @@ const helpers = {
   setAutoBackupIntervalSec: (sec) => uiPrefsOps.setAutoBackupIntervalSec(sec),
   setTouchMode: (on) => uiPrefsOps.setTouchMode(on),
   setTouchMultiSelect: (on) => uiPrefsOps.setTouchMultiSelect(on),
+  confirmTouchRectStep: () => {
+    if (!(String(state.tool || "") === "rect" && !!state.ui?.touchMode)) return false;
+    if (!state.input.touchRectDraft || typeof state.input.touchRectDraft !== "object") {
+      state.input.touchRectDraft = { stage: 0, p1: null, candidateStart: null, candidateEnd: null };
+    }
+    const d = state.input.touchRectDraft;
+    if (Number(d.stage) === 1 && d.p1 && d.candidateEnd) {
+      const p1 = { x: Number(d.p1.x), y: Number(d.p1.y) };
+      const p2 = { x: Number(d.candidateEnd.x), y: Number(d.candidateEnd.y) };
+      const lines = buildRectAsLines(p1, p2);
+      lines.forEach((l) => {
+        l.id = nextShapeId(state);
+        l.layerId = state.activeLayerId;
+        l.color = "#0f172a";
+        l.lineWidthMm = Math.max(0.01, Number(state.rectSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+        l.lineType = String(state.rectSettings?.lineType || "solid");
+      });
+      pushHistory(state);
+      addShapesAsGroup(state, lines);
+      clearSelection(state);
+      state.activeGroupId = null;
+      state.preview = null;
+      state.input.dragStartWorld = null;
+      state.input.touchRectDraft = { stage: 0, p1: null, candidateStart: null, candidateEnd: null };
+      setStatus("RECT created");
+      draw();
+      return true;
+    }
+    if (d.candidateStart) {
+      d.p1 = { x: Number(d.candidateStart.x), y: Number(d.candidateStart.y) };
+      d.stage = 1;
+      d.candidateEnd = null;
+      state.input.dragStartWorld = { x: Number(d.p1.x), y: Number(d.p1.y) };
+      setStatus("RECT: second point candidate, then Confirm");
+      draw();
+      return true;
+    }
+    setStatus("RECT: tap first point candidate");
+    draw();
+    return false;
+  },
+  cancelTouchPending: () => {
+    let changed = false;
+    if (state.polylineDraft) {
+      state.polylineDraft = null;
+      changed = true;
+    }
+    if (state.dimDraft) {
+      state.dimDraft = null;
+      changed = true;
+    }
+    if (Array.isArray(state.input?.circleThreePointRefs) && state.input.circleThreePointRefs.length) {
+      state.input.circleThreePointRefs = [];
+      changed = true;
+    }
+    if (state.hatchDraft?.boundaryIds?.length) {
+      state.hatchDraft.boundaryIds = [];
+      changed = true;
+    }
+    if (state.input?.touchRectDraft) {
+      const d = state.input.touchRectDraft;
+      if (d.stage || d.p1 || d.candidateStart || d.candidateEnd) changed = true;
+    }
+    state.input.touchRectDraft = { stage: 0, p1: null, candidateStart: null, candidateEnd: null };
+    state.input.dragStartWorld = null;
+    state.preview = null;
+    if (changed) {
+      setStatus("Canceled");
+      draw();
+      return true;
+    }
+    return false;
+  },
   setToolShortcut: (tool, key) => uiPrefsOps.setToolShortcut(tool, key),
   resetToolShortcuts: () => uiPrefsOps.resetToolShortcuts(),
   setPatternCopyMode: (mode) => {

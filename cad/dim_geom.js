@@ -53,6 +53,40 @@ export function getDimGeometry(dim) {
     };
 }
 
+const DIM_TEXT_HANDLE_OFFSET_PX = 14;
+
+export function getLinearDimTextWorld(dim, geom, scale = 1.0) {
+    if (!geom) return null;
+    const dimPtToWorld = (pt) => Math.max(0, Number(pt) || 0) / Math.max(1e-9, Number(scale) || 1);
+    const tx = Number(dim?.tx), ty = Number(dim?.ty);
+    const hasRel = Number.isFinite(Number(dim?.tdx)) && Number.isFinite(Number(dim?.tdy));
+    if (hasRel) {
+        return {
+            x: Number(geom.allCtrl.x) + Number(dim.tdx),
+            y: Number(geom.allCtrl.y) + Number(dim.tdy)
+        };
+    }
+    if (Number.isFinite(tx) && Number.isFinite(ty)) return { x: tx, y: ty };
+    return {
+        x: Number(geom.allCtrl.x) + Number(geom.nx) * dimPtToWorld(Number(dim?.fontSize ?? 12) || 12),
+        y: Number(geom.allCtrl.y) + Number(geom.ny) * dimPtToWorld(Number(dim?.fontSize ?? 12) || 12)
+    };
+}
+
+export function getLinearDimTextHandleWorld(dim, geom, scale = 1.0) {
+    const text = getLinearDimTextWorld(dim, geom, scale);
+    if (!text || !geom) return null;
+    const off = DIM_TEXT_HANDLE_OFFSET_PX / Math.max(1e-9, Number(scale) || 1);
+    return {
+        x: Number(text.x) + Number(geom.nx) * off,
+        y: Number(text.y) + Number(geom.ny) * off,
+        textX: Number(text.x),
+        textY: Number(text.y),
+        offsetX: Number(geom.nx) * off,
+        offsetY: Number(geom.ny) * off,
+    };
+}
+
 /**
  * Returns geometry for a chain dimension.
  * Returns { segments, nx, ny, off } where each segment has the same structure as getDimGeometry().
@@ -279,17 +313,8 @@ export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
         if (dist < tol) return 'line';
 
         // Text
-        const tx = Number(dim.tx), ty = Number(dim.ty);
-        const hasRel = Number.isFinite(Number(dim.tdx)) && Number.isFinite(Number(dim.tdy));
-        const text = hasRel
-            ? { x: Number(g.allCtrl.x) + Number(dim.tdx), y: Number(g.allCtrl.y) + Number(dim.tdy) }
-            : (Number.isFinite(tx) && Number.isFinite(ty))
-                ? { x: tx, y: ty }
-                : {
-                    x: g.allCtrl.x + g.nx * dimPtToWorld(Number(dim.fontSize ?? 12) || 12),
-                    y: g.allCtrl.y + g.ny * dimPtToWorld(Number(dim.fontSize ?? 12) || 12)
-                };
-        if (Math.hypot(worldX - text.x, worldY - text.y) < tol) return 'text';
+        const textHandle = getLinearDimTextHandleWorld(dim, g, scale);
+        if (textHandle && Math.hypot(worldX - textHandle.x, worldY - textHandle.y) < tol * 1.4) return 'text';
 
         // Radial specifics
         if (dim.dimRef) {

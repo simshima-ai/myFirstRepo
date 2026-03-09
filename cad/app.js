@@ -485,6 +485,19 @@ const helpers = {
   setCircleRadiusInput: (r) => { setCircleRadiusInput(state, r); draw(); },
   setCircleRadiusLocked: (on = null) => { setCircleRadiusLocked(state, helpers, on); draw(); },
   setPositionSize: (v) => setPositionSize(state, helpers, v),
+  setTextSettings: (patch = {}) => {
+    if (!state.textSettings) state.textSettings = {};
+    const next = { ...state.textSettings };
+    if (Object.prototype.hasOwnProperty.call(patch, "content")) next.content = String(patch.content ?? "");
+    if (Object.prototype.hasOwnProperty.call(patch, "sizePt")) next.sizePt = Math.max(1, Number(patch.sizePt) || 12);
+    if (Object.prototype.hasOwnProperty.call(patch, "rotate")) next.rotate = Number(patch.rotate) || 0;
+    if (Object.prototype.hasOwnProperty.call(patch, "fontFamily")) next.fontFamily = String(patch.fontFamily || "Yu Gothic UI");
+    if (Object.prototype.hasOwnProperty.call(patch, "bold")) next.bold = !!patch.bold;
+    if (Object.prototype.hasOwnProperty.call(patch, "italic")) next.italic = !!patch.italic;
+    if (Object.prototype.hasOwnProperty.call(patch, "color")) next.color = String(patch.color || "#0f172a");
+    state.textSettings = next;
+    draw();
+  },
   setLineWidthMm: (v, toolKey = null) => setLineWidthMm(state, helpers, v, toolKey),
   setToolLineType: (v, toolKey = null) => setToolLineType(state, helpers, v, toolKey),
   setSelectedLineWidthMm: (v) => setSelectedLineWidthMm(state, helpers, v),

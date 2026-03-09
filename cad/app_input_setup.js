@@ -770,7 +770,8 @@ export function setupInputListenersImpl(state, dom, helpers) {
         getMouseScreen,
         getMouseWorld,
         hitTestShapes,
-        findConnectedLinesChain
+        findConnectedLinesChain,
+        setSelection
     });
 
     bindKeyboardInput(state, helpers, {

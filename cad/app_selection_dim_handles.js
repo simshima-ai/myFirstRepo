@@ -6,7 +6,8 @@ import {
   getDimGeometry,
   getDimChainGeometry,
   getCircleDimGeometry,
-  getDimAngleGeometry
+  getDimAngleGeometry,
+  getLinearDimTextHandleWorld
 } from "./dim_geom.js";
 
 export function hitTestDimHandle(state, worldRaw) {
@@ -150,22 +151,15 @@ export function applyDimHandleDrag(state, worldRaw) {
     if (dd.part === "text") {
       const g0 = getDimGeometry(dim);
       if (g0) {
-        const nx = Number(g0.nx), ny = Number(g0.ny);
-        const mx = Number(g0.allCtrl.x);
-        const my = Number(g0.allCtrl.y);
-        const base = {
-          x: (Number.isFinite(Number(dim.tdx)) && Number.isFinite(Number(dim.tdy)))
-            ? (mx + Number(dim.tdx))
-            : (Number.isFinite(Number(dim.tx)) ? Number(dim.tx) : mx),
-          y: (Number.isFinite(Number(dim.tdx)) && Number.isFinite(Number(dim.tdy)))
-            ? (my + Number(dim.tdy))
-            : (Number.isFinite(Number(dim.ty)) ? Number(dim.ty) : my)
-        };
-        const constrained = projectPointToAxis(base, { x: nx, y: ny }, pSnap);
-        dim.tx = constrained.x;
-        dim.ty = constrained.y;
-        dim.tdx = constrained.x - mx;
-        dim.tdy = constrained.y - my;
+        const handle = getLinearDimTextHandleWorld(dim, g0, state.view.scale);
+        const hdx = Number(handle?.offsetX || 0);
+        const hdy = Number(handle?.offsetY || 0);
+        const textX = Number(pSnap.x) - hdx;
+        const textY = Number(pSnap.y) - hdy;
+        dim.tx = textX;
+        dim.ty = textY;
+        dim.tdx = textX - Number(g0.allCtrl.x);
+        dim.tdy = textY - Number(g0.allCtrl.y);
       } else {
         dim.tx = pSnap.x; dim.ty = pSnap.y;
       }

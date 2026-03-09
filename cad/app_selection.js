@@ -14,7 +14,7 @@ import {
     screenToWorld, snapPoint, hitTestLine,
     getEffectiveGridSize, nearestPointOnSegment
 } from "./geom.js";
-import { getDimChainGeometry, getCircleDimGeometry, getDimAngleGeometry } from "./dim_geom.js";
+import { getDimGeometry, getDimChainGeometry, getCircleDimGeometry, getDimAngleGeometry, getLinearDimTextWorld } from "./dim_geom.js";
 import {
     buildHatchLoopsFromBoundaryIds, isPointInHatch, isHatchBoundaryShape
 } from "./hatch_geom.js";
@@ -287,6 +287,12 @@ function resolveFollowPointFromAttrib(state, attrib) {
 export function resolveDimensionSnapAttribs(state) {
     for (const shape of (state.shapes || [])) {
         if (!shape || shape.type !== "dim") continue;
+        const scale = Math.max(1e-9, Number(state.view?.scale) || 1);
+        const gBefore = getDimGeometry(shape);
+        const oldMid = gBefore ? { x: Number(gBefore.allCtrl.x), y: Number(gBefore.allCtrl.y) } : null;
+        const oldText = gBefore ? getLinearDimTextWorld(shape, gBefore, scale) : null;
+        const oldOff = gBefore ? Number(gBefore.off) : 0;
+        let targetUpdated = false;
         for (const [attrKey, xKey, yKey] of [["p1Attrib", "x1", "y1"], ["p2Attrib", "x2", "y2"]]) {
             const attrib = shape[attrKey];
             if (!attrib || typeof attrib !== "object") continue;
@@ -298,6 +304,7 @@ export function resolveDimensionSnapAttribs(state) {
                 }
                 shape[xKey] = fx;
                 shape[yKey] = fy;
+                targetUpdated = true;
                 continue;
             }
             if (attrib.type === "followPoint") {
@@ -308,6 +315,7 @@ export function resolveDimensionSnapAttribs(state) {
                 }
                 shape[xKey] = Number(pt.x);
                 shape[yKey] = Number(pt.y);
+                targetUpdated = true;
                 continue;
             }
             if (attrib.type === "intersection") {
@@ -324,6 +332,26 @@ export function resolveDimensionSnapAttribs(state) {
                 if (!ip) continue;
                 shape[xKey] = Number(ip.x);
                 shape[yKey] = Number(ip.y);
+                targetUpdated = true;
+            }
+        }
+        if (targetUpdated) {
+            const gAfter = getDimGeometry(shape);
+            if (gAfter) {
+                // Preserve dimension-line normal offset when target endpoints move.
+                shape.px = Number(gAfter.x1) + Number(gAfter.nx) * Number(oldOff || 0);
+                shape.py = Number(gAfter.y1) + Number(gAfter.ny) * Number(oldOff || 0);
+                // Preserve text's full 2-axis offset from current dim midpoint.
+                if (oldMid && oldText && Number.isFinite(Number(oldText.x)) && Number.isFinite(Number(oldText.y))) {
+                    const relX = Number(oldText.x) - Number(oldMid.x);
+                    const relY = Number(oldText.y) - Number(oldMid.y);
+                    const newX = Number(gAfter.allCtrl.x) + relX;
+                    const newY = Number(gAfter.allCtrl.y) + relY;
+                    shape.tx = newX;
+                    shape.ty = newY;
+                    shape.tdx = relX;
+                    shape.tdy = relY;
+                }
             }
         }
     }

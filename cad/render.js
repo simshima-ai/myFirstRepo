@@ -387,16 +387,31 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
   }
   if (shape.type === "position") {
     const c = worldToScreen(state.view, { x: shape.x, y: shape.y });
-    const size = Math.max(1.5, (shape.size ?? 20) * state.view.scale);
-    ctx.beginPath();
-    ctx.arc(c.x, c.y, size * 0.28, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(c.x - size, c.y);
-    ctx.lineTo(c.x + size, c.y);
-    ctx.moveTo(c.x, c.y - size);
-    ctx.lineTo(c.x, c.y + size);
-    ctx.stroke();
+    const isMarker = String(shape.positionPreviewMode || "") === "marker";
+    if (isMarker) {
+      const half = 5;
+      ctx.save();
+      ctx.strokeStyle = "#7c3aed";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(c.x - half, c.y);
+      ctx.lineTo(c.x + half, c.y);
+      ctx.moveTo(c.x, c.y - half);
+      ctx.lineTo(c.x, c.y + half);
+      ctx.stroke();
+      ctx.restore();
+    } else {
+      const size = Math.max(1.5, (shape.size ?? 20) * state.view.scale);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, size * 0.28, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(c.x - size, c.y);
+      ctx.lineTo(c.x + size, c.y);
+      ctx.moveTo(c.x, c.y - size);
+      ctx.lineTo(c.x, c.y + size);
+      ctx.stroke();
+    }
   }
   if (shape.type === "dim" || shape.type === "dimchain" || shape.type === "dimangle" || shape.type === "circleDim") {
     // Determine geometry based on type

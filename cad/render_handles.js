@@ -245,16 +245,18 @@ export function createRenderHandlesOps(deps) {
         ctx.fill();
         ctx.stroke();
         const hasRel = Number.isFinite(Number(s.tdx)) && Number.isFinite(Number(s.tdy));
-        const tw = hasRel
+        const textWorld = hasRel
           ? { x: mid.x + Number(s.tdx), y: mid.y + Number(s.tdy) }
           : (Number.isFinite(Number(s.tx)) && Number.isFinite(Number(s.ty)))
             ? { x: Number(s.tx), y: Number(s.ty) }
             : { x: mid.x + nx * (12 / Math.max(1e-9, state.view.scale)), y: mid.y + ny * (12 / Math.max(1e-9, state.view.scale)) };
+        const textHandleOff = 14 / Math.max(1e-9, state.view.scale);
+        const tw = { x: Number(textWorld.x) + Number(nx) * textHandleOff, y: Number(textWorld.y) + Number(ny) * textHandleOff };
         const tp = worldToScreen(state.view, tw);
         ctx.beginPath();
-        ctx.rect(tp.x - 5, tp.y - 5, 10, 10);
-        ctx.fillStyle = "#bfdbfe";
-        ctx.strokeStyle = "#2563eb";
+        ctx.rect(tp.x - 6, tp.y - 6, 12, 12);
+        ctx.fillStyle = "#fecaca";
+        ctx.strokeStyle = "#dc2626";
         ctx.lineWidth = 1.5;
         ctx.fill();
         ctx.stroke();

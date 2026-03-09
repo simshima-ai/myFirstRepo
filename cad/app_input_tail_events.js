@@ -9,7 +9,8 @@ export function bindInputTailEvents(state, dom, helpers, deps) {
         getMouseScreen,
         getMouseWorld,
         hitTestShapes,
-        findConnectedLinesChain
+        findConnectedLinesChain,
+        setSelection
     } = deps;
 
     dom.canvas.addEventListener("pointercancel", (e) => {
@@ -67,6 +68,25 @@ export function bindInputTailEvents(state, dom, helpers, deps) {
             state.hatchDraft.boundaryIds = chain;
         }
         if (setStatus) setStatus("境界をダブルクリックで連続選択");
+        if (draw) draw();
+        e.preventDefault();
+    });
+
+    // Select(object mode): double-click to select connected chain from clicked line/arc/rect/bspline.
+    dom.canvas.addEventListener("dblclick", (e) => {
+        const tool = String(state.tool || "");
+        if (tool !== "select") return;
+        const pickMode = String(state.ui?.selectPickMode || "object");
+        if (pickMode !== "object") return;
+        const worldRaw = getMouseWorld(state, dom, e, false);
+        const hit = hitTestShapes(state, worldRaw, dom);
+        if (!hit || (hit.type !== "line" && hit.type !== "arc" && hit.type !== "rect" && hit.type !== "bspline")) return;
+        const id = Number(hit.id);
+        const chain = findConnectedLinesChain(state, id).map(Number).filter(Number.isFinite);
+        const base = e.shiftKey ? (state.selection?.ids || []).map(Number).filter(Number.isFinite) : [];
+        setSelection(Array.from(new Set([...base, ...chain])));
+        state.activeGroupId = null;
+        if (setStatus) setStatus("連続オブジェクトを選択");
         if (draw) draw();
         e.preventDefault();
     });

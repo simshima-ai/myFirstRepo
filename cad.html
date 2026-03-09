@@ -333,27 +333,28 @@
 
     .bottom-left-overlay {
       position: absolute;
-      bottom: 15px;
+      bottom: 14px;
       left: 50%;
       transform: translateX(-50%);
       z-index: 100;
       pointer-events: none;
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 4px;
       align-items: center;
     }
 
     .bottom-scale-overlay {
       position: absolute;
-      left: 156px;
-      bottom: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 44px;
       z-index: 110;
       pointer-events: none;
       display: flex;
       flex-direction: column;
       gap: 4px;
-      align-items: flex-start;
+      align-items: center;
     }
 
     .grid-scale-indicator {
@@ -363,7 +364,7 @@
       padding: 5px 7px 6px;
       color: var(--muted);
       font-size: 11px;
-      min-width: 92px;
+      min-width: 180px;
     }
 
     .grid-auto-debug {
@@ -556,6 +557,84 @@
       pointer-events: auto;
     }
 
+    /* Compact vertical rhythm for group/layer panels */
+    .right-stack .section {
+      padding: 4px 5px;
+      gap: 3px;
+    }
+
+    .right-stack .panel-toggle.section-title {
+      padding: 2px 7px;
+      font-size: 10px;
+      min-height: 22px;
+    }
+
+    .right-stack .section-subtitle.panel-toggle {
+      padding: 2px 7px;
+      min-height: 22px;
+      font-size: 10px;
+    }
+
+    .right-stack .section-subtitle.panel-toggle[data-layer-inner-toggle="groupOps"] {
+      font-size: 11px;
+      font-weight: 400;
+      border: 1px solid #a8b4c7;
+      background: #f8fafc;
+      border-radius: 7px;
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .right-stack .section-subtitle.panel-toggle[data-layer-inner-toggle="ops"] {
+      font-size: 11px;
+      font-weight: 400;
+      border: 1px solid #a8b4c7;
+      background: #f8fafc;
+      border-radius: 7px;
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.6);
+    }
+
+    .right-stack .inner-collapsible.collapsed .section-subtitle.panel-toggle {
+      min-height: 20px;
+      padding-top: 1px;
+      padding-bottom: 1px;
+    }
+
+    .right-stack #groupList,
+    .right-stack #layerList {
+      gap: 2px !important;
+    }
+
+    .right-stack .inner-collapsible {
+      padding: 4px 5px;
+      gap: 3px;
+    }
+
+    .right-stack .inner-collapsible [data-layer-inner-panel] {
+      gap: 3px !important;
+    }
+
+    .right-stack .inner-collapsible [data-layer-inner-panel],
+    .right-stack .inner-collapsible [data-layer-inner-panel] button,
+    .right-stack .inner-collapsible [data-layer-inner-panel] input,
+    .right-stack .inner-collapsible [data-layer-inner-panel] select,
+    .right-stack .inner-collapsible [data-layer-inner-panel] label,
+    .right-stack .inner-collapsible [data-layer-inner-panel] span {
+      font-size: 11px;
+    }
+
+    .right-stack .inner-collapsible button,
+    .right-stack .inner-collapsible input,
+    .right-stack .inner-collapsible select {
+      min-height: 22px;
+      padding-top: 2px;
+      padding-bottom: 2px;
+      line-height: 1.2;
+    }
+
+    .right-stack .inner-collapsible label {
+      min-height: 20px;
+    }
+
     .left-aux-stack {
       position: relative;
       z-index: 1;
@@ -648,25 +727,28 @@
     .touch-confirm-overlay {
       position: fixed;
       left: 14px;
-      top: calc(env(safe-area-inset-top, 0px) + 14px);
+      top: 14px;
+      top: calc(constant(safe-area-inset-top) + 14px);
+      top: calc(env(safe-area-inset-top) + 14px);
       z-index: 2200;
       pointer-events: auto;
       display: none;
+      flex-direction: column;
       gap: 8px;
-      align-items: center;
+      align-items: flex-start;
     }
 
     .touch-confirm-btn {
-      min-width: 120px;
-      min-height: 40px;
-      padding: 8px 18px;
-      border-radius: 999px;
+      min-width: 110px;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 8px;
       border: 1px solid #1d4ed8;
       background: #2563eb;
       color: #ffffff;
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 700;
-      box-shadow: 0 8px 20px rgba(37, 99, 235, 0.34);
+      box-shadow: 0 4px 10px rgba(37, 99, 235, 0.24);
     }
 
     .touch-confirm-btn:disabled {
@@ -678,16 +760,16 @@
     }
 
     .touch-cancel-btn {
-      min-width: 96px;
-      min-height: 40px;
-      padding: 8px 14px;
-      border-radius: 999px;
+      min-width: 110px;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 8px;
       border: 1px solid #64748b;
       background: rgba(255, 255, 255, 0.95);
       color: #0f172a;
       font-size: 13px;
       font-weight: 700;
-      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
     }
 
     .touch-cancel-btn:disabled {
@@ -707,32 +789,31 @@
 
     .touch-multiselect-overlay {
       position: fixed;
-      left: 50%;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
-      transform: translateX(calc(-50% - 160px));
+      left: 14px;
+      top: 96px;
       z-index: 2200;
       pointer-events: auto;
       display: none;
     }
 
     .touch-multiselect-btn {
-      min-width: 138px;
-      min-height: 40px;
-      padding: 8px 14px;
-      border-radius: 999px;
-      border: 1px solid #334155;
-      background: rgba(255, 255, 255, 0.94);
+      min-width: 110px;
+      min-height: 34px;
+      padding: 6px 12px;
+      border-radius: 8px;
+      border: 1px solid #64748b;
+      background: rgba(255, 255, 255, 0.95);
       color: #0f172a;
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 700;
-      box-shadow: 0 8px 20px rgba(15, 23, 42, 0.2);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
     }
 
     .touch-multiselect-btn.is-active {
       border-color: #166534;
       background: #dcfce7;
-      color: #166534;
-      box-shadow: 0 8px 20px rgba(22, 101, 52, 0.18);
+      color: #0f172a;
+      box-shadow: 0 4px 10px rgba(22, 101, 52, 0.14);
     }
 
     .touch-select-back-btn {
@@ -868,8 +949,8 @@
       background: rgba(255, 255, 255, 0.94);
       backdrop-filter: blur(4px);
       border-radius: 10px;
-      padding: 6px 7px;
-      gap: 5px;
+      padding: 4px 5px;
+      gap: 3px;
       box-shadow: var(--shadow-soft);
     }
 
@@ -877,18 +958,21 @@
       font-size: 11px;
       letter-spacing: 0.02em;
       color: #64748b;
-      margin-bottom: 1px;
+      margin-bottom: 0;
+      line-height: 1.15;
     }
 
     .right-stack .panel-toggle.section-title {
       width: 100%;
       text-align: left;
-      padding: 4px 8px;
+      padding: 3px 8px;
       background: rgba(248, 250, 252, 0.95);
       border: 1px solid rgba(148, 163, 184, 0.22);
       border-radius: 8px;
       cursor: pointer;
       position: relative;
+      min-height: 22px;
+      line-height: 1.15;
     }
 
     .right-stack .panel-toggle.section-title::after {
@@ -911,8 +995,8 @@
     }
 
     .right-stack label {
-      min-height: 24px;
-      gap: 6px;
+      min-height: 20px;
+      gap: 4px;
       color: #334155;
     }
 
@@ -922,7 +1006,7 @@
       min-width: 0;
       border: 1px solid var(--line);
       border-radius: 7px;
-      padding: 4px 6px;
+      padding: 2px 6px;
       background: rgba(255, 255, 255, 0.98);
     }
 
@@ -931,7 +1015,7 @@
     }
 
     .right-stack button {
-      padding: 6px 8px;
+      padding: 4px 8px;
       border-radius: 8px;
     }
 
@@ -1008,7 +1092,7 @@
     .right-stack #groupList>div {
       border: 1px solid rgba(148, 163, 184, 0.22);
       border-radius: 8px;
-      padding: 4px 5px;
+      padding: 3px 4px;
       background: rgba(255, 255, 255, 0.65);
     }
 
@@ -1094,7 +1178,7 @@
 
     .right-stack #layerList button,
     .right-stack #groupList button {
-      padding: 4px 7px;
+      padding: 3px 6px;
       border-radius: 7px;
       font-size: 12px;
     }
@@ -1102,7 +1186,7 @@
     .compact-actions {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 6px;
+      gap: 4px;
     }
 
     .right-stack [data-layer-inner-panel="ops"] {
@@ -1122,13 +1206,25 @@
     }
 
     .right-stack button[data-layer-inner-toggle] {
-      border: none !important;
-      background: transparent !important;
-      box-shadow: none !important;
-      padding: 0 2px !important;
-      min-height: 16px;
-      line-height: 1.1;
-      border-radius: 0 !important;
+      border: 1px solid #a8b4c7 !important;
+      background: #f8fafc !important;
+      box-shadow: inset 0 -1px 0 rgba(255, 255, 255, 0.65) !important;
+      padding: 2px 7px !important;
+      min-height: 22px;
+      line-height: 1.15;
+      border-radius: 7px !important;
+    }
+
+    .right-stack button[data-layer-inner-toggle].is-collapsed {
+      min-height: 20px !important;
+      padding-top: 1px !important;
+      padding-bottom: 1px !important;
+    }
+
+    .right-stack .section.collapsed > .panel-toggle.section-title {
+      min-height: 18px;
+      padding-top: 1px;
+      padding-bottom: 1px;
     }
 
     .right-stack button[data-layer-inner-toggle] .inner-arrow {
@@ -1148,7 +1244,7 @@
 
     .right-stack [data-layer-inner-panel="groupOps"] {
       font-size: 12px;
-      gap: 4px !important;
+      gap: 2px !important;
     }
 
     .right-stack [data-layer-inner-panel="groupOps"] button {
@@ -1156,7 +1252,19 @@
     }
 
     .right-stack [data-layer-inner-panel="ops"] {
-      gap: 4px !important;
+      gap: 2px !important;
+    }
+
+    .right-stack .inner-collapsible [data-layer-inner-panel] > div {
+      gap: 3px !important;
+    }
+
+    .right-stack .inner-collapsible [data-layer-inner-panel] > label {
+      min-height: 0;
+      line-height: 1;
+      margin: 0;
+      padding: 0;
+      gap: 2px;
     }
 
     .sidebar .section.utilities {
@@ -2077,19 +2185,19 @@
           <div id="groupPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="高さを変更"></div>
           <div id="groupPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="幅を変更"></div>
           <button class="section-title panel-toggle" type="button">グループ</button>
-          <div id="groupList" style="display:flex; flex-direction:column; gap:4px;"></div>
+          <div id="groupList" style="display:flex; flex-direction:column; gap:3px;"></div>
           <div class="section inner-collapsible" data-inner-owner="groups">
             <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="groupOps">グループ操作</button>
-            <div data-layer-inner-panel="groupOps" style="display:flex; flex-direction:column; gap:6px;">
-              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+            <div data-layer-inner-panel="groupOps" style="display:flex; flex-direction:column; gap:4px;">
+              <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="newGroupNameInput" type="text" placeholder="グループ名">
                 <button id="createGroupBtn" type="button">新規グループ作成</button>
               </div>
-              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+              <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="renameGroupNameInput" type="text" placeholder="グループ名">
                 <button id="renameGroupBtn" type="button">リネーム</button>
               </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
                 <button id="moveGroupUpBtn" type="button">↑</button>
                 <button id="moveGroupDownBtn" type="button">↓</button>
               </div>
@@ -2112,25 +2220,25 @@
           <div id="layerPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="高さを変更"></div>
           <div id="layerPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="幅を変更"></div>
           <button class="section-title panel-toggle" type="button">レイヤー</button>
-          <div id="layerList" style="display:flex; flex-direction:column; gap:4px;"></div>
+          <div id="layerList" style="display:flex; flex-direction:column; gap:3px;"></div>
           <div class="section inner-collapsible" data-inner-owner="layers">
             <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="ops">レイヤー操作</button>
-            <div data-layer-inner-panel="ops" style="display:flex; flex-direction:column; gap:6px;">
-              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+            <div data-layer-inner-panel="ops" style="display:flex; flex-direction:column; gap:4px;">
+              <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="newLayerNameInput" type="text" placeholder="新規レイヤー名">
                 <button id="addLayerBtn" type="button">新規作成</button>
               </div>
-              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+              <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="renameLayerNameInput" type="text" placeholder="レイヤー名">
                 <button id="renameLayerBtn" type="button">リネーム</button>
               </div>
-              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+              <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <button id="moveSelectionLayerBtn" type="button" style="grid-column:1 / -1;">オブジェクトを移動</button>
               </div>
-              <div style="display:grid; grid-template-columns:1fr auto; gap:6px;">
+              <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <button id="deleteLayerBtn" type="button" style="grid-column:1 / -1;">レイヤー削除</button>
               </div>
-              <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
                 <button id="moveLayerUpBtn" type="button">↑</button>
                 <button id="moveLayerDownBtn" type="button">↓</button>
               </div>
@@ -2156,8 +2264,8 @@
         <div id="statusText" class="status"></div>
       </div>
       <div id="touchConfirmOverlay" class="touch-confirm-overlay">
-        <button id="touchCancelBtn" class="touch-cancel-btn" type="button">キャンセル</button>
         <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">決定</button>
+        <button id="touchCancelBtn" class="touch-cancel-btn" type="button">キャンセル</button>
       </div>
       <div id="touchMultiSelectOverlay" class="touch-multiselect-overlay">
         <button id="touchMultiSelectBtn" class="touch-multiselect-btn" type="button">複数選択 OFF</button>

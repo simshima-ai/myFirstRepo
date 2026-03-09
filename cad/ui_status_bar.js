@@ -1,11 +1,9 @@
 export function refreshStatusBar(state, dom) {
   if (!dom?.statusText) return;
   const toolText = `Tool: ${state.tool ? state.tool.toUpperCase() : "NONE"}`;
-  const x = state.input.hoverWorld?.x ?? 0;
-  const y = state.input.hoverWorld?.y ?? 0;
-  const coordText = `X: ${x.toFixed(2)}, Y: ${y.toFixed(2)}`;
   const zoomScale = Math.max(0, Number(state.view?.scale) || 0);
-  const zoomText = `Zoom: ${(zoomScale * 100).toFixed(0)}%`;
+  const fps = Number(state.ui?.perfStats?.fps || 0);
+  const objects = Array.isArray(state.shapes) ? state.shapes.length : 0;
   const baseGrid = Math.max(1e-9, Number(state.grid?.size) || 100);
   let effGrid = baseGrid;
   if (state.grid?.auto) {
@@ -47,11 +45,10 @@ export function refreshStatusBar(state, dom) {
       `\nZoom: ${(zoomScale * 100).toFixed(1)}%` +
       `\nEffectiveGrid: ${Number(baseGrid.toFixed(4)).toString()}`;
   }
-  const gridText = `Grid: ${Number(effGrid.toFixed(4)).toString()}`;
-  const isDraggingSelection = state.selection?.drag?.active && state.selection?.drag?.moved;
-  const isDraggingVertex = state.vertexEdit?.drag?.active && state.vertexEdit?.drag?.moved;
-  const dragHint = (isDraggingSelection || isDraggingVertex) ? "  |  Enter to confirm" : "";
-  dom.statusText.textContent = `${toolText} | ${zoomText} | ${gridText} | ${coordText}${dragHint}`;
+  const unit = String(state.pageSetup?.unit || "mm").toLowerCase();
+  const unitLabel = (unit === "in") ? "inch" : unit;
+  const gridModelText = Number.isFinite(effGrid) ? Number(effGrid.toFixed(3)).toString() : "-";
+  dom.statusText.textContent = `${toolText} | FPS: ${fps.toFixed(1)} | Objects: ${objects} | Zoom: ${(zoomScale * 100).toFixed(0)}% | 1 grid = ${gridModelText} ${unitLabel}`;
 
   if (dom.gridScaleIndicator && dom.gridScaleBar && dom.gridScaleText) {
     const unit = String(state.pageSetup?.unit || "mm").toLowerCase();
@@ -63,11 +60,10 @@ export function refreshStatusBar(state, dom) {
     const viewportW = Math.max(1, Number(state.view?.viewportWidth) || 1);
     const maxBarPx = Math.max(120, Math.min(900, viewportW * 0.45));
     const barPx = Math.max(1, Math.min(maxBarPx, Number.isFinite(gridPx) ? gridPx : 1));
-    dom.gridScaleIndicator.style.display = "";
+    dom.gridScaleIndicator.style.display = "none";
     dom.gridScaleBar.style.width = `${barPx.toFixed(1)}px`;
     const unitLabel = (unit === "in") ? "inch" : unit;
     const modelTxt = Number.isFinite(gridModelUnit) ? Number(gridModelUnit.toFixed(3)).toString() : "-";
-    const paperTxt = Number.isFinite(gridPaperMm) ? Number(gridPaperMm.toFixed(3)).toString() : "-";
-    dom.gridScaleText.textContent = `1 grid = ${modelTxt} ${unitLabel} (model) / ${paperTxt} mm (paper)`;
+    dom.gridScaleText.textContent = `1 grid = ${modelTxt} ${unitLabel}`;
   }
 }

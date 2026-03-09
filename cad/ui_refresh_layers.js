@@ -46,7 +46,7 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
         const row = document.createElement("div");
         row.style.display = "grid";
         row.style.gridTemplateColumns = "1fr auto";
-        row.style.gap = "6px";
+        row.style.gap = "4px";
         row.style.alignItems = "center";
         const isActive = (Number(layer.id) === Number(state.activeLayerId));
         const nameBtn = document.createElement("button");
@@ -57,6 +57,7 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
         nameBtn.style.textAlign = "left";
         nameBtn.style.width = "100%";
         nameBtn.style.fontSize = "11px";
+        nameBtn.style.padding = "3px 6px";
         nameBtn.style.background = isActive ? "rgba(219,234,254,0.9)" : "rgba(255,255,255,0.75)";
         nameBtn.style.border = isActive ? "1px solid rgba(37,99,235,0.45)" : "1px solid rgba(148,163,184,0.25)";
         nameBtn.style.color = isActive ? "var(--ink)" : "var(--muted)";
@@ -65,6 +66,7 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
         modeBtn.type = "button";
         modeBtn.dataset.layerModeCycle = String(layer.id);
         modeBtn.style.fontSize = "10px";
+        modeBtn.style.padding = "2px 6px";
         const visible = layer.visible !== false;
         const locked = layer.locked === true;
         modeBtn.textContent = visible ? (locked ? "LOCK" : "ON") : "OFF";
@@ -127,6 +129,7 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
     const key = btn.getAttribute("data-layer-inner-toggle");
     if (!key) continue;
     const collapsed = !!state.ui?.layerPanelInnerCollapsed?.[key];
+    btn.classList.toggle("is-collapsed", collapsed);
     if (!btn.dataset.innerLabel) {
       btn.dataset.innerLabel = String(btn.textContent || "").replace(/^[▾▸]\s*/, "");
     }

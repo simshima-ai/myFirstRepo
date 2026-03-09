@@ -607,6 +607,8 @@ const helpers = {
       d.stage = 1;
       d.candidateEnd = null;
       state.input.dragStartWorld = { x: Number(d.p1.x), y: Number(d.p1.y) };
+      state.preview = createPosition(d.p1);
+      state.preview.positionPreviewMode = "marker";
       setStatus("RECT: second point candidate, then Confirm");
       draw();
       return true;

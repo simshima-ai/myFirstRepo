@@ -38,7 +38,7 @@ export function createTouchInputController(state, dom, deps) {
         return { center: { x: cx, y: cy }, distance };
     };
 
-    const isTouchMultiSelect = (e) => !!(state.ui?.touchMode && state.ui?.touchMultiSelect && e?.pointerType === "touch");
+    const isTouchMultiSelect = () => !!(state.ui?.touchMode && state.ui?.touchMultiSelect);
 
     return {
         isAppendSelect(e) {

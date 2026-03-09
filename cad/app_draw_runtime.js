@@ -1,4 +1,4 @@
-export function createDrawRuntime(config) {
+﻿export function createDrawRuntime(config) {
   const {
     state,
     dom,
@@ -80,24 +80,8 @@ export function createDrawRuntime(config) {
       ps.accumMs = 0;
       ps.frameCount = 0;
     }
-    if (dom.fpsBadge) {
-      const show = !!state.ui?.showFps;
-      dom.fpsBadge.style.display = show ? "" : "none";
-      if (show) {
-        dom.fpsBadge.textContent = `FPS ${Number(ps.fps || 0).toFixed(1)} | Draw ${Number(ps.drawMs || 0).toFixed(1)}ms`;
-      }
-    }
-    if (dom.objectCountBadge) {
-      const show = !!state.ui?.showObjectCount;
-      dom.objectCountBadge.style.display = show ? "" : "none";
-      if (show) {
-        const count = Array.isArray(state.shapes) ? state.shapes.length : 0;
-        const lang = String(state.ui?.language || "ja").toLowerCase();
-        dom.objectCountBadge.textContent = (lang === "en")
-          ? `Objects ${count}`
-          : `オブジェクト数 ${count}`;
-      }
-    }
+    if (dom.fpsBadge) dom.fpsBadge.style.display = "none";
+    if (dom.objectCountBadge) dom.objectCountBadge.style.display = "none";
   }
 
   function mergeDrawOpts(base, incoming) {

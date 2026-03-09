@@ -175,7 +175,7 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
       row.dataset.groupRow = String(group.id);
       row.draggable = true;
       row.style.display = "flex";
-      row.style.gap = "6px";
+      row.style.gap = "4px";
       row.style.alignItems = "center";
       const isActiveGroup = Number(group.id) === Number(state.activeGroupId);
       const isSelectedGroup = selectedGroupIdSet.has(Number(group.id));
@@ -192,11 +192,11 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
         row.style.background = "rgba(220,252,231,0.72)";
       }
       row.style.borderRadius = "8px";
-      row.style.padding = "4px 5px";
+      row.style.padding = "3px 4px";
       const nameWrap = document.createElement("div");
       nameWrap.style.display = "flex";
       nameWrap.style.alignItems = "center";
-      nameWrap.style.gap = "6px";
+      nameWrap.style.gap = "4px";
       nameWrap.style.paddingLeft = `${depth * 12}px`;
       const treeBtn = document.createElement("button");
       treeBtn.type = "button";
@@ -285,9 +285,9 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
       const unGroupHeader = document.createElement("div");
       unGroupHeader.style.display = "grid";
       unGroupHeader.style.gridTemplateColumns = "20px 1fr";
-      unGroupHeader.style.gap = "6px";
+      unGroupHeader.style.gap = "4px";
       unGroupHeader.style.alignItems = "center";
-      unGroupHeader.style.padding = "4px 5px";
+      unGroupHeader.style.padding = "3px 4px";
       unGroupHeader.style.color = "var(--muted)";
       unGroupHeader.style.fontSize = "12px";
       unGroupHeader.style.fontWeight = "600";
@@ -358,11 +358,11 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
     objRow.style.display = "grid";
     objRow.draggable = true;
     objRow.style.gridTemplateColumns = "auto 1fr";
-    objRow.style.gap = "6px";
+    objRow.style.gap = "4px";
     objRow.style.alignItems = "center";
     objRow.style.border = "1px dashed rgba(148,163,184,0.20)";
     objRow.style.borderRadius = "8px";
-    objRow.style.padding = "3px 5px";
+    objRow.style.padding = "2px 4px";
     const selectedSet = selectedShapeIdSetArg || new Set((state.selection?.ids || []).map(Number));
     const isShapeSelected = selectedSet.has(Number(s.id));
     const inActiveGroupSelection = !!activeGroupShapeIdSet?.has?.(Number(s.id));

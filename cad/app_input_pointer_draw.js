@@ -10,7 +10,6 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         setSelection,
         pushHistory,
         createCircle,
-        createRect,
         createPosition,
         nextShapeId,
         applyToolStrokeToShape,
@@ -35,7 +34,13 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         const draft = state.input.touchRectDraft;
         if (draft.stage === 1 && draft.p1) {
             draft.candidateEnd = { x: world.x, y: world.y };
-            state.preview = createRect(draft.p1, draft.candidateEnd);
+            state.preview = {
+                type: "touchRectPlan",
+                x1: Number(draft.p1.x),
+                y1: Number(draft.p1.y),
+                x2: Number(draft.candidateEnd.x),
+                y2: Number(draft.candidateEnd.y),
+            };
             if (setStatus) setStatus("四角: 2点目候補を更新。左上の「決定」で作成");
         } else {
             draft.candidateStart = { x: world.x, y: world.y };

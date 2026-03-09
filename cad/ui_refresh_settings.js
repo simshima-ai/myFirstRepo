@@ -173,35 +173,35 @@
     ));
     const show = touchMode && (hasLinearDraft || canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy" || tool === "rect");
     let enabled = false;
-    let label = panelLang === "en" ? "Confirm" : "豎ｺ螳・;
+    let label = panelLang === "en" ? "Confirm" : "確定";
     if (hasLinearDraft) {
       enabled = true;
-      label = panelLang === "en" ? "Finish Continuous Line" : "騾｣邯夂ｷ壹ｒ遒ｺ螳・;
+      label = panelLang === "en" ? "Finish Continuous Line" : "連続線を確定";
     } else if (canLineFinalize) {
       enabled = !!(state.polylineDraft && (state.polylineDraft.points || []).length >= 2);
       label = (lineMode === "freehand")
-        ? (panelLang === "en" ? "Finalize B-Spline" : "B繧ｹ繝励Λ繧､繝ｳ遒ｺ螳・)
-        : (panelLang === "en" ? "Finish Continuous Line" : "騾｣邯夂ｷ壹ｒ遒ｺ螳・);
+        ? (panelLang === "en" ? "Finalize B-Spline" : "Bスプライン確定")
+        : (panelLang === "en" ? "Finish Continuous Line" : "連続線を確定");
     } else if (isChainDim) {
       enabled = canPrepareDim || canFinalizeDim;
       label = canFinalizeDim
-        ? (panelLang === "en" ? "Finalize Dim" : "蟇ｸ豕慕｢ｺ螳・)
-        : (panelLang === "en" ? "Set Placement" : "驟咲ｽｮ菴咲ｽｮ繧呈欠螳・);
+        ? (panelLang === "en" ? "Finalize Dim" : "寸法確定")
+        : (panelLang === "en" ? "Set Placement" : "配置位置を指定");
     } else if (tool === "circle" && circleMode === "threepoint") {
       enabled = canCircleThreePoint;
-      label = panelLang === "en" ? "Create 3-Point Circle" : "荳臥せ蜀・ｒ菴懈・";
+      label = panelLang === "en" ? "Create 3-Point Circle" : "三点円を作成";
     } else if (tool === "fillet") {
       enabled = canFillet;
-      label = panelLang === "en" ? "Apply Fillet" : "繝輔ぅ繝ｬ繝・ヨ螳溯｡・;
+      label = panelLang === "en" ? "Apply Fillet" : "フィレット適用";
     } else if (tool === "doubleline") {
       enabled = canDline;
-      label = panelLang === "en" ? "Apply Double Line" : "莠碁㍾邱壹ｒ驕ｩ逕ｨ";
+      label = panelLang === "en" ? "Apply Double Line" : "二重線を適用";
     } else if (tool === "hatch") {
       enabled = canHatch;
-      label = panelLang === "en" ? "Apply Hatch" : "繝上ャ繝√Φ繧ｰ螳溯｡・;
+      label = panelLang === "en" ? "Apply Hatch" : "ハッチング適用";
     } else if (tool === "patterncopy") {
       enabled = canPatternCopy;
-      label = panelLang === "en" ? "Run Pattern Copy" : "繝代ち繝ｼ繝ｳ繧ｳ繝斐・螳溯｡・;
+      label = panelLang === "en" ? "Run Pattern Copy" : "パターンコピー実行";
     }
     if (tool === "rect") {
       enabled = canRectConfirm;
@@ -210,6 +210,18 @@
         : (panelLang === "en" ? "Confirm 1st Point" : "1点目を確定");
     }
     dom.touchConfirmOverlay.style.display = show ? "flex" : "none";
+    if (show) {
+      // Keep top-fixed placement and avoid overlap by shifting horizontally to the right of sidebar.
+      const sidebar = document.querySelector(".sidebar");
+      const top = 14;
+      let left = 14;
+      if (sidebar) {
+        const r = sidebar.getBoundingClientRect();
+        left = Math.max(8, Math.round(r.right + 8));
+      }
+      dom.touchConfirmOverlay.style.left = `${left}px`;
+      dom.touchConfirmOverlay.style.top = `${top}px`;
+    }
     dom.touchConfirmBtn.disabled = !enabled;
     dom.touchConfirmBtn.textContent = label;
     if (dom.touchCancelBtn) {
@@ -240,10 +252,28 @@
     const needsMultiSelect = (tool === "select" || tool === "hatch" || tool === "doubleline" || tool === "patterncopy" || (tool === "circle" && circleMode === "threepoint"));
     const on = !!state.ui?.touchMultiSelect;
     dom.touchMultiSelectOverlay.style.display = (touchMode && needsMultiSelect) ? "block" : "none";
+    if (touchMode && needsMultiSelect) {
+      const sidebar = document.querySelector(".sidebar");
+      let left = 14;
+      let top = 14;
+      if (sidebar) {
+        const r = sidebar.getBoundingClientRect();
+        left = Math.max(8, Math.round(r.right + 8));
+      }
+      const confirmShown = !!(dom.touchConfirmOverlay && dom.touchConfirmOverlay.style.display !== "none");
+      if (confirmShown) {
+        const cr = dom.touchConfirmOverlay.getBoundingClientRect();
+        top = Math.max(8, Math.round(cr.bottom + 8));
+      } else {
+        top = 14;
+      }
+      dom.touchMultiSelectOverlay.style.left = `${left}px`;
+      dom.touchMultiSelectOverlay.style.top = `${top}px`;
+    }
     dom.touchMultiSelectBtn.classList.toggle("is-active", on);
     dom.touchMultiSelectBtn.textContent = on
-      ? (panelLang === "en" ? "Multi-Select ON" : "隍・焚驕ｸ謚・ON")
-      : (panelLang === "en" ? "Multi-Select OFF" : "隍・焚驕ｸ謚・OFF");
+      ? (panelLang === "en" ? "Multi-Select ON" : "複数選択 ON")
+      : (panelLang === "en" ? "Multi-Select OFF" : "複数選択 OFF");
   }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.checked = !!state.ui?.showFps;

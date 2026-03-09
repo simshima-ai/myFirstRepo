@@ -539,6 +539,37 @@ export function setupInputListenersImpl(state, dom, helpers) {
         if (state.tool === "doubleline") {
             state.dlinePreview = buildDoubleLinePreview(state, worldRaw);
         }
+        const touchRectDraft = state.input?.touchRectDraft;
+        const isTouchRectFlow = (state.tool === "rect") && !!state.ui?.touchMode;
+        if (isTouchRectFlow && touchRectDraft) {
+            if (Number(touchRectDraft.stage) === 1 && touchRectDraft.p1 && touchRectDraft.candidateEnd) {
+                state.preview = {
+                    type: "touchRectPlan",
+                    x1: Number(touchRectDraft.p1.x),
+                    y1: Number(touchRectDraft.p1.y),
+                    x2: Number(touchRectDraft.candidateEnd.x),
+                    y2: Number(touchRectDraft.candidateEnd.y),
+                };
+            } else if (Number(touchRectDraft.stage) === 1 && touchRectDraft.p1) {
+                const ph = state.input.hoverWorld || world;
+                state.preview = {
+                    type: "touchRectCandidates",
+                    x1: Number(touchRectDraft.p1.x),
+                    y1: Number(touchRectDraft.p1.y),
+                    x2: Number(ph.x),
+                    y2: Number(ph.y),
+                };
+            } else if (touchRectDraft.candidateStart) {
+                state.preview = helpers.createPosition(touchRectDraft.candidateStart);
+                state.preview.positionPreviewMode = "marker";
+            } else {
+                const ph = state.input.hoverWorld || world;
+                state.preview = helpers.createPosition(ph);
+                state.preview.positionPreviewMode = "marker";
+            }
+            drawFast();
+            return;
+        }
         if (state.input.dragStartWorld) {
             const p1 = state.input.dragStartWorld;
             const p2 = state.input.hoverWorld;

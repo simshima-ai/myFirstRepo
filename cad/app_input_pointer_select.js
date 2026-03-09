@@ -88,6 +88,21 @@ export function handlePointerDownSelectMode(state, dom, helpers, deps, ctx) {
     const hit = hitTestShapes(state, worldRaw, dom);
     if (hit) {
         const pickMode = String(state.ui?.selectPickMode || "object");
+        const touchMultiToggleMode = !!(
+            state.ui?.touchMode &&
+            state.ui?.touchMultiSelect &&
+            pickMode === "object"
+        );
+        if (touchMultiToggleMode) {
+            const cur = new Set((state.selection?.ids || []).map(Number));
+            const hid = Number(hit.id);
+            if (cur.has(hid)) cur.delete(hid);
+            else cur.add(hid);
+            setSelection(Array.from(cur));
+            state.activeGroupId = null;
+            if (draw) draw();
+            return true;
+        }
         if (pickMode === "group" && hit.groupId != null) {
             toggleGroupSelectionById(state, hit.groupId);
         } else if (isAppendSelect(e)) {

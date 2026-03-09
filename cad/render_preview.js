@@ -73,6 +73,58 @@ export function createRenderPreviewOps(config) {
 
   function drawPreview(ctx, state, preview) {
     if (!preview) return;
+    if (preview.type === "touchRectCandidates") {
+      const p1 = worldToScreen(state.view, { x: Number(preview.x1), y: Number(preview.y1) });
+      const p2 = worldToScreen(state.view, { x: Number(preview.x2), y: Number(preview.y2) });
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "#7c3aed";
+      ctx.lineWidth = 1.2;
+      const drawMarker = (x, y) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x - 7, y); ctx.lineTo(x + 7, y);
+        ctx.moveTo(x, y - 7); ctx.lineTo(x, y + 7);
+        ctx.stroke();
+      };
+      drawMarker(p1.x, p1.y);
+      drawMarker(p2.x, p2.y);
+      ctx.restore();
+      return;
+    }
+    if (preview.type === "touchRectPlan") {
+      const p1 = worldToScreen(state.view, { x: Number(preview.x1), y: Number(preview.y1) });
+      const p2 = worldToScreen(state.view, { x: Number(preview.x2), y: Number(preview.y2) });
+      const sx = Math.min(p1.x, p2.x), sy = Math.min(p1.y, p2.y);
+      const ex = Math.max(p1.x, p2.x), ey = Math.max(p1.y, p2.y);
+      ctx.save();
+      ctx.strokeStyle = "#ef4444";
+      ctx.setLineDash([7, 4]);
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy); ctx.lineTo(ex, sy);
+      ctx.lineTo(ex, ey); ctx.lineTo(sx, ey);
+      ctx.closePath();
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.strokeStyle = "#7c3aed";
+      ctx.lineWidth = 1.2;
+      const drawMarker = (x, y) => {
+        ctx.beginPath();
+        ctx.arc(x, y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(x - 7, y); ctx.lineTo(x + 7, y);
+        ctx.moveTo(x, y - 7); ctx.lineTo(x, y + 7);
+        ctx.stroke();
+      };
+      drawMarker(p1.x, p1.y);
+      drawMarker(p2.x, p2.y);
+      ctx.restore();
+      return;
+    }
     if (preview.type === "rect" && preview.rectPreviewMode === "fixed") {
       const p1 = worldToScreen(state.view, { x: Number(preview.x1), y: Number(preview.y1) });
       const p2 = worldToScreen(state.view, { x: Number(preview.x2), y: Number(preview.y2) });
@@ -83,6 +135,23 @@ export function createRenderPreviewOps(config) {
       ctx.setLineDash([7, 4]);
       ctx.lineWidth = 1.1;
       ctx.strokeRect(sx, sy, sw, sh);
+      const ax = Number(preview.touchRectAnchor?.x);
+      const ay = Number(preview.touchRectAnchor?.y);
+      if (Number.isFinite(ax) && Number.isFinite(ay)) {
+        const a = worldToScreen(state.view, { x: ax, y: ay });
+        ctx.setLineDash([]);
+        ctx.strokeStyle = "#7c3aed";
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(a.x, a.y, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(a.x - 7, a.y);
+        ctx.lineTo(a.x + 7, a.y);
+        ctx.moveTo(a.x, a.y - 7);
+        ctx.lineTo(a.x, a.y + 7);
+        ctx.stroke();
+      }
       ctx.restore();
       drawPreviewMetrics(ctx, state, preview);
       return;

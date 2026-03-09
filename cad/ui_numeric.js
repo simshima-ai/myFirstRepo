@@ -2,14 +2,38 @@ export function clampGridAutoTiming(v) {
   return Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 }
 
-export function gridThresholdsFromTiming(timing) {
-  const t = clampGridAutoTiming(timing);
+const GRID_T50_MIN = 110;
+const GRID_T50_OLD_MAX = 240;
+const GRID_T50_SPLIT = 157; // old formula at timing=60
+const GRID_T50_NEW_MAX = 420; // extended slow-side headroom
+
+function oldThresholdsFromTiming(t) {
   const u = t / 100;
   const s = u * u;
-  const th50 = Math.round(110 + (130 * s));
-  const th10 = Math.round(150 + (220 * s));
-  const th5 = Math.round(200 + (320 * s));
-  const th1 = Math.round(260 + (520 * s));
+  return {
+    th50: Math.round(110 + (130 * s)),
+    th10: Math.round(150 + (220 * s)),
+    th5: Math.round(200 + (320 * s)),
+    th1: Math.round(260 + (520 * s)),
+  };
+}
+
+export function gridThresholdsFromTiming(timing) {
+  const t = clampGridAutoTiming(timing);
+  const old = oldThresholdsFromTiming(t);
+  let th50 = old.th50;
+  let th10 = old.th10;
+  let th5 = old.th5;
+  let th1 = old.th1;
+  if (t > 60) {
+    const z = ((t - 60) / 40);
+    const w = z * z;
+    const from = oldThresholdsFromTiming(60);
+    th50 = Math.round(from.th50 + (420 - from.th50) * w);
+    th10 = Math.round(from.th10 + (680 - from.th10) * w);
+    th5 = Math.round(from.th5 + (980 - from.th5) * w);
+    th1 = Math.round(from.th1 + (1500 - from.th1) * w);
+  }
   return {
     th50,
     th10: Math.max(th50, th10),
@@ -19,9 +43,13 @@ export function gridThresholdsFromTiming(timing) {
 }
 
 export function gridAutoTimingFromThreshold50(th50) {
-  const v50 = Math.max(110, Math.min(240, Math.round(Number(th50) || 130)));
-  const s = Math.max(0, Math.min(1, (v50 - 110) / 130));
-  return clampGridAutoTiming(Math.sqrt(s) * 100);
+  const v50 = Math.max(GRID_T50_MIN, Math.min(GRID_T50_NEW_MAX, Math.round(Number(th50) || 130)));
+  if (v50 <= GRID_T50_SPLIT) {
+    const s = Math.max(0, Math.min(1, (v50 - GRID_T50_MIN) / (GRID_T50_OLD_MAX - GRID_T50_MIN)));
+    return clampGridAutoTiming(Math.sqrt(s) * 100);
+  }
+  const z = Math.sqrt(Math.max(0, Math.min(1, (v50 - GRID_T50_SPLIT) / (GRID_T50_NEW_MAX - GRID_T50_SPLIT))));
+  return clampGridAutoTiming(60 + (40 * z));
 }
 
 export function gridAutoTimingLabelText(timing) {

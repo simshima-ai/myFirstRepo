@@ -12,6 +12,7 @@ export function createSelectionBoxOps(config) {
     collectGroupTreeShapeIds,
     isLayerVisible,
     isLayerLocked,
+    isGroupVisible,
     sampleBSplinePoints,
     getImageCornersWorld
   } = config || {};
@@ -136,6 +137,11 @@ export function createSelectionBoxOps(config) {
           return (s.x1 >= wx1 && s.x1 <= wx2 && s.y1 >= wy1 && s.y1 <= wy2) &&
             (s.x2 >= wx1 && s.x2 <= wx2 && s.y2 >= wy1 && s.y2 <= wy2);
         }
+        if (s.type === "polyline") {
+          const pts = Array.isArray(s.points) ? s.points : [];
+          if (!pts.length) return false;
+          return pts.every((p) => Number(p.x) >= wx1 && Number(p.x) <= wx2 && Number(p.y) >= wy1 && Number(p.y) <= wy2);
+        }
         if (s.type === "rect") {
           const sxMin = Math.min(s.x1, s.x2), sxMax = Math.max(s.x1, s.x2);
           const syMin = Math.min(s.y1, s.y2), syMax = Math.max(s.y1, s.y2);
@@ -177,6 +183,29 @@ export function createSelectionBoxOps(config) {
           const p1 = { x: s.x1, y: s.y1 }, p2 = { x: s.x2, y: s.y2 };
           if (isInside(s)) return true;
           return rectEdges.some(edge => segmentIntersectionPoint(p1, p2, edge[0], edge[1]));
+        }
+        if (s.type === "polyline") {
+          const pts = Array.isArray(s.points) ? s.points : [];
+          if (pts.length < 2) return false;
+          const anyInside = pts.some((p) => Number(p.x) >= wx1 && Number(p.x) <= wx2 && Number(p.y) >= wy1 && Number(p.y) <= wy2);
+          if (anyInside) return true;
+          const edgesRect = [
+            [{ x: wx1, y: wy1 }, { x: wx2, y: wy1 }],
+            [{ x: wx2, y: wy1 }, { x: wx2, y: wy2 }],
+            [{ x: wx2, y: wy2 }, { x: wx1, y: wy2 }],
+            [{ x: wx1, y: wy2 }, { x: wx1, y: wy1 }]
+          ];
+          for (let i = 1; i < pts.length; i++) {
+            const p1 = { x: Number(pts[i - 1].x), y: Number(pts[i - 1].y) };
+            const p2 = { x: Number(pts[i].x), y: Number(pts[i].y) };
+            if (edgesRect.some((e) => segmentIntersectionPoint(p1, p2, e[0], e[1]))) return true;
+          }
+          if (s.closed) {
+            const p1 = { x: Number(pts[pts.length - 1].x), y: Number(pts[pts.length - 1].y) };
+            const p2 = { x: Number(pts[0].x), y: Number(pts[0].y) };
+            if (edgesRect.some((e) => segmentIntersectionPoint(p1, p2, e[0], e[1]))) return true;
+          }
+          return false;
         }
         if (s.type === "rect") {
           const sxMin = Math.min(s.x1, s.x2), sxMax = Math.max(s.x1, s.x2);
@@ -254,9 +283,25 @@ export function createSelectionBoxOps(config) {
       };
 
       const picked = [];
+      const shapeGroupMap = new Map();
+      for (const g of (state.groups || [])) {
+        const gid = Number(g?.id);
+        if (!Number.isFinite(gid)) continue;
+        for (const sid of (g?.shapeIds || [])) {
+          const sidNum = Number(sid);
+          if (!Number.isFinite(sidNum)) continue;
+          shapeGroupMap.set(sidNum, gid);
+        }
+      }
+      const resolveGroupId = (shape) => {
+        const sid = Number(shape?.id);
+        const gidFromMap = shapeGroupMap.has(sid) ? Number(shapeGroupMap.get(sid)) : NaN;
+        return Number.isFinite(gidFromMap) ? gidFromMap : Number(shape?.groupId);
+      };
       for (const s of state.shapes) {
         if (!isLayerVisible(state, s.layerId)) continue;
         if (isLayerLocked(state, s.layerId)) continue;
+        if (!isGroupVisible(state, resolveGroupId(s))) continue;
         if (state.ui?.layerView?.editOnlyActive && Number(s.layerId ?? state.activeLayerId) !== Number(state.activeLayerId)) continue;
         if (leftToRight ? isInside(s) : isCrossing(s)) picked.push(Number(s.id));
       }
@@ -273,7 +318,7 @@ export function createSelectionBoxOps(config) {
           const pickedGroupIds = new Set();
           for (const sid of picked) {
             const s = byId.get(Number(sid));
-            const gid = Number(s?.groupId);
+            const gid = resolveGroupId(s);
             if (Number.isFinite(gid)) pickedGroupIds.add(gid);
           }
           const nextGroupIds = box.additive

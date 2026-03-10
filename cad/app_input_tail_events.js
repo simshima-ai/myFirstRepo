@@ -58,7 +58,7 @@ export function bindInputTailEvents(state, dom, helpers, deps) {
         if (tool !== "hatch") return;
         const worldRaw = getMouseWorld(state, dom, e, false);
         const hit = hitTestShapes(state, worldRaw, dom);
-        if (!hit || (hit.type !== "line" && hit.type !== "arc" && hit.type !== "rect" && hit.type !== "bspline")) return;
+        if (!hit || (hit.type !== "line" && hit.type !== "arc" && hit.type !== "rect" && hit.type !== "polyline" && hit.type !== "bspline")) return;
         const id = Number(hit.id);
         const chain = findConnectedLinesChain(state, id).map(Number).filter(Number.isFinite);
         if (!state.hatchDraft.boundaryIds) state.hatchDraft.boundaryIds = [];
@@ -87,6 +87,23 @@ export function bindInputTailEvents(state, dom, helpers, deps) {
         setSelection(Array.from(new Set([...base, ...chain])));
         state.activeGroupId = null;
         if (setStatus) setStatus("連続オブジェクトを選択");
+        if (draw) draw();
+        e.preventDefault();
+    });
+
+    // Double line: double-click to select connected chain from clicked line/arc/rect/bspline.
+    dom.canvas.addEventListener("dblclick", (e) => {
+        const tool = String(state.tool || "");
+        if (tool !== "doubleline") return;
+        const worldRaw = getMouseWorld(state, dom, e, false);
+        const hit = hitTestShapes(state, worldRaw, dom);
+        if (!hit || (hit.type !== "line" && hit.type !== "arc" && hit.type !== "rect" && hit.type !== "bspline")) return;
+        const id = Number(hit.id);
+        const chain = findConnectedLinesChain(state, id).map(Number).filter(Number.isFinite);
+        const base = e.shiftKey ? (state.selection?.ids || []).map(Number).filter(Number.isFinite) : [];
+        setSelection(Array.from(new Set([...base, ...chain])));
+        state.activeGroupId = null;
+        if (setStatus) setStatus("Connected chain selected");
         if (draw) draw();
         e.preventDefault();
     });

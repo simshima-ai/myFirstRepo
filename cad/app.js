@@ -13,7 +13,7 @@ import { chooseEndsForLineByKeepEnd, getObjectSnapPoint } from "./solvers.js";
 import {
   ensureUngroupedShapesHaveGroups, selectGroupById, toggleGroupSelectionById,
   getTrimHoverCandidate, hitTestShapes, collectGroupTreeShapeIds, collectDescendantGroupIds,
-  resolveVertexTangentAttribs, resolveDimensionSnapAttribs
+  resolveVertexTangentAttribs, resolveDimensionSnapAttribs, deleteSelectedPolylineVertices
 } from "./app_selection.js";
 
 import {
@@ -29,12 +29,13 @@ import {
   setCircleMode, setCircleRadiusLocked,
   setPositionSize, setSelectionCircleCenterMark, setFilletRadius, setFilletLineMode, setVertexMoveInputs,
   setLineWidthMm, setToolLineType, setSelectedLineWidthMm, setSelectedLineType,
-  setSelectedColor,
+  setSelectedColor, setToolColor,
   setFilletNoTrim,
-  executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg, exportDxf,
+  buildDoubleLinePreview, executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg, exportDxf,
   beginOrAdvanceDim, updateDimHover, finalizeDimDraft,
   beginOrExtendPolyline, updatePolylineHover, finalizePolylineDraft,
-  executeHatch, trimateFillet, applyDimSettingsToSelection, mergeSelectedShapesToGroup,
+  executeHatch, validateHatchBoundary, trimateFillet, applyDimSettingsToSelection, mergeSelectedShapesToGroup,
+  lineToPolyline,
   setPatternCopyMode, setPatternCopyCenterFromSelection, clearPatternCopyCenter,
   setPatternCopyAxisFromSelection, clearPatternCopyAxis, executePatternCopy
 } from "./app_tools.js";
@@ -241,9 +242,19 @@ const doubleLineOps = createDoubleLineOps({
   state,
   helpers: {
     snapshotModel: () => snapshotModel(state),
-    pushHistorySnapshot: (snap) => pushHistorySnapshot(state, snap)
+    pushHistorySnapshot: (snap) => pushHistorySnapshot(state, snap),
+    setStatus,
+    pushHistory: () => pushHistory(state),
+    nextShapeId: () => nextShapeId(state),
+    addShape: (s) => addShape(state, s),
+    removeShapeById: (id) => removeShapeById(state, id),
+    clearSelection: () => clearSelection(state),
+    setSelection: (ids) => setSelection(state, ids),
+    getTrimHoverCandidate: (st, wr) => getTrimHoverCandidate(st, wr, dom),
+    hitTestShapes: (st, wr, d) => hitTestShapes(st, wr, d || dom),
   },
   executeDoubleLineGeom: executeDoubleLine,
+  buildDoubleLinePreviewGeom: buildDoubleLinePreview,
   buildDoubleLineTargetLineIntersections,
   trimClickedLineAtNearestIntersection,
   clearDoubleLineTrimPendingState,
@@ -320,6 +331,7 @@ const helpers = {
   updatePolylineHover: (w) => updatePolylineHover(state, w),
   finalizePolylineDraft: () => finalizePolylineDraft(state, helpers),
   executeHatch: () => executeHatch(state, helpers),
+  validateHatchBoundary: () => validateHatchBoundary(state, helpers),
   trimateFillet: (r, h) => trimateFillet(state, helpers, r, h),
   buildHatchLoopsFromBoundaryIds,
   chooseEndsForLineByKeepEnd,
@@ -327,12 +339,27 @@ const helpers = {
   setTool: (t) => toolSwitchOps.setToolAction(t),
   undo: () => historyViewOps.undoAction(),
   redo: () => historyViewOps.redoAction(),
-  delete: () => selectionVisibilityOps.deleteSelection(),
+  delete: () => {
+    if (state.tool === "vertex") return deleteSelectedPolylineVertices(state, helpers);
+    return selectionVisibilityOps.deleteSelection();
+  },
+  deleteSelectedVertices: () => deleteSelectedPolylineVertices(state, helpers),
   resetView: () => historyViewOps.resetViewAction(),
   refitViewToPage: () => historyViewOps.refitViewToPageAction(),
   loadJson: () => documentOps.loadJson(),
   newFile: () => documentOps.newFile(),
   importJson: () => documentOps.importJson(),
+  traceImage: () => fileOps.openTracePanel(),
+  closeTracePanel: () => fileOps.closeTracePanel(),
+  traceRegenerate: () => fileOps.traceSelectedImageUsingStateParams(),
+  setImportAdjustParam: (patch) => fileOps.setImportAdjustParam(patch),
+  applyImportAdjust: () => fileOps.applyImportAdjust(),
+  cancelImportAdjust: () => fileOps.cancelImportAdjust(),
+  setTraceParams: (patch) => {
+    fileOps.setTraceParam(patch);
+    scheduleSaveAppSettings();
+    draw();
+  },
   saveJson: () => saveJsonToFile(state, helpers),
   saveJsonAs: () => saveJsonAsToFile(state, helpers),
   pdf: () => exportPdf(state, helpers),
@@ -393,6 +420,7 @@ const helpers = {
   moveShapesToGroup: (shapeIds, gid) => groupStructureOps.moveShapesToGroup(shapeIds, gid),
   createGroupFromSelection: (name) => { pushHistory(state); const g = createGroupFromSelection(state, name); draw(); return g; },
   mergeSelectedShapesToGroup: () => mergeSelectedShapesToGroup(state, helpers),
+  lineToPolyline: () => lineToPolyline(state, helpers),
 
   updateSelectedTextSettings: (s) => updateSelectedTextSettings(state, helpers, s),
   updateSelectedImageSettings: (s) => updateSelectedImageSettings(state, helpers, s),
@@ -401,6 +429,7 @@ const helpers = {
   copySelectionToClipboard: () => clipboardOps.copySelectionToClipboard(),
   pasteClipboard: () => clipboardOps.pasteClipboard(),
   moveSelectedVertices: (dx, dy) => moveSelectedVertices(state, helpers, dx, dy),
+  deleteSelectedVertices: () => deleteSelectedPolylineVertices(state, helpers),
 
   setGroupRotateSnap: (v) => { setGroupRotateSnap(state, v); draw(); },
   setVertexLinkCoincident: (v) => { setVertexLinkCoincident(state, v); draw(); },
@@ -439,6 +468,7 @@ const helpers = {
     shape.layerId = state.activeLayerId;
     shape.lineWidthMm = Math.max(0.01, Number(state.circleSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
     shape.lineType = String(state.circleSettings?.lineType || "solid");
+    shape.color = String(state.circleSettings?.color || "#0f172a");
     addShape(state, shape);
     clearSelection(state);
     state.activeGroupId = null;
@@ -512,6 +542,7 @@ const helpers = {
   setSelectedLineWidthMm: (v) => setSelectedLineWidthMm(state, helpers, v),
   setSelectedLineType: (v) => setSelectedLineType(state, helpers, v),
   setSelectedColor: (v) => setSelectedColor(state, helpers, v),
+  setToolColor: (v, toolKey = null) => setToolColor(state, helpers, v, toolKey),
   setSelectPickMode: (mode) => {
     if (!state.ui) state.ui = {};
     state.ui.selectPickMode = (String(mode) === "group") ? "group" : "object";
@@ -574,6 +605,7 @@ const helpers = {
   setAutoBackupIntervalSec: (sec) => uiPrefsOps.setAutoBackupIntervalSec(sec),
   setTouchMode: (on) => uiPrefsOps.setTouchMode(on),
   setTouchMultiSelect: (on) => uiPrefsOps.setTouchMultiSelect(on),
+  setImportDxfAsPolyline: (on) => uiPrefsOps.setImportDxfAsPolyline(on),
   confirmTouchRectStep: () => {
     if (!(String(state.tool || "") === "rect" && !!state.ui?.touchMode)) return false;
     if (!state.input.touchRectDraft || typeof state.input.touchRectDraft !== "object") {
@@ -772,6 +804,7 @@ document.addEventListener("visibilitychange", () => {
 });
 
 fileOps.bindJsonFileInputChange();
+fileOps.bindDropImport();
 
 // Handle exports for manual access if needed
 window.cadApp = { state, dom, helpers, exportJsonObject, importJsonObject };

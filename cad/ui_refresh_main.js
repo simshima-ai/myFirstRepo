@@ -53,17 +53,17 @@ export function refreshUiMain(state, dom) {
   const panelLang = getUiLanguage(state);
   const panelText = (panelLang === "en")
     ? {
-      hiddenSuffix: " (非表示)",
-      setAsCurrentLayerTitle: "ダブルクリックで現在レイヤーに設定",
-      toggleLayerModeTitle: "ON / OFF / LOCK を切替",
-      moveObjectsToLayer: "オブジェクトを移動",
-      noObjects: "オブジェクトなし",
-      active: "アクティブ",
-      clickToSelect: "クリックで選択",
-      ungrouped: "未グループ",
-      clickToSelectObject: "クリックでオブジェクト選択",
-      movingOrigin: "原点を移動中...",
-      moveOrigin: "原点を移動",
+      hiddenSuffix: " (hidden)",
+      setAsCurrentLayerTitle: "Double-click to set as current layer",
+      toggleLayerModeTitle: "Toggle ON / OFF / LOCK",
+      moveObjectsToLayer: "Move Objects",
+      noObjects: "No objects",
+      active: "Active",
+      clickToSelect: "Click to select",
+      ungrouped: "Ungrouped",
+      clickToSelectObject: "Click to select object",
+      movingOrigin: "Moving origin...",
+      moveOrigin: "Move Origin",
     }
     : {
       hiddenSuffix: " (非表示)",

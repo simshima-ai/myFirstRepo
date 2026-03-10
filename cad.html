@@ -514,6 +514,16 @@
       background: rgba(255, 255, 255, 0.98);
     }
 
+    .top-context input[type="color"] {
+      width: 64px !important;
+      min-width: 64px !important;
+      height: 32px;
+      padding: 0;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      background: #ffffff;
+    }
+
     .top-context input[type="checkbox"] {
       margin-left: auto;
     }
@@ -1352,13 +1362,19 @@
           </div>
           <div class="section" data-context="vertex">
             <div class="section-title">頂点編集</div>
-            <div style="display:grid; grid-template-columns:auto auto auto 68px auto 68px auto; gap:4px; align-items:center; justify-content:start;">
+            <div style="display:grid; grid-template-columns:auto auto auto auto 68px auto 68px auto; gap:4px; align-items:center; justify-content:start;">
+              <span>モード</span>
+              <select id="vertexModeSelect" style="min-width:92px;">
+                <option value="move" selected>頂点移動</option>
+                <option value="insert">頂点挿入</option>
+              </select>
               <label style="display:inline-flex; align-items:center; gap:2px; justify-content:flex-start; white-space:nowrap;">
                 複数選択 <input id="vertexLinkCoincidentToggle" type="checkbox" checked style="margin-left:0;">
               </label>
               <span>dX</span><input id="vertexMoveDxInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
               <span>dY</span><input id="vertexMoveDyInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
               <button id="moveVertexBtn" type="button">移動</button>
+              <button id="deleteVertexBtn" type="button">頂点削除</button>
             </div>
           </div>
           <div class="section" data-context="line" style="font-size:12px;">
@@ -1408,6 +1424,10 @@
                 <option value="hidden">隠れ線</option>
               </select>
             </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>色</span>
+              <input id="lineToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
+            </div>
           </div>
           <div class="section" data-context="rect" style="font-size:12px;">
             <div class="section-title">四角 作成</div>
@@ -1451,6 +1471,10 @@
                 <option value="center">中心線</option>
                 <option value="hidden">隠れ線</option>
               </select>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>色</span>
+              <input id="rectToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
           <div class="section" data-context="circle" style="font-size:12px;">
@@ -1496,6 +1520,10 @@
                 <option value="hidden">隠れ線</option>
               </select>
             </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>色</span>
+              <input id="circleToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
+            </div>
           </div>
           <div class="section" data-context="fillet">
             <div class="section-title">Fillet</div>
@@ -1506,8 +1534,8 @@
               </label>
               <span id="filletModeLabel">動作モード</span>
               <select id="filletLineModeSelect" style="width:auto; min-width:74px;">
-                <option value="trim">トリムも行う</option>
-                <option value="split" selected>トリムしない</option>
+                <option value="trim" selected>トリムも行う</option>
+                <option value="split">トリムしない</option>
               </select>
               <button id="applyFilletBtn" type="button" style="display:none;">実行</button>
             </div>
@@ -1677,6 +1705,10 @@
                 <option value="hidden">隠れ線</option>
               </select>
             </div>
+            <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+              <span>色</span>
+              <input id="positionToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
+            </div>
           </div>
           <div class="section" data-context="text" style="font-size:12px;">
             <div class="section-title">Text</div>
@@ -1721,6 +1753,75 @@
                   <option value="hidden">隠れ線</option>
                 </select>
               </label>
+            </div>
+          </div>
+          <div class="section" data-context="importadjust" style="font-size:12px;">
+            <div class="section-title">Import Adjust</div>
+            <div style="display:grid; grid-template-columns:auto 92px auto 92px auto auto; gap:6px; align-items:center; justify-content:start;">
+              <span>Scale</span>
+              <input id="importAdjustScaleInput" type="number" min="0.000001" step="0.01" value="1" style="width:100%; min-width:0;">
+              <span>dX</span>
+              <input id="importAdjustDxInput" type="number" step="1" value="0" style="width:100%; min-width:0;">
+              <span>dY</span>
+              <input id="importAdjustDyInput" type="number" step="1" value="0" style="width:100%; min-width:0;">
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; justify-content:flex-start;">
+              <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
+                Flip X
+                <input id="importAdjustFlipXToggle" type="checkbox" style="margin-left:0;">
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
+                Flip Y
+                <input id="importAdjustFlipYToggle" type="checkbox" style="margin-left:0;">
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
+                <span id="importDxfAsPolylineLabel">DXFをポリライン化</span>
+                <input id="importDxfAsPolylineToggle" type="checkbox" style="margin-left:0;">
+              </label>
+              <button id="importAdjustApplyBtn" type="button">Apply</button>
+              <button id="importAdjustCancelBtn" type="button">Cancel</button>
+            </div>
+          </div>
+          <div class="section" data-context="trace" style="font-size:12px;">
+            <div class="section-title" id="tracePanelTitle">画像トレース(実験)</div>
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div id="traceTargetInfo" style="font-size:11px; color:#475569;">画像を選択してください</div>
+              <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
+                <span id="traceMaxDimLabel">解像度上限</span>
+                <input id="traceMaxDimInput" type="number" min="64" max="2048" step="1" value="420">
+                <span id="traceEdgePercentLabel">エッジ量</span>
+                <input id="traceEdgePercentInput" type="number" min="1" max="99" step="1" value="72">
+                <span id="traceSimplifyLabel">簡略化</span>
+                <input id="traceSimplifyInput" type="number" min="0" max="12" step="0.05" value="1.25">
+                <span id="traceMinSegLabel">最小線分</span>
+                <input id="traceMinSegInput" type="number" min="0" max="40" step="0.1" value="1.2">
+                <span id="traceMaxSegLabel">最大線分数</span>
+                <input id="traceMaxSegmentsInput" type="number" min="100" max="50000" step="100" value="12000">
+                <span id="traceOffsetXLabel">オフセットX</span>
+                <input id="traceOffsetXInput" type="number" step="1" value="0">
+                <span id="traceOffsetYLabel">オフセットY</span>
+                <input id="traceOffsetYInput" type="number" step="1" value="0">
+                <span id="traceLineWidthLabel">線幅(mm)</span>
+                <input id="traceLineWidthInput" type="number" min="0.01" max="10" step="0.01" value="0.1">
+                <span id="traceLineTypeLabel">線種</span>
+                <select id="traceLineTypeInput">
+                  <option value="solid" selected>実線</option>
+                  <option value="dashed">破線</option>
+                  <option value="dotted">点線</option>
+                  <option value="dashdot">一点鎖線</option>
+                  <option value="longdash">長破線</option>
+                  <option value="center">中心線</option>
+                  <option value="hidden">隠れ線</option>
+                </select>
+              </div>
+              <label style="display:inline-flex; align-items:center; justify-content:flex-start; gap:6px;">
+                <span id="traceInvertLabel">反転</span>
+                <input id="traceInvertToggle" type="checkbox" style="margin-left:0;">
+              </label>
+              <div style="display:flex; gap:6px; justify-content:flex-end;">
+                <button id="traceRegenerateBtn" type="button">再生成</button>
+                <button id="traceClosePanelBtn" type="button">閉じる</button>
+              </div>
             </div>
           </div>
           <div class="section" data-context="dim" style="font-size:12px;">
@@ -1823,6 +1924,9 @@
                   <option value="hidden">隠れ線</option>
                 </select>
               </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">色
+                <input id="dimToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
+              </label>
               <label id="dimSelectionColorWrap" style="display:inline-flex; align-items:center; gap:4px;">色
                 <input id="dimSelectionColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
               </label>
@@ -1874,7 +1978,11 @@
               <input id="hatchLineColorInput" type="color" value="#0f172a"
                 style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
-            <button id="applyHatchBtn" type="button">Hatch Selected</button>
+            <div style="display:flex; gap:6px;">
+              <button id="hatchValidateBtn" type="button" style="flex:1 1 0;">端点一致チェック</button>
+              <button id="applyHatchBtn" type="button" style="flex:1 1 0;">Hatch Selected</button>
+            </div>
+            <div id="hatchValidateResult" style="margin-top:4px; font-size:11px; color:#64748b;"></div>
           </div>
 
           <div class="section" data-context="patterncopy">
@@ -1935,7 +2043,7 @@
               </select>
               <label style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
                 <input id="dlineNoTrimToggle" type="checkbox">
-                トリムしない
+                <span>トリムしない</span>
               </label>
               <span>線幅(mm)</span>
               <select id="dlineToolLineWidthInput" style="width:auto; min-width:58px;">
@@ -2282,9 +2390,9 @@
       </div>
     </main>
   </div>
-  <input id="jsonFileInput" type="file" accept=".json,application/json,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,image/*" hidden>
+  <input id="jsonFileInput" type="file" accept=".json,application/json,.dxf,.svg,.png,.jpg,.jpeg,.webp,.gif,.bmp,image/*" hidden>
   <div id="colorPalettePopup"
-    style="position:fixed; display:none; z-index:1200; background:#ffffff; border:1px solid #cbd5e1; border-radius:8px; padding:6px; box-shadow:0 8px 24px rgba(2,6,23,0.18);"></div>
+    style="position:fixed; display:none; z-index:1200; background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:10px; box-shadow:0 10px 28px rgba(2,6,23,0.2);"></div>
   <script>
     (function () {
       const a = document.getElementById("cadHomeLink");

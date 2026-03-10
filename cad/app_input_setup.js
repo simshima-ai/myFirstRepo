@@ -10,6 +10,7 @@ import {
     hitTestShapes, hitTestDimHandle, beginDimHandleDrag, beginVertexDrag,
     beginSelectionDrag, beginImageScaleDrag, hitTestImageScaleHandle, toggleGroupSelectionById,
     findConnectedLinesChain,
+    getVertexInsertCandidate, insertVertexAtCandidate,
     applyGroupRotateDrag, applyGroupOriginDrag, applyDimHandleDrag, applyVertexDrag,
     applySelectionDrag, updateSelectionBox,
     endGroupRotateDrag, endGroupOriginDrag, endDimHandleDrag, endVertexDrag,
@@ -23,7 +24,7 @@ import {
     trimClickedLineAtNearestIntersection
 } from "./app_tools.js";
 import { getObjectSnapPoint } from "./solvers.js";
-import { buildDoubleLinePreview } from "./dline_geom.js";
+import { buildDoubleLinePreview, buildDoubleLineLineTrimMarkers } from "./dline_geom.js";
 import { bindViewportResize } from "./app_input_viewport.js";
 import { isTypingTarget, findShortcutAction } from "./app_input_shortcuts.js";
 import { normalizeLineType, resolveCircleCreateMode, resolveLineCreateMode } from "./app_input_mode_utils.js";
@@ -36,6 +37,8 @@ import { resolvePolylineDraftEndpointSnap as resolvePolylineDraftEndpointSnapImp
 import { bindInputTailEvents } from "./app_input_tail_events.js";
 import { handlePointerDownSelectMode } from "./app_input_pointer_select.js";
 import { handlePointerDownDrawMode } from "./app_input_pointer_draw.js";
+import { collectGroupTreeShapeIds } from "./app_selection_group_tree.js";
+import { isHatchBoundaryShape } from "./hatch_geom.js";
 
 export function setupInputListenersImpl(state, dom, helpers) {
     const {
@@ -47,6 +50,88 @@ export function setupInputListenersImpl(state, dom, helpers) {
     } = helpers;
     const getCircleCreateMode = () => resolveCircleCreateMode(state);
     const getLineCreateMode = () => resolveLineCreateMode(state);
+    const isVertexEditableShapeType = (shapeTypeRaw) => {
+        const t = String(shapeTypeRaw || "").toLowerCase();
+        return t === "line" || t === "rect" || t === "arc" || t === "polyline" || t === "bspline";
+    };
+    const hitTestVertexEditableShape = (worldRaw) => {
+        const pickState = {
+            ...state,
+            shapes: (state.shapes || []).filter((s) => isVertexEditableShapeType(s?.type)),
+        };
+        return hitTestShapes(pickState, worldRaw, dom);
+    };
+    const collectVertexTargetShapeIdsFromCurrentSelection = () => {
+        const shapeById = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+        const out = new Set();
+        for (const sidRaw of (state.selection?.ids || [])) {
+            const sid = Number(sidRaw);
+            if (!Number.isFinite(sid)) continue;
+            const s = shapeById.get(sid);
+            if (!s || !isVertexEditableShapeType(s.type)) continue;
+            out.add(sid);
+        }
+        const gidSet = new Set();
+        for (const gidRaw of (state.selection?.groupIds || [])) {
+            const gid = Number(gidRaw);
+            if (Number.isFinite(gid)) gidSet.add(gid);
+        }
+        if (state.activeGroupId != null && Number.isFinite(Number(state.activeGroupId))) {
+            gidSet.add(Number(state.activeGroupId));
+        }
+        for (const gid of gidSet) {
+            const ids = collectGroupTreeShapeIds(state, Number(gid));
+            for (const sidRaw of ids) {
+                const sid = Number(sidRaw);
+                if (!Number.isFinite(sid)) continue;
+                const s = shapeById.get(sid);
+                if (!s || !isVertexEditableShapeType(s.type)) continue;
+                out.add(sid);
+            }
+        }
+        return Array.from(out);
+    };
+    const syncVertexTargetsFromSelection = (force = false) => {
+        if (!state.vertexEdit) return [];
+        const shapeById = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+        const current = Array.isArray(state.vertexEdit.targetShapeIds) ? state.vertexEdit.targetShapeIds : [];
+        const validCurrent = current
+            .map(Number)
+            .filter((sid) => {
+                if (!Number.isFinite(sid)) return false;
+                const s = shapeById.get(sid);
+                return !!s && isVertexEditableShapeType(s.type);
+            });
+        let targetIds = validCurrent;
+        if (force || !targetIds.length) {
+            targetIds = collectVertexTargetShapeIdsFromCurrentSelection();
+        }
+        state.vertexEdit.targetShapeIds = Array.from(new Set(targetIds.map(Number).filter(Number.isFinite)));
+        if (state.vertexEdit.filterShapeId != null) {
+            const fid = Number(state.vertexEdit.filterShapeId);
+            if (!state.vertexEdit.targetShapeIds.includes(fid)) state.vertexEdit.filterShapeId = null;
+        }
+        return state.vertexEdit.targetShapeIds;
+    };
+    const selectVertexConnectedChainFromLine = (lineId) => {
+        const chain = findConnectedLinesChain(state, Number(lineId))
+            .map(Number)
+            .filter(Number.isFinite);
+        if (!chain.length) return false;
+        const shapeById = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+        const editableChain = chain.filter((sid) => {
+            const s = shapeById.get(Number(sid));
+            return !!s && isVertexEditableShapeType(s.type);
+        });
+        if (!editableChain.length) return false;
+        setSelection(editableChain);
+        state.activeGroupId = null;
+        state.vertexEdit.targetShapeIds = editableChain;
+        state.vertexEdit.filterShapeId = null;
+        state.vertexEdit.insertCandidate = null;
+        clearVertexSelection(state);
+        return true;
+    };
 
     const touch = createTouchInputController(state, dom, {
         getMouseScreen,
@@ -72,8 +157,11 @@ export function setupInputListenersImpl(state, dom, helpers) {
         const cfg = getCfg();
         const lw = Math.max(0.01, Number(cfg?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
         const lt = normalizeLineType(cfg?.lineType ?? "solid");
+        const rawColor = String(cfg?.color || "#0f172a").trim();
+        const color = /^#[0-9a-fA-F]{6}$/.test(rawColor) ? rawColor.toLowerCase() : "#0f172a";
         shape.lineWidthMm = lw;
         shape.lineType = lt;
+        if (Object.prototype.hasOwnProperty.call(shape, "color")) shape.color = color;
         return shape;
     };
     const bspline = createBsplineDraftController(state, {
@@ -164,22 +252,94 @@ export function setupInputListenersImpl(state, dom, helpers) {
         }
 
         if (state.tool === "vertex") {
-            if (e.button !== 0) return;
-            const vhit = hitTestVertexHandle(state, worldRaw);
-            if (vhit) {
-                // Vertex clicked: clear line filter, begin drag
-                state.vertexEdit.filterShapeId = null;
-                beginVertexDrag(state, vhit, worldRaw, helpers, e.shiftKey);
-            } else {
-                // No vertex hit: check if a line was clicked to set filter
-                const shapeHit = hitTestShapes(state, worldRaw);
-                if (shapeHit && (shapeHit.type === "line" || shapeHit.type === "rect")) {
-                    state.vertexEdit.filterShapeId = Number(shapeHit.id);
-                    clearVertexSelection(state);
+            const isPrimaryPress = (e.pointerType === "touch") || (e.button === 0);
+            if (!isPrimaryPress) return;
+            const targetIds = syncVertexTargetsFromSelection(false);
+            if (!targetIds.length) {
+                const hit = hitTestVertexEditableShape(worldRaw);
+                if (hit && isVertexEditableShapeType(hit.type)) {
+                    if (hit.type === "line" && selectVertexConnectedChainFromLine(Number(hit.id))) {
+                        if (setStatus) setStatus("Connected lines selected for vertex edit");
+                    } else {
+                        setSelection([Number(hit.id)]);
+                        state.activeGroupId = null;
+                        state.vertexEdit.targetShapeIds = [Number(hit.id)];
+                        state.vertexEdit.filterShapeId = Number(hit.id);
+                        state.vertexEdit.insertCandidate = null;
+                        clearVertexSelection(state);
+                        if (setStatus) setStatus("Vertex target selected");
+                    }
                 } else {
-                    // Empty area: clear filter and start selection box
+                    // No current target: allow drag-box to pick vertices after target is chosen.
+                    beginVertexSelectionBox(state, screen, e.shiftKey);
+                    if (setStatus) setStatus("Drag to select vertices");
+                }
+                if (draw) draw();
+                return;
+            }
+            const targetSet = new Set(targetIds.map(Number).filter(Number.isFinite));
+            const vertexMode = String(state.vertexEdit?.mode || "move").toLowerCase();
+            if (vertexMode === "insert") {
+                const cand = getVertexInsertCandidate(state, worldRaw);
+                state.vertexEdit.insertCandidate = cand;
+                if (cand) {
+                    const ok = insertVertexAtCandidate(state, cand, helpers);
+                    if (ok && setStatus) setStatus("Vertex inserted");
+                } else {
+                    const shapeHit = hitTestVertexEditableShape(worldRaw);
+                    if (shapeHit && isVertexEditableShapeType(shapeHit.type)) {
+                        if (shapeHit.type === "line" && selectVertexConnectedChainFromLine(Number(shapeHit.id))) {
+                            if (setStatus) setStatus("Connected lines selected for vertex edit");
+                        } else if (targetSet.has(Number(shapeHit.id))) {
+                            state.vertexEdit.filterShapeId = Number(shapeHit.id);
+                            clearVertexSelection(state);
+                        } else {
+                            setSelection([Number(shapeHit.id)]);
+                            state.activeGroupId = null;
+                            state.vertexEdit.targetShapeIds = [Number(shapeHit.id)];
+                            state.vertexEdit.filterShapeId = Number(shapeHit.id);
+                            state.vertexEdit.insertCandidate = null;
+                            clearVertexSelection(state);
+                            if (setStatus) setStatus("Vertex target selected");
+                        }
+                    } else {
+                        clearSelection(state);
+                        state.vertexEdit.targetShapeIds = [];
+                        state.vertexEdit.filterShapeId = null;
+                        state.vertexEdit.insertCandidate = null;
+                        clearVertexSelection(state);
+                        if (setStatus) setStatus("Selection cleared");
+                    }
+                }
+            } else {
+                const vhit = hitTestVertexHandle(state, worldRaw);
+                if (vhit) {
+                    // Vertex clicked: clear line filter, begin drag
                     state.vertexEdit.filterShapeId = null;
-                    beginSelectionBox(state, screen, e.shiftKey);
+                    beginVertexDrag(state, vhit, worldRaw, helpers, e.shiftKey);
+                } else {
+                    // No vertex hit: check if a line was clicked to set filter
+                    const shapeHit = hitTestVertexEditableShape(worldRaw);
+                    if (shapeHit && isVertexEditableShapeType(shapeHit.type)) {
+                        if (shapeHit.type === "line" && selectVertexConnectedChainFromLine(Number(shapeHit.id))) {
+                            if (setStatus) setStatus("Connected lines selected for vertex edit");
+                        } else if (targetSet.has(Number(shapeHit.id))) {
+                            state.vertexEdit.filterShapeId = Number(shapeHit.id);
+                            clearVertexSelection(state);
+                        } else {
+                            setSelection([Number(shapeHit.id)]);
+                            state.activeGroupId = null;
+                            state.vertexEdit.targetShapeIds = [Number(shapeHit.id)];
+                            state.vertexEdit.filterShapeId = Number(shapeHit.id);
+                            state.vertexEdit.insertCandidate = null;
+                            clearVertexSelection(state);
+                            if (setStatus) setStatus("Vertex target selected");
+                        }
+                    } else {
+                        // Empty area: start vertex box selection (drag-select).
+                        beginVertexSelectionBox(state, screen, e.shiftKey);
+                        if (setStatus) setStatus("Drag to select vertices");
+                    }
                 }
             }
             if (draw) draw();
@@ -262,19 +422,49 @@ export function setupInputListenersImpl(state, dom, helpers) {
             // In single mode, drag from a hovered line candidate to place dimension at mouse-up.
             if (!state.dimDraft && linearMode === "single") {
                 const hoveredId = Number(state.input?.dimHoveredShapeId);
-                const hoveredLine = (state.shapes || []).find(s => Number(s?.id) === hoveredId && s.type === "line");
-                if (hoveredLine) {
+                const hoveredShape = (state.shapes || []).find(s => Number(s?.id) === hoveredId);
+                if (hoveredShape && hoveredShape.type === "line") {
                     state.dimDraft = {
-                        p1: { x: Number(hoveredLine.x1), y: Number(hoveredLine.y1) },
-                        p2: { x: Number(hoveredLine.x2), y: Number(hoveredLine.y2) },
+                        p1: { x: Number(hoveredShape.x1), y: Number(hoveredShape.y1) },
+                        p2: { x: Number(hoveredShape.x2), y: Number(hoveredShape.y2) },
                         place: { x: world.x, y: world.y },
-                        sourceLineId: Number(hoveredLine.id),
+                        sourceLineId: Number(hoveredShape.id),
+                        sourceRefType: "line_endpoint",
+                        sourceRefKey1: "p1",
+                        sourceRefKey2: "p2",
                     };
                     state.input.dimLineDrag.active = true;
                     state.input.dimLineDrag.moved = false;
                     if (setStatus) setStatus("Dim: drag to place, release to create.");
                     if (draw) draw();
                     return;
+                }
+                if (hoveredShape && hoveredShape.type === "polyline") {
+                    const pts = Array.isArray(hoveredShape.points) ? hoveredShape.points : [];
+                    const segIdx = Number(state.input?.dimHoveredSegmentIndex);
+                    if (pts.length >= 2 && Number.isFinite(segIdx)) {
+                        const segCount = pts.length - 1 + (hoveredShape.closed ? 1 : 0);
+                        if (segIdx >= 0 && segIdx < segCount) {
+                            const i1 = segIdx;
+                            const i2 = (segIdx + 1) % pts.length;
+                            const p1 = pts[i1];
+                            const p2 = pts[i2];
+                            state.dimDraft = {
+                                p1: { x: Number(p1.x), y: Number(p1.y) },
+                                p2: { x: Number(p2.x), y: Number(p2.y) },
+                                place: { x: world.x, y: world.y },
+                                sourceLineId: Number(hoveredShape.id),
+                                sourceRefType: "polyline_vertex",
+                                sourceRefKey1: `v${Number(i1)}`,
+                                sourceRefKey2: `v${Number(i2)}`,
+                            };
+                            state.input.dimLineDrag.active = true;
+                            state.input.dimLineDrag.moved = false;
+                            if (setStatus) setStatus("Dim: drag to place, release to create.");
+                            if (draw) draw();
+                            return;
+                        }
+                    }
                 }
             }
             let finalWorld = world; // object-snapped world
@@ -347,18 +537,29 @@ export function setupInputListenersImpl(state, dom, helpers) {
 
         if (state.tool === "hatch") {
             if (e.button !== 0) return;
-            const hit = hitTestShapes(state, worldRaw, dom);
+            const hatchPickState = {
+                ...state,
+                shapes: (state.shapes || []).filter((s) => isHatchBoundaryShape(s)),
+            };
+            const hit = hitTestShapes(hatchPickState, worldRaw, dom);
             if (hit) {
+                if (!isHatchBoundaryShape(hit)) {
+                    if (setStatus) setStatus("Hatch: line/arc/circle/rect/polyline/B-spline only");
+                    if (draw) draw();
+                    return;
+                }
                 const id = Number(hit.id);
                 if (!state.hatchDraft.boundaryIds) state.hatchDraft.boundaryIds = [];
                 const idx = state.hatchDraft.boundaryIds.indexOf(id);
                 if (idx >= 0) state.hatchDraft.boundaryIds.splice(idx, 1);
                 else state.hatchDraft.boundaryIds.push(id);
+                if (state.input) state.input.hatchValidation = null;
             } else {
                 // Empty-click in hatch tool should clear current boundary selection.
                 state.hatchDraft.boundaryIds = [];
                 clearSelection();
                 state.activeGroupId = null;
+                if (state.input) state.input.hatchValidation = null;
             }
             if (draw) draw();
             return;
@@ -366,7 +567,22 @@ export function setupInputListenersImpl(state, dom, helpers) {
 
         if (state.tool === "doubleline") {
             if (e.button !== 0) return;
+            if (state.dlineTrimPending) {
+                if (draw) draw();
+                return;
+            }
             const hit = hitTestShapes(state, worldRaw, dom);
+            const isSingleMode = String(state.dlineSettings?.mode || "both") === "single";
+            const hasSelection = Array.isArray(state.selection?.ids) && state.selection.ids.length > 0;
+            const hitId = Number(hit?.id);
+            const hitIsSelected = Number.isFinite(hitId) && state.selection.ids.some((id) => Number(id) === hitId);
+            if (isSingleMode && hasSelection && !isAppendSelect(e) && (!hit || hitIsSelected)) {
+                // In single mode, one click locks inside/outside side until execute/cancel.
+                state.dlineSingleSidePickPoint = { x: Number(worldRaw.x), y: Number(worldRaw.y) };
+                state.dlinePreview = buildDoubleLinePreview(state, state.dlineSingleSidePickPoint);
+                if (draw) draw();
+                return;
+            }
             if (hit && (hit.type === "line" || hit.type === "circle" || hit.type === "arc")) {
                 const cur = new Set(state.selection.ids.map(Number));
                 if (cur.has(Number(hit.id))) cur.delete(Number(hit.id)); else cur.add(Number(hit.id));
@@ -378,7 +594,21 @@ export function setupInputListenersImpl(state, dom, helpers) {
                 }
                 beginSelectionBox(state, screen, isAppendSelect(e));
             }
-            state.dlinePreview = buildDoubleLinePreview(state, worldRaw);
+            const sidePt = state.dlineSingleSidePickPoint || worldRaw;
+            state.dlinePreview = buildDoubleLinePreview(state, sidePt);
+            if (state.dlineSettings?.noTrim) {
+                state.dlineTrimIntersections = null;
+            } else {
+                const selectedBases = (state.selection?.ids || [])
+                    .map(id => state.shapes.find(s => Number(s.id) === Number(id)))
+                    .filter(s => !!s);
+                state.dlineTrimIntersections = buildDoubleLineLineTrimMarkers(
+                    state.dlinePreview || [],
+                    selectedBases,
+                    Number(state.dlineSettings?.offset) || 0,
+                    String(state.dlineSettings?.mode || "both")
+                );
+            }
             if (draw) draw();
             return;
         }
@@ -495,7 +725,13 @@ export function setupInputListenersImpl(state, dom, helpers) {
         state.input.hover.world = world;
         state.input.hover.screen = screen;
         state.input.hover.shape = hasVisibleLayer ? hitTestShapes(state, worldRaw, dom) : null;
-        state.input.hover.vertex = hasVisibleLayer ? hitTestVertexHandle(state, worldRaw) : null;
+        const vertexInsertMode = (state.tool === "vertex") && (String(state.vertexEdit?.mode || "move").toLowerCase() === "insert");
+        state.input.hover.vertex = (!vertexInsertMode && hasVisibleLayer) ? hitTestVertexHandle(state, worldRaw) : null;
+        if (vertexInsertMode && hasVisibleLayer) {
+            state.vertexEdit.insertCandidate = getVertexInsertCandidate(state, worldRaw);
+        } else if (state.vertexEdit) {
+            state.vertexEdit.insertCandidate = null;
+        }
         state.input.hover.groupRotate = hitActiveGroupRotateHandle(state, screen);
         state.input.hover.groupOrigin = hitActiveGroupOriginHandle(state, screen);
         state.input.hover.dimHandle = hasVisibleLayer ? hitTestDimHandle(state, worldRaw) : null;
@@ -505,7 +741,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
         state.input.hoverWorld = world;
 
         state.input.trimHover = (hasVisibleLayer && state.tool === "trim")
-            ? (state.input.modifierKeys.alt ? getTrimDeleteOnlyHoverCandidate(state, worldRaw, dom) : getTrimHoverCandidate(state, worldRaw, dom))
+            ? (state.input.modifierKeys.alt ? getTrimDeleteOnlyHoverCandidate(state, worldRaw, dom) : getTrimHoverCandidate(state, worldRaw, dom, { fast: true }))
             : null;
         state.input.filletHover = (hasVisibleLayer && state.tool === "fillet") ? getFilletHoverCandidate(state, worldRaw) : null;
         if (state.tool === "fillet" && state.selection.ids.length === 2 && !state.input.filletHover) {
@@ -537,7 +773,25 @@ export function setupInputListenersImpl(state, dom, helpers) {
         // Preview Shape
         state.preview = null;
         if (state.tool === "doubleline") {
-            state.dlinePreview = buildDoubleLinePreview(state, worldRaw);
+            if (state.dlineTrimPending) {
+                drawFast();
+                return;
+            }
+            const sidePt = state.dlineSingleSidePickPoint || worldRaw;
+            state.dlinePreview = buildDoubleLinePreview(state, sidePt);
+            if (state.dlineSettings?.noTrim) {
+                state.dlineTrimIntersections = null;
+            } else {
+                const selectedBases = (state.selection?.ids || [])
+                    .map(id => state.shapes.find(s => Number(s.id) === Number(id)))
+                    .filter(s => !!s);
+                state.dlineTrimIntersections = buildDoubleLineLineTrimMarkers(
+                    state.dlinePreview || [],
+                    selectedBases,
+                    Number(state.dlineSettings?.offset) || 0,
+                    String(state.dlineSettings?.mode || "both")
+                );
+            }
         }
         const touchRectDraft = state.input?.touchRectDraft;
         const isTouchRectFlow = (state.tool === "rect") && !!state.ui?.touchMode;
@@ -759,7 +1013,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
             }
         }
         if (state.selection.box.active) {
-            if (state.tool === "vertex") endVertexSelectionBox(state, helpers);
+            if (state.tool === "vertex" && String(state.vertexEdit?.mode || "move").toLowerCase() !== "insert") endVertexSelectionBox(state, helpers);
             else endSelectionBox(state, helpers);
         }
         if (state.tool === "dim" && state.input.dimLineDrag.active) {

@@ -35,6 +35,8 @@ export function createRenderOverlayOps(deps) {
 
   function drawObjectSnapHover(ctx, state) {
     if (state.tool === "trim") return;
+    if (state.tool === "dim" && state.dimSettings?.linearMode === "single") return;
+    if (state.tool === "dim" && !state.dimDraft) return;
     const p = state.input?.objectSnapHover;
     if (!p) return;
 
@@ -100,6 +102,34 @@ export function createRenderOverlayOps(deps) {
     const th = state.input?.trimHover;
     if (!th) return;
     const s = th.line;
+    const buildSampledSlice = (sampled, t0, t1) => {
+      const pts = Array.isArray(sampled) ? sampled : [];
+      if (pts.length < 2) return [];
+      const segCount = pts.length - 1;
+      const a = Math.max(0, Math.min(1, Number(t0) || 0));
+      const b = Math.max(0, Math.min(1, Number(t1) || 0));
+      if (b - a < 1e-6) return [];
+      const pointAt = (t) => {
+        const clamped = Math.max(0, Math.min(1, Number(t) || 0));
+        const idxF = clamped * segCount;
+        const idx = Math.max(0, Math.min(segCount - 1, Math.floor(idxF)));
+        const lt = Math.max(0, Math.min(1, idxF - idx));
+        const p1 = pts[idx];
+        const p2 = pts[idx + 1];
+        return {
+          x: Number(p1.x) + (Number(p2.x) - Number(p1.x)) * lt,
+          y: Number(p1.y) + (Number(p2.y) - Number(p1.y)) * lt,
+        };
+      };
+      const out = [pointAt(a)];
+      const iStart = Math.floor(a * segCount);
+      const iEnd = Math.floor(b * segCount);
+      for (let i = iStart + 1; i <= iEnd; i++) {
+        if (i > 0 && i < pts.length - 1) out.push({ x: Number(pts[i].x), y: Number(pts[i].y) });
+      }
+      out.push(pointAt(b));
+      return out.filter((p) => Number.isFinite(Number(p?.x)) && Number.isFinite(Number(p?.y)));
+    };
     if (th.targetType === "circle" || th.targetType === "arc") {
       const csh = th.circle || th.arc;
       if (!csh || !isLayerVisible(state, csh.layerId) || !isVisibleByCurrentLayerFilter(state, csh)) return;
@@ -124,6 +154,38 @@ export function createRenderOverlayOps(deps) {
         ctx.stroke();
       }
       ctx.restore();
+      return;
+    }
+    if (th.targetType === "bspline") {
+      const bs = th.spline;
+      if (!bs || !isLayerVisible(state, bs.layerId) || !isVisibleByCurrentLayerFilter(state, bs)) return;
+      const segPts = buildSampledSlice(th.sampled, th.t0, th.t1);
+      if (segPts.length >= 2) {
+        ctx.save();
+        ctx.strokeStyle = "#ef4444";
+        ctx.lineWidth = 3;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        const p0 = worldToScreen(state.view, segPts[0]);
+        ctx.moveTo(p0.x, p0.y);
+        for (let i = 1; i < segPts.length; i++) {
+          const pi = worldToScreen(state.view, segPts[i]);
+          ctx.lineTo(pi.x, pi.y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+        for (const p of [{ x: Number(th.x1), y: Number(th.y1) }, { x: Number(th.x2), y: Number(th.y2) }]) {
+          const ip = worldToScreen(state.view, p);
+          ctx.fillStyle = "rgba(239,68,68,0.12)";
+          ctx.strokeStyle = "#ef4444";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(ip.x, ip.y, 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
       return;
     }
     if (!s || !isLayerVisible(state, s.layerId) || !isVisibleByCurrentLayerFilter(state, s)) return;
@@ -283,6 +345,13 @@ export function createRenderOverlayOps(deps) {
       ctx.stroke();
       ctx.restore();
     };
+    const normTau = (a) => {
+      let x = Number(a) || 0;
+      const t = Math.PI * 2;
+      while (x < 0) x += t;
+      while (x >= t) x -= t;
+      return x;
+    };
 
     ctx.save();
     ctx.strokeStyle = "#8b5cf6";
@@ -323,18 +392,15 @@ export function createRenderOverlayOps(deps) {
         }
       }
       if (fh.sol.circle?.type === "arc") {
-        const ac = plan?.arcCandidate || null;
-        if (ac && ac.targetType === "arc") {
-          if (ac.mode === "arc-remove-arc" || ac.mode === "arc-remove-middle") {
-            drawTrimArcSeg(fh.sol.circle, Number(ac.remA1), Number(ac.remA2), ac.remCCW !== false);
-          } else if (ac.mode === "delete-arc") {
-            drawTrimArcSeg(
-              fh.sol.circle,
-              Number(fh.sol.circle?.a1) || 0,
-              Number(fh.sol.circle?.a2) || 0,
-              fh.sol.circle?.ccw !== false
-            );
-          }
+        const cutKey = (plan?.cutKey === "a1" || plan?.cutKey === "a2") ? plan.cutKey : null;
+        const a1Old = normTau(Number(fh.sol.circle?.a1) || 0);
+        const a2Old = normTau(Number(fh.sol.circle?.a2) || 0);
+        const ccwOld = fh.sol.circle?.ccw !== false;
+        const th = normTau(Math.atan2(Number(fh.sol?.tCircle?.y) - Number(fh.sol.circle?.cy), Number(fh.sol?.tCircle?.x) - Number(fh.sol.circle?.cx)));
+        if (cutKey === "a1") {
+          drawTrimArcSeg(fh.sol.circle, a1Old, th, ccwOld);
+        } else if (cutKey === "a2") {
+          drawTrimArcSeg(fh.sol.circle, th, a2Old, ccwOld);
         }
       }
     }
@@ -421,12 +487,61 @@ export function createRenderOverlayOps(deps) {
   function drawHatchHover(ctx, state) {
     if (state.tool !== "hatch") return;
     const h = state.input?.hatchHover;
-    if (!h) return;
+    if (h) {
+      ctx.save();
+      ctx.strokeStyle = "#8b5cf6";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([5, 5]);
+      drawShape(ctx, state, h, null);
+      ctx.restore();
+    }
+    drawHatchValidation(ctx, state);
+  }
+
+  function drawHatchValidation(ctx, state) {
+    if (state.tool !== "hatch") return;
+    const v = state.input?.hatchValidation;
+    if (!v) return;
+    const currentIds = Array.from(new Set((state.hatchDraft?.boundaryIds || []).map((id) => Number(id)).filter(Number.isFinite))).sort((a, b) => a - b);
+    const currentKey = currentIds.join(",");
+    if (String(v.idsKey || "") !== currentKey) return;
+
+    const openNodes = Array.isArray(v.openNodes) ? v.openNodes : [];
+    const nearPairs = Array.isArray(v.nearMissPairs) ? v.nearMissPairs : [];
+    if (openNodes.length === 0 && nearPairs.length === 0) return;
+
     ctx.save();
-    ctx.strokeStyle = "#8b5cf6";
-    ctx.lineWidth = 3;
-    ctx.setLineDash([5, 5]);
-    drawShape(ctx, state, h, null);
+    for (const pair of nearPairs) {
+      const a = pair?.a;
+      const b = pair?.b;
+      if (!a || !b) continue;
+      const sa = worldToScreen(state.view, { x: Number(a.x), y: Number(a.y) });
+      const sb = worldToScreen(state.view, { x: Number(b.x), y: Number(b.y) });
+      ctx.strokeStyle = "#f59e0b";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(sa.x, sa.y);
+      ctx.lineTo(sb.x, sb.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    for (const n of openNodes) {
+      const s = worldToScreen(state.view, { x: Number(n.x), y: Number(n.y) });
+      ctx.strokeStyle = "#ef4444";
+      ctx.fillStyle = "rgba(239,68,68,0.12)";
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(s.x - 8, s.y);
+      ctx.lineTo(s.x + 8, s.y);
+      ctx.moveTo(s.x, s.y - 8);
+      ctx.lineTo(s.x, s.y + 8);
+      ctx.stroke();
+    }
     ctx.restore();
   }
 

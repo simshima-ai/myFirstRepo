@@ -23,6 +23,13 @@ export function bindKeyboardInput(state, helpers, deps) {
         if (!isTouchDebugEnabled) return;
         try { console.log(`[touch-debug] ${msg}`); } catch (_) {}
     };
+    const toggleVertexEditMode = () => {
+        const cur = String(state.vertexEdit?.mode || "move").toLowerCase();
+        state.vertexEdit.mode = (cur === "insert") ? "move" : "insert";
+        if (state.vertexEdit.mode !== "insert") state.vertexEdit.insertCandidate = null;
+        if (setStatus) setStatus(state.vertexEdit.mode === "insert" ? "Vertex mode: Insert" : "Vertex mode: Move");
+        if (draw) draw();
+    };
 
     const onKeyDown = (e) => {
         state.input.modifierKeys.shift = e.shiftKey;
@@ -56,7 +63,15 @@ export function bindKeyboardInput(state, helpers, deps) {
             const shortcutAction = findShortcutAction(state, e.key);
             if (shortcutAction) {
                 if (shortcutAction === "delete") {
-                    if (helpers.delete) helpers.delete();
+                    if (state.tool === "vertex") {
+                        if (helpers.deleteSelectedVertices) helpers.deleteSelectedVertices();
+                    } else {
+                        if (helpers.delete) helpers.delete();
+                    }
+                } else if (shortcutAction === "vertex_mode_toggle") {
+                    if (state.tool === "vertex") {
+                        toggleVertexEditMode();
+                    }
                 } else if (setTool) {
                     setTool(shortcutAction);
                     if (setStatus) setStatus(`Tool changed: ${String(shortcutAction).toUpperCase()}`);
@@ -82,6 +97,9 @@ export function bindKeyboardInput(state, helpers, deps) {
                 state.dlineTrimPendingPreview = null;
                 state.dlineTrimCandidates = null;
                 state.dlineTrimIntersections = null;
+                state.dlineTrimStepTargets = null;
+                state.dlineTrimStepCreatedIds = null;
+                state.dlineTrimStepTotal = 0;
                 state.tool = "select";
                 if (setStatus) setStatus("Tool changed: SELECT");
             }
@@ -90,7 +108,11 @@ export function bindKeyboardInput(state, helpers, deps) {
             return;
         }
         if (e.key === "Delete") {
-            if (helpers.delete) helpers.delete();
+            if (state.tool === "vertex") {
+                if (helpers.deleteSelectedVertices) helpers.deleteSelectedVertices();
+            } else {
+                if (helpers.delete) helpers.delete();
+            }
         }
         if (isEnterKey(e)) {
             const d = state.polylineDraft;
@@ -178,6 +200,9 @@ export function bindKeyboardInput(state, helpers, deps) {
                 state.dlineTrimPendingPreview = null;
                 state.dlineTrimCandidates = null;
                 state.dlineTrimIntersections = null;
+                state.dlineTrimStepTargets = null;
+                state.dlineTrimStepCreatedIds = null;
+                state.dlineTrimStepTotal = 0;
                 state.tool = "select";
                 if (setStatus) setStatus("Tool changed: SELECT");
                 if (draw) draw();

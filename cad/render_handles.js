@@ -14,10 +14,17 @@ export function createRenderHandlesOps(deps) {
   function drawVertexHandles(ctx, state) {
     if (state.tool !== "vertex") return;
     const filterShapeId = state.vertexEdit?.filterShapeId != null ? Number(state.vertexEdit.filterShapeId) : null;
+    const targetSet = new Set(
+      (Array.isArray(state.vertexEdit?.targetShapeIds) ? state.vertexEdit.targetShapeIds : [])
+        .map(Number)
+        .filter(Number.isFinite)
+    );
+    if (!targetSet.size) return;
     const active = state.vertexEdit?.activeVertex || null;
     const selectedSet = new Set(((state.vertexEdit?.selectedVertices) || []).map((v) => `${Number(v.shapeId)}:${v.key}`));
     ctx.save();
     for (const s of (state.shapes || [])) {
+      if (!targetSet.has(Number(s.id))) continue;
       if (!isLayerVisible(state, s.layerId)) continue;
       if (!isVisibleByCurrentLayerFilter(state, s)) continue;
       if (filterShapeId !== null && Number(s.id) !== filterShapeId) continue;
@@ -27,6 +34,10 @@ export function createRenderHandlesOps(deps) {
           { key: "p1", x: s.x1, y: s.y1 },
           { key: "p2", x: s.x2, y: s.y2 },
         ];
+      } else if (s.type === "polyline" && Array.isArray(s.points)) {
+        pts = s.points
+          .map((p, idx) => ({ key: `v${idx}`, x: Number(p?.x), y: Number(p?.y) }))
+          .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
       } else if (s.type === "arc") {
         const cx = Number(s.cx);
         const cy = Number(s.cy);
@@ -73,6 +84,23 @@ export function createRenderHandlesOps(deps) {
         ctx.fill();
         ctx.stroke();
       }
+    }
+    if (String(state.vertexEdit?.mode || "move").toLowerCase() === "insert" && state.vertexEdit?.insertCandidate) {
+      const c = state.vertexEdit.insertCandidate;
+      const sp = worldToScreen(state.view, { x: Number(c.x), y: Number(c.y) });
+      ctx.beginPath();
+      ctx.arc(sp.x, sp.y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(168,85,247,0.15)";
+      ctx.strokeStyle = "#7c3aed";
+      ctx.lineWidth = 2;
+      ctx.fill();
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(sp.x - 8, sp.y);
+      ctx.lineTo(sp.x + 8, sp.y);
+      ctx.moveTo(sp.x, sp.y - 8);
+      ctx.lineTo(sp.x, sp.y + 8);
+      ctx.stroke();
     }
     ctx.restore();
   }

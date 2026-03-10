@@ -31,8 +31,8 @@ export function refreshGroupContext(state, dom, panelLang) {
       && Number(state.input?.groupAimPick?.groupId) === Number(state.activeGroupId);
     const selIds = new Set((state.selection?.ids || []).map(Number));
     const selectedShapes = selIds.size > 0 ? (state.shapes || []).filter(s => selIds.has(Number(s.id))) : [];
-    const styleTargetTypes = new Set(["line", "circle", "arc", "position"]);
-    const colorTargetTypes = new Set(["line", "rect", "circle", "arc", "position", "text", "dim", "dimchain", "dimangle", "circleDim", "hatch"]);
+    const styleTargetTypes = new Set(["line", "polyline", "circle", "arc", "position"]);
+    const colorTargetTypes = new Set(["line", "polyline", "rect", "circle", "arc", "position", "text", "dim", "dimchain", "dimangle", "circleDim", "hatch"]);
     const hasOnlyStyleTargetSelection = selectedShapes.length > 0
       && selectedShapes.every(s => styleTargetTypes.has(String(s.type || "")));
     const hasOnlyColorTargetSelection = selectedShapes.length > 0
@@ -56,6 +56,7 @@ export function refreshGroupContext(state, dom, panelLang) {
         title = panelLang === "en" ? "Group" : "グループ";
       } else if (selectedShapes.length === 1) {
         const t = String(selectedShapes[0]?.type || "");
+        if (t === "polyline") title = panelLang === "en" ? "Polyline" : "Polyline";
         if (t === "line") title = panelLang === "en" ? "Line" : "線分";
         else if (t === "circle") title = panelLang === "en" ? "Circle" : "円";
         else if (t === "arc") title = panelLang === "en" ? "Arc" : "円弧";

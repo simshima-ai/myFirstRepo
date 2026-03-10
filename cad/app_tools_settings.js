@@ -192,15 +192,15 @@ export function setCircleRadiusLocked(state, helpers, on = null) {
     if (helpers?.draw) helpers.draw();
 }
 export function setPositionSize(state, helpers, v) {
-    const next = Math.max(1, Number(v) || 20);
-    if (!state.positionSettings) state.positionSettings = { size: next };
+    const next = Math.max(1, Number(v) || 3);
+    if (!state.positionSettings) state.positionSettings = { size: next, lineWidthMm: 0.1, lineType: "solid" };
     const selectedPositions = getSelectedShapes(state).filter(s => s.type === "position");
-    const needsShapeUpdate = selectedPositions.some(s => Number(s.size ?? 20) !== next);
+    const needsShapeUpdate = selectedPositions.some(s => Number(s.size ?? 3) !== next);
     if (needsShapeUpdate && helpers.pushHistory) helpers.pushHistory();
     if (needsShapeUpdate) {
         for (const s of selectedPositions) s.size = next;
     }
-    const prevSetting = Number(state.positionSettings.size ?? 20);
+    const prevSetting = Number(state.positionSettings.size ?? 3);
     if (prevSetting !== next) state.positionSettings.size = next;
     if (needsShapeUpdate || prevSetting !== next) {
         if (helpers.draw) helpers.draw();
@@ -264,6 +264,16 @@ export function setToolLineType(state, helpers, v, toolKey = null) {
     if (draw) draw();
 }
 
+export function setToolColor(state, helpers, color, toolKey = null) {
+    const { draw, setStatus } = helpers;
+    const next = normalizeHexColor(color, "#0f172a");
+    const name = String(toolKey || state.tool || "tool");
+    const target = resolveToolStyleTarget(state, name);
+    if (target) target.color = next;
+    if (setStatus) setStatus(`${name} 色を ${next} に設定`);
+    if (draw) draw();
+}
+
 export function setSelectedLineWidthMm(state, helpers, v) {
     const { pushHistory, draw, setStatus } = helpers;
     const presets = [0.1, 0.25, 0.5, 0.75, 1, 1.5, 2];
@@ -282,8 +292,10 @@ export function setSelectedLineWidthMm(state, helpers, v) {
     const isStyleEditableShape = (s) => {
         if (!s) return false;
         return s.type === "line"
+            || s.type === "polyline"
             || s.type === "circle"
             || s.type === "arc"
+            || s.type === "imagetrace"
             || s.type === "position"
             || s.type === "dim"
             || s.type === "dimchain"
@@ -312,8 +324,10 @@ export function setSelectedLineType(state, helpers, v) {
     const selected = (state.shapes || []).filter((s) => {
         if (!selIds.has(Number(s.id))) return false;
         return s.type === "line"
+            || s.type === "polyline"
             || s.type === "circle"
             || s.type === "arc"
+            || s.type === "imagetrace"
             || s.type === "position"
             || s.type === "dim"
             || s.type === "dimchain"

@@ -3,6 +3,7 @@ export function createRenderDoubleLineOverlayOps(deps) {
 
   function drawDoubleLinePreview(ctx, state) {
     if (!state.dlinePreview || state.tool !== "doubleline") return;
+    if (state.dlineTrimPending) return;
     ctx.save();
     ctx.strokeStyle = state.dlineTrimPending ? "#8b5cf6" : "#ef4444";
     ctx.lineWidth = 1.0;
@@ -23,12 +24,16 @@ export function createRenderDoubleLineOverlayOps(deps) {
         const a2 = Number(o.a2) || 0;
         const ccw = !!o.ccw;
         ctx.beginPath();
-        ctx.arc(c.x, c.y, rr, -a1, -a2, !ccw);
+        ctx.arc(c.x, c.y, rr, a1, a2, !ccw);
         ctx.stroke();
         continue;
       }
-      const p1 = worldToScreen(state.view, { x: o.x1, y: o.y1 });
-      const p2 = worldToScreen(state.view, { x: o.x2, y: o.y2 });
+      const x1 = Number.isFinite(Number(o.fullX1)) ? Number(o.fullX1) : Number(o.x1);
+      const y1 = Number.isFinite(Number(o.fullY1)) ? Number(o.fullY1) : Number(o.y1);
+      const x2 = Number.isFinite(Number(o.fullX2)) ? Number(o.fullX2) : Number(o.x2);
+      const y2 = Number.isFinite(Number(o.fullY2)) ? Number(o.fullY2) : Number(o.y2);
+      const p1 = worldToScreen(state.view, { x: x1, y: y1 });
+      const p2 = worldToScreen(state.view, { x: x2, y: y2 });
       ctx.beginPath();
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
@@ -39,6 +44,7 @@ export function createRenderDoubleLineOverlayOps(deps) {
 
   function drawDoubleLineTrimCandidates(ctx, state) {
     if (state.tool !== "doubleline" || !state.dlineTrimPending) return;
+    return;
     const candidates = Array.isArray(state.dlineTrimCandidates) ? state.dlineTrimCandidates : [];
     if (!candidates.length) return;
     ctx.save();
@@ -58,7 +64,7 @@ export function createRenderDoubleLineOverlayOps(deps) {
   }
 
   function drawDoubleLineTrimIntersections(ctx, state) {
-    if (state.tool !== "doubleline" || !state.dlineTrimPending) return;
+    return;
     const points = Array.isArray(state.dlineTrimIntersections) ? state.dlineTrimIntersections : [];
     if (!points.length) return;
     ctx.save();

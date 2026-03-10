@@ -696,13 +696,10 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
         } else if (s.type === "bspline") {
             const cps = Array.isArray(s.controlPoints) ? s.controlPoints : [];
             if (state.objectSnap?.endpoint !== false && cps.length) {
-                const first = cps[0];
-                const last = cps[cps.length - 1];
-                if (Number.isFinite(Number(first?.x)) && Number.isFinite(Number(first?.y))) {
-                    consider(Number(first.x), Number(first.y), "endpoint", { shapeId: Number(s.id), refType: "bspline_control", refKey: "cp0" });
-                }
-                if (Number.isFinite(Number(last?.x)) && Number.isFinite(Number(last?.y))) {
-                    consider(Number(last.x), Number(last.y), "endpoint", { shapeId: Number(s.id), refType: "bspline_control", refKey: `cp${Math.max(0, cps.length - 1)}` });
+                for (let i = 0; i < cps.length; i++) {
+                    const cp = cps[i];
+                    if (!Number.isFinite(Number(cp?.x)) || !Number.isFinite(Number(cp?.y))) continue;
+                    consider(Number(cp.x), Number(cp.y), "endpoint", { shapeId: Number(s.id), refType: "bspline_control", refKey: `cp${i}` });
                 }
             }
         } else if (s.type === "dim") {

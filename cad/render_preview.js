@@ -338,13 +338,14 @@ export function createRenderPreviewOps(config) {
         ctx.moveTo(p1s.x, p1s.y);
         ctx.lineTo(hs.x, hs.y);
         ctx.stroke();
-        if (Number.isFinite(Number(d.hover.x)) && Number.isFinite(Number(d.hover.y))) {
+        // Single linear dimension: hide purple candidate marker while creating.
+        if (state.dimSettings?.linearMode !== "single" && Number.isFinite(Number(d.hover.x)) && Number.isFinite(Number(d.hover.y))) {
           drawPurpleCandidate(Number(d.hover.x), Number(d.hover.y));
         }
       } else {
         const hx = Number(state.input?.hoverWorld?.x);
         const hy = Number(state.input?.hoverWorld?.y);
-        if (Number.isFinite(hx) && Number.isFinite(hy)) drawPurpleCandidate(hx, hy);
+        if (state.dimSettings?.linearMode !== "single" && Number.isFinite(hx) && Number.isFinite(hy)) drawPurpleCandidate(hx, hy);
       }
     }
     ctx.restore();
@@ -355,9 +356,9 @@ export function createRenderPreviewOps(config) {
     const preview = state.input.dimHoverPreview;
     if (preview) {
       ctx.save();
-      ctx.strokeStyle = "rgba(100, 116, 139, 0.75)";
-      ctx.lineWidth = 1;
-      ctx.setLineDash([5, 4]);
+      ctx.strokeStyle = "#ef4444";
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
       const geom = getSpecialDimGeometry(preview, state.shapes);
       if (geom) drawDimensionCommon(ctx, state, { type: "dim", kind: preview.kind, precision: state.dimSettings?.precision ?? 1 }, geom, false, false);
       ctx.setLineDash([]);
@@ -368,15 +369,9 @@ export function createRenderPreviewOps(config) {
     const s = state.shapes.find(sh => Number(sh.id) === Number(state.input.dimHoveredShapeId));
     if (!s) return;
     ctx.save();
-    if (s.type === "line") {
-      ctx.strokeStyle = "#ef4444";
-      ctx.lineWidth = 3;
-      ctx.setLineDash([6, 4]);
-    } else {
-      ctx.strokeStyle = "rgba(34, 197, 94, 0.5)";
-      ctx.lineWidth = 6;
-      ctx.setLineDash([]);
-    }
+    ctx.strokeStyle = "#ef4444";
+    ctx.lineWidth = 3;
+    ctx.setLineDash([6, 4]);
     if (s.type === "line") {
       const p1 = worldToScreen(state.view, { x: s.x1, y: s.y1 });
       const p2 = worldToScreen(state.view, { x: s.x2, y: s.y2 });
@@ -384,6 +379,32 @@ export function createRenderPreviewOps(config) {
       ctx.moveTo(p1.x, p1.y);
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
+    } else if (s.type === "polyline") {
+      const pts = Array.isArray(s.points) ? s.points : [];
+      if (pts.length >= 2) {
+        const segIdx = Number(state.input?.dimHoveredSegmentIndex);
+        const segCount = pts.length - 1 + (s.closed ? 1 : 0);
+        if (Number.isFinite(segIdx) && segIdx >= 0 && segIdx < segCount) {
+          const i1 = segIdx;
+          const i2 = (segIdx + 1) % pts.length;
+          const a = worldToScreen(state.view, { x: Number(pts[i1].x), y: Number(pts[i1].y) });
+          const b = worldToScreen(state.view, { x: Number(pts[i2].x), y: Number(pts[i2].y) });
+          ctx.beginPath();
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.stroke();
+        } else {
+          const p0 = worldToScreen(state.view, { x: Number(pts[0].x), y: Number(pts[0].y) });
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          for (let i = 1; i < pts.length; i++) {
+            const p = worldToScreen(state.view, { x: Number(pts[i].x), y: Number(pts[i].y) });
+            ctx.lineTo(p.x, p.y);
+          }
+          if (s.closed) ctx.closePath();
+          ctx.stroke();
+        }
+      }
     } else if (s.type === "circle" || s.type === "arc") {
       const c = worldToScreen(state.view, { x: s.cx, y: s.cy });
       const r = Math.abs(Number(s.r)) * state.view.scale;

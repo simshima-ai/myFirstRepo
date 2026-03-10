@@ -56,6 +56,7 @@ function splitTrunkOffsetByBranch(trunkObj, branchBaseId, offsetLines, nextVirtu
     const pa = (a.t === clampT(a.t)) ? a.p : { x: tx1 + dx * clampT(a.t), y: ty1 + dy * clampT(a.t) };
     const pb = (b.t === clampT(b.t)) ? b.p : { x: tx1 + dx * clampT(b.t), y: ty1 + dy * clampT(b.t) };
     const leftLen = Math.hypot(pa.x - tx1, pa.y - ty1);
+    const midLen = Math.hypot(pb.x - pa.x, pb.y - pa.y);
     const rightLen = Math.hypot(tx2 - pb.x, ty2 - pb.y);
     if (leftLen <= 1e-9 && rightLen <= 1e-9) return;
     if (leftLen <= 1e-9) {
@@ -73,9 +74,18 @@ function splitTrunkOffsetByBranch(trunkObj, branchBaseId, offsetLines, nextVirtu
         side: Number(trunkObj.side),
         x1: pb.x, y1: pb.y, x2: tx2, y2: ty2
     };
+    const extraMid = {
+        baseId: nextVirtualBaseIdRef.val--,
+        rootBaseId: trunkRootBaseId,
+        side: Number(trunkObj.side),
+        x1: pa.x, y1: pa.y, x2: pb.x, y2: pb.y
+    };
     trunkObj.rootBaseId = trunkRootBaseId;
     trunkObj.x2 = pa.x;
     trunkObj.y2 = pa.y;
+    // Keep center bridge at branch junctions to avoid dropped inside segment
+    // on multi-line connected shapes (e.g. connected squares).
+    if (midLen > 1e-9) offsetLines.push(extraMid);
     offsetLines.push(extra);
 }
 
@@ -128,7 +138,124 @@ function trimTBranchToBestTrunk(branchBaseId, branchEnd, trunkBaseId, trunkSideH
     if (chosenTrunk) splitTrunkOffsetByBranch(chosenTrunk, branchBaseId, offsetLines, nextVirtualBaseIdRef, map, branchSegBySide);
 }
 
-function trimOffsetLineConnections(offsetLines, baseAdjPairs) {
+function collectHighDegreeBaseJunctions(baseLines, eps = 1e-6) {
+    const e = Math.max(1e-9, Number(eps) || 1e-6);
+    const keyOf = (x, y) => `${Math.round(Number(x) / e)}:${Math.round(Number(y) / e)}`;
+    const map = new Map();
+    for (const l of (baseLines || [])) {
+        if (!l || String(l.type || "line") !== "line") continue;
+        const id = Number(l.id);
+        const p1 = { x: Number(l.x1), y: Number(l.y1), end: "p1" };
+        const p2 = { x: Number(l.x2), y: Number(l.y2), end: "p2" };
+        for (const p of [p1, p2]) {
+            if (![p.x, p.y].every(Number.isFinite)) continue;
+            const k = keyOf(p.x, p.y);
+            if (!map.has(k)) map.set(k, { x: p.x, y: p.y, incidences: [] });
+            map.get(k).incidences.push({ lineId: id, endKey: p.end });
+        }
+    }
+    return Array.from(map.values()).filter((j) => (j?.incidences?.length || 0) >= 3);
+}
+
+function findClosestOffsetEndpointForTarget(offsetLines, lineId, side, targetPt, tol = 1e-5) {
+    const t = Math.max(1e-9, Number(tol) || 1e-5);
+    let best = null;
+    let bestDist = Infinity;
+    for (const o of (offsetLines || [])) {
+        if (!o) continue;
+        if (Number(o.side) !== Number(side)) continue;
+        const rb = Number(o.rootBaseId ?? o.baseId);
+        if (rb !== Number(lineId)) continue;
+        const p1 = { x: Number(o.x1), y: Number(o.y1), endKey: "p1", obj: o };
+        const p2 = { x: Number(o.x2), y: Number(o.y2), endKey: "p2", obj: o };
+        for (const p of [p1, p2]) {
+            if (![p.x, p.y].every(Number.isFinite)) continue;
+            const d = Math.hypot(Number(p.x) - Number(targetPt.x), Number(p.y) - Number(targetPt.y));
+            if (d < bestDist) {
+                bestDist = d;
+                best = p;
+            }
+        }
+    }
+    if (!best || bestDist > t) return null;
+    return best;
+}
+
+function expectedOffsetEndpointFromBase(line, endKey, side, offsetDist) {
+    const x1 = Number(line?.x1), y1 = Number(line?.y1), x2 = Number(line?.x2), y2 = Number(line?.y2);
+    if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-9) return null;
+    const tx = dx / len, ty = dy / len;
+    const nx = -ty * Number(side), ny = tx * Number(side);
+    const bx = (endKey === "p2") ? x2 : x1;
+    const by = (endKey === "p2") ? y2 : y1;
+    return { x: bx + nx * Number(offsetDist), y: by + ny * Number(offsetDist) };
+}
+
+function hasConnectorLike(offsetLines, pA, pB, tol = 1e-8) {
+    const t = Math.max(1e-10, Number(tol) || 1e-8);
+    for (const o of (offsetLines || [])) {
+        if (!o || String(o.type || "line") !== "line") continue;
+        const a1 = { x: Number(o.x1), y: Number(o.y1) };
+        const a2 = { x: Number(o.x2), y: Number(o.y2) };
+        if (![a1.x, a1.y, a2.x, a2.y].every(Number.isFinite)) continue;
+        const dDir = Math.hypot(a1.x - Number(pA.x), a1.y - Number(pA.y)) + Math.hypot(a2.x - Number(pB.x), a2.y - Number(pB.y));
+        const dRev = Math.hypot(a1.x - Number(pB.x), a1.y - Number(pB.y)) + Math.hypot(a2.x - Number(pA.x), a2.y - Number(pA.y));
+        if (Math.min(dDir, dRev) <= t) return true;
+    }
+    return false;
+}
+
+function bridgeMissingHighDegreeJunctionSegments(offsetLines, baseLines, nextVirtualBaseIdRef, offsetDist) {
+    const joints = collectHighDegreeBaseJunctions(baseLines, 1e-6);
+    if (!joints.length) return;
+    const endpointTol = 1e-3;
+    const baseById = new Map((baseLines || []).filter((l) => l && String(l.type || "line") === "line").map((l) => [Number(l.id), l]));
+    for (const j of joints) {
+        for (const side of [1, -1]) {
+            const pts = [];
+            for (const inc of (j.incidences || [])) {
+                const base = baseById.get(Number(inc.lineId));
+                if (!base) continue;
+                const expected = expectedOffsetEndpointFromBase(base, inc.endKey, side, offsetDist);
+                if (!expected) continue;
+                const ep = findClosestOffsetEndpointForTarget(offsetLines, inc.lineId, side, expected, Math.max(endpointTol, Number(offsetDist) * 0.75));
+                if (!ep) continue;
+                pts.push({ x: Number(ep.x), y: Number(ep.y), lineId: Number(inc.lineId) });
+            }
+            if (pts.length < 2) continue;
+            const uniq = [];
+            for (const p of pts) {
+                let hit = false;
+                for (const q of uniq) {
+                    if (Math.hypot(Number(p.x) - Number(q.x), Number(p.y) - Number(q.y)) <= 1e-6) {
+                        hit = true;
+                        break;
+                    }
+                }
+                if (!hit) uniq.push(p);
+            }
+            // Conservative fix: when only one bridge is missing, we see exactly 2 unmatched endpoints.
+            if (uniq.length !== 2) continue;
+            const pA = uniq[0], pB = uniq[1];
+            if (Math.hypot(Number(pA.x) - Number(pB.x), Number(pA.y) - Number(pB.y)) <= 1e-9) continue;
+            if (hasConnectorLike(offsetLines, pA, pB, 1e-8)) continue;
+            offsetLines.push({
+                baseId: nextVirtualBaseIdRef.val--,
+                rootBaseId: Number.isFinite(Number(pA.lineId)) ? Number(pA.lineId) : Number(pB.lineId),
+                side: Number(side),
+                x1: Number(pA.x),
+                y1: Number(pA.y),
+                x2: Number(pB.x),
+                y2: Number(pB.y),
+            });
+        }
+    }
+}
+
+function trimOffsetLineConnections(offsetLines, baseAdjPairs, baseLines = null, offsetDist = 0) {
     const map = new Map();
     for (const o of offsetLines) map.set(`${o.baseId}:${o.side}`, o);
     let nextVirtualBaseIdRef = { val: -1 };
@@ -150,6 +277,7 @@ function trimOffsetLineConnections(offsetLines, baseAdjPairs) {
             else if (p.bEnd === 'p2') { ob.x2 = ip.x; ob.y2 = ip.y; }
         }
     }
+    bridgeMissingHighDegreeJunctionSegments(offsetLines, baseLines, nextVirtualBaseIdRef, offsetDist);
 }
 
 function extendOffsetLinesBothEnds(offsetLines, extendDist) {
@@ -311,6 +439,407 @@ function computeDoubleLineSideSigns(lines, mousePt) {
         out[s.id] = side;
     }
     return out;
+}
+
+function computeLineSideFromMouse(line, mousePt) {
+    if (!line || !mousePt) return 1;
+    const x1 = Number(line.x1), y1 = Number(line.y1), x2 = Number(line.x2), y2 = Number(line.y2);
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-9) return 1;
+    const tx = dx / len, ty = dy / len;
+    const nx = -ty, ny = tx;
+    const t = Math.max(0, Math.min(len, (mousePt.x - x1) * tx + (mousePt.y - y1) * ty));
+    const qx = x1 + tx * t, qy = y1 + ty * t;
+    return ((mousePt.x - qx) * nx + (mousePt.y - qy) * ny) >= 0 ? 1 : -1;
+}
+
+function getOffsetEndpointForLine(line, endKey, sign, offsetDist) {
+    const x1 = Number(line.x1), y1 = Number(line.y1), x2 = Number(line.x2), y2 = Number(line.y2);
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-9) return null;
+    const tx = dx / len, ty = dy / len;
+    const nx = -ty * Number(sign), ny = tx * Number(sign);
+    const bx = (endKey === "p2") ? x2 : x1;
+    const by = (endKey === "p2") ? y2 : y1;
+    return { x: bx + nx * Number(offsetDist), y: by + ny * Number(offsetDist) };
+}
+
+function getOffsetEndpointForArc(arc, endKey, sign, offsetDist) {
+    if (!arc) return null;
+    const cx = Number(arc.cx), cy = Number(arc.cy), r0 = Number(arc.r);
+    const a1 = Number(arc.a1), a2 = Number(arc.a2);
+    if (![cx, cy, r0, a1, a2].every(Number.isFinite)) return null;
+    const r = r0 + Number(sign) * Number(offsetDist);
+    if (!(r > 1e-9)) return null;
+    const th = (endKey === "a2") ? a2 : a1;
+    return { x: cx + Math.cos(th) * r, y: cy + Math.sin(th) * r };
+}
+
+function computeArcSideFromMouse(arc, mousePt) {
+    if (!arc || !mousePt) return 1;
+    const cx = Number(arc.cx), cy = Number(arc.cy), r0 = Number(arc.r);
+    if (![cx, cy, r0].every(Number.isFinite)) return 1;
+    const d = Math.hypot(Number(mousePt.x) - cx, Number(mousePt.y) - cy);
+    return d >= r0 ? 1 : -1;
+}
+
+function computeConnectedSingleSigns(lines, mousePt, offsetDist) {
+    const out = {};
+    const arr = Array.isArray(lines) ? lines.slice() : [];
+    if (!arr.length) return out;
+    const byId = new Map(arr.map((l) => [Number(l.id), l]));
+    // Use a looser endpoint tolerance for side propagation so tiny numeric gaps
+    // do not split one intended chain into multiple components.
+    const chainTol = Math.max(1e-3, Math.abs(Number(offsetDist) || 0) * 1e-2);
+    const pairs = findAdjacentBaseLinePairs(arr, chainTol).filter((p) => !!p && p.aEnd && p.bEnd);
+    const adj = new Map();
+    const addAdj = (fromId, fromEnd, toId, toEnd) => {
+        const fid = Number(fromId), tid = Number(toId);
+        if (!Number.isFinite(fid) || !Number.isFinite(tid)) return;
+        if (!adj.has(fid)) adj.set(fid, []);
+        adj.get(fid).push({ toId: tid, fromEnd, toEnd });
+    };
+    for (const p of pairs) {
+        addAdj(p.aId, p.aEnd, p.bId, p.bEnd);
+        addAdj(p.bId, p.bEnd, p.aId, p.aEnd);
+    }
+    const unvisited = new Set(arr.map((l) => Number(l.id)));
+    const pickSeedId = () => {
+        if (!mousePt) return unvisited.values().next().value;
+        let bestId = null;
+        let bestDist = Infinity;
+        for (const id of unvisited) {
+            const l = byId.get(Number(id));
+            if (!l) continue;
+            const x1 = Number(l.x1), y1 = Number(l.y1), x2 = Number(l.x2), y2 = Number(l.y2);
+            const dx = x2 - x1, dy = y2 - y1;
+            const len = Math.hypot(dx, dy);
+            if (len <= 1e-9) continue;
+            const tx = dx / len, ty = dy / len;
+            const t = Math.max(0, Math.min(len, (mousePt.x - x1) * tx + (mousePt.y - y1) * ty));
+            const qx = x1 + tx * t, qy = y1 + ty * t;
+            const d = Math.hypot(Number(mousePt.x) - qx, Number(mousePt.y) - qy);
+            if (d < bestDist) { bestDist = d; bestId = Number(id); }
+        }
+        return (bestId != null) ? bestId : unvisited.values().next().value;
+    };
+    while (unvisited.size) {
+        const seedId = Number(pickSeedId());
+        if (!Number.isFinite(seedId)) break;
+        const seedLine = byId.get(seedId);
+        const seedSign = computeLineSideFromMouse(seedLine, mousePt);
+        out[seedId] = (seedSign === -1) ? -1 : 1;
+        const q = [seedId];
+        unvisited.delete(seedId);
+        while (q.length) {
+            const curId = Number(q.shift());
+            const curLine = byId.get(curId);
+            const curSign = (out[curId] === -1) ? -1 : 1;
+            const neighbors = adj.get(curId) || [];
+            for (const e of neighbors) {
+                const nid = Number(e.toId);
+                if (!Number.isFinite(nid) || !byId.has(nid) || out[nid] === 1 || out[nid] === -1) continue;
+                const nextLine = byId.get(nid);
+                const pCur = getOffsetEndpointForLine(curLine, e.fromEnd, curSign, offsetDist);
+                const pSame = getOffsetEndpointForLine(nextLine, e.toEnd, curSign, offsetDist);
+                const pFlip = getOffsetEndpointForLine(nextLine, e.toEnd, -curSign, offsetDist);
+                if (!pCur || !pSame || !pFlip) continue;
+                const dSame = Math.hypot(Number(pCur.x) - Number(pSame.x), Number(pCur.y) - Number(pSame.y));
+                const dFlip = Math.hypot(Number(pCur.x) - Number(pFlip.x), Number(pCur.y) - Number(pFlip.y));
+                out[nid] = (dSame <= dFlip) ? curSign : -curSign;
+                unvisited.delete(nid);
+                q.push(nid);
+            }
+        }
+        // If disconnected members remain in this component due missing adjacency, they will be seeded in next loop.
+    }
+    return out;
+}
+
+function findAdjacentBaseArcPairs(arcs, tol = 1e-4) {
+    const eps = Math.max(1e-9, Number(tol) || 1e-4);
+    const out = [];
+    const ep = (a, key) => {
+        const th = (key === "a2") ? Number(a.a2) : Number(a.a1);
+        return {
+            x: Number(a.cx) + Math.cos(th) * Number(a.r),
+            y: Number(a.cy) + Math.sin(th) * Number(a.r),
+            key,
+        };
+    };
+    for (let i = 0; i < arcs.length; i++) {
+        for (let j = i + 1; j < arcs.length; j++) {
+            const a = arcs[i], b = arcs[j];
+            const ae = [ep(a, "a1"), ep(a, "a2")];
+            const be = [ep(b, "a1"), ep(b, "a2")];
+            let best = null;
+            let bestD = Infinity;
+            for (const pa of ae) for (const pb of be) {
+                const d = Math.hypot(Number(pa.x) - Number(pb.x), Number(pa.y) - Number(pb.y));
+                if (d <= eps && d < bestD) {
+                    bestD = d;
+                    best = { aEnd: pa.key, bEnd: pb.key };
+                }
+            }
+            if (best) {
+                out.push({
+                    aId: Number(a.id),
+                    bId: Number(b.id),
+                    aEnd: best.aEnd,
+                    bEnd: best.bEnd,
+                });
+            }
+        }
+    }
+    return out;
+}
+
+function computeConnectedSingleArcSigns(arcs, mousePt, offsetDist) {
+    const out = {};
+    const arr = Array.isArray(arcs) ? arcs.slice() : [];
+    if (!arr.length) return out;
+    const byId = new Map(arr.map((a) => [Number(a.id), a]));
+    const chainTol = Math.max(1e-3, Math.abs(Number(offsetDist) || 0) * 1e-2);
+    const pairs = findAdjacentBaseArcPairs(arr, chainTol);
+    const adj = new Map();
+    const addAdj = (fromId, fromEnd, toId, toEnd) => {
+        const fid = Number(fromId), tid = Number(toId);
+        if (!Number.isFinite(fid) || !Number.isFinite(tid)) return;
+        if (!adj.has(fid)) adj.set(fid, []);
+        adj.get(fid).push({ toId: tid, fromEnd, toEnd });
+    };
+    for (const p of pairs) {
+        addAdj(p.aId, p.aEnd, p.bId, p.bEnd);
+        addAdj(p.bId, p.bEnd, p.aId, p.aEnd);
+    }
+    const unvisited = new Set(arr.map((a) => Number(a.id)));
+    const pickSeedId = () => {
+        if (!mousePt) return unvisited.values().next().value;
+        let bestId = null;
+        let bestDist = Infinity;
+        for (const id of unvisited) {
+            const a = byId.get(Number(id));
+            if (!a) continue;
+            const cx = Number(a.cx), cy = Number(a.cy), r0 = Number(a.r);
+            if (![cx, cy, r0].every(Number.isFinite)) continue;
+            const d = Math.abs(Math.hypot(Number(mousePt.x) - cx, Number(mousePt.y) - cy) - r0);
+            if (d < bestDist) {
+                bestDist = d;
+                bestId = Number(id);
+            }
+        }
+        return (bestId != null) ? bestId : unvisited.values().next().value;
+    };
+    while (unvisited.size) {
+        const seedId = Number(pickSeedId());
+        if (!Number.isFinite(seedId)) break;
+        const seedArc = byId.get(seedId);
+        const seedSign = computeArcSideFromMouse(seedArc, mousePt);
+        out[seedId] = (seedSign === -1) ? -1 : 1;
+        const q = [seedId];
+        unvisited.delete(seedId);
+        while (q.length) {
+            const curId = Number(q.shift());
+            const curArc = byId.get(curId);
+            const curSign = (out[curId] === -1) ? -1 : 1;
+            const neighbors = adj.get(curId) || [];
+            for (const e of neighbors) {
+                const nid = Number(e.toId);
+                if (!Number.isFinite(nid) || !byId.has(nid) || out[nid] === 1 || out[nid] === -1) continue;
+                const nextArc = byId.get(nid);
+                const pCur = getOffsetEndpointForArc(curArc, e.fromEnd, curSign, offsetDist);
+                const pSame = getOffsetEndpointForArc(nextArc, e.toEnd, curSign, offsetDist);
+                const pFlip = getOffsetEndpointForArc(nextArc, e.toEnd, -curSign, offsetDist);
+                if (!pCur || !pSame || !pFlip) continue;
+                const dSame = Math.hypot(Number(pCur.x) - Number(pSame.x), Number(pCur.y) - Number(pSame.y));
+                const dFlip = Math.hypot(Number(pCur.x) - Number(pFlip.x), Number(pCur.y) - Number(pFlip.y));
+                out[nid] = (dSame <= dFlip) ? curSign : -curSign;
+                unvisited.delete(nid);
+                q.push(nid);
+            }
+        }
+    }
+    return out;
+}
+
+function pointToSegmentDistance(p, l) {
+    const x1 = Number(l.x1), y1 = Number(l.y1), x2 = Number(l.x2), y2 = Number(l.y2);
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.hypot(dx, dy);
+    if (len <= 1e-9) return Infinity;
+    const tx = dx / len, ty = dy / len;
+    const t = Math.max(0, Math.min(len, (Number(p.x) - x1) * tx + (Number(p.y) - y1) * ty));
+    const qx = x1 + tx * t, qy = y1 + ty * t;
+    return Math.hypot(Number(p.x) - qx, Number(p.y) - qy);
+}
+
+function pointToArcRadialDistance(p, a) {
+    const cx = Number(a.cx), cy = Number(a.cy), r = Number(a.r);
+    if (![cx, cy, r].every(Number.isFinite)) return Infinity;
+    return Math.abs(Math.hypot(Number(p.x) - cx, Number(p.y) - cy) - r);
+}
+
+function computeConnectedSingleMixedSigns(lines, arcs, mousePt, offsetDist) {
+    const lineArr = Array.isArray(lines) ? lines.slice() : [];
+    const arcArr = Array.isArray(arcs) ? arcs.slice() : [];
+    const outLine = {};
+    const outArc = {};
+    if (!lineArr.length && !arcArr.length) return { lineSigns: outLine, arcSigns: outArc };
+
+    const lineById = new Map(lineArr.map((l) => [Number(l.id), l]));
+    const arcById = new Map(arcArr.map((a) => [Number(a.id), a]));
+
+    const chainTol = Math.max(1e-3, Math.abs(Number(offsetDist) || 0) * 1e-2);
+    const ll = findAdjacentBaseLinePairs(lineArr, chainTol).filter((p) => !!p && p.aEnd && p.bEnd);
+    const aa = findAdjacentBaseArcPairs(arcArr, chainTol);
+    const la = findAdjacentLineArcPairs(lineArr, arcArr, chainTol);
+
+    const adj = new Map();
+    const addEdge = (fromKey, toKey, fromEnd, toEnd) => {
+        if (!adj.has(fromKey)) adj.set(fromKey, []);
+        adj.get(fromKey).push({ toKey, fromEnd, toEnd });
+    };
+
+    for (const p of ll) {
+        const aKey = `L:${Number(p.aId)}`;
+        const bKey = `L:${Number(p.bId)}`;
+        addEdge(aKey, bKey, p.aEnd, p.bEnd);
+        addEdge(bKey, aKey, p.bEnd, p.aEnd);
+    }
+    for (const p of aa) {
+        const aKey = `A:${Number(p.aId)}`;
+        const bKey = `A:${Number(p.bId)}`;
+        addEdge(aKey, bKey, p.aEnd, p.bEnd);
+        addEdge(bKey, aKey, p.bEnd, p.aEnd);
+    }
+    for (const p of la) {
+        const lKey = `L:${Number(p.lineId)}`;
+        const aKey = `A:${Number(p.arcId)}`;
+        addEdge(lKey, aKey, p.lineEnd, p.arcEnd);
+        addEdge(aKey, lKey, p.arcEnd, p.lineEnd);
+    }
+
+    const allKeys = [];
+    for (const l of lineArr) allKeys.push(`L:${Number(l.id)}`);
+    for (const a of arcArr) allKeys.push(`A:${Number(a.id)}`);
+    const unvisited = new Set(allKeys);
+
+    const getShapeByKey = (k) => {
+        if (String(k).startsWith("L:")) return lineById.get(Number(String(k).slice(2)));
+        return arcById.get(Number(String(k).slice(2)));
+    };
+    const isLineKey = (k) => String(k).startsWith("L:");
+    const getSeedSign = (k) => {
+        const s = getShapeByKey(k);
+        return isLineKey(k) ? computeLineSideFromMouse(s, mousePt) : computeArcSideFromMouse(s, mousePt);
+    };
+    const getOffsetEndpointByKey = (k, endKey, sign) => {
+        const s = getShapeByKey(k);
+        if (!s) return null;
+        return isLineKey(k)
+            ? getOffsetEndpointForLine(s, endKey, sign, offsetDist)
+            : getOffsetEndpointForArc(s, endKey, sign, offsetDist);
+    };
+    const getDistanceToMouse = (k) => {
+        const s = getShapeByKey(k);
+        if (!s || !mousePt) return 0;
+        return isLineKey(k) ? pointToSegmentDistance(mousePt, s) : pointToArcRadialDistance(mousePt, s);
+    };
+    const setSign = (k, sg) => {
+        const id = Number(String(k).slice(2));
+        if (isLineKey(k)) outLine[id] = (sg === -1) ? -1 : 1;
+        else outArc[id] = (sg === -1) ? -1 : 1;
+    };
+    const hasSign = (k) => {
+        const id = Number(String(k).slice(2));
+        const v = isLineKey(k) ? outLine[id] : outArc[id];
+        return v === 1 || v === -1;
+    };
+    const getSign = (k) => {
+        const id = Number(String(k).slice(2));
+        const v = isLineKey(k) ? outLine[id] : outArc[id];
+        return (v === -1) ? -1 : 1;
+    };
+
+    while (unvisited.size) {
+        let seedKey = null;
+        let bestDist = Infinity;
+        for (const k of unvisited) {
+            const d = getDistanceToMouse(k);
+            if (d < bestDist) {
+                bestDist = d;
+                seedKey = k;
+            }
+        }
+        if (!seedKey) seedKey = unvisited.values().next().value;
+        if (!seedKey) break;
+
+        setSign(seedKey, getSeedSign(seedKey));
+        unvisited.delete(seedKey);
+        const q = [seedKey];
+        while (q.length) {
+            const cur = q.shift();
+            const curSign = getSign(cur);
+            const neighbors = adj.get(cur) || [];
+            for (const e of neighbors) {
+                const nxt = String(e.toKey || "");
+                if (!nxt || hasSign(nxt)) continue;
+                const pCur = getOffsetEndpointByKey(cur, e.fromEnd, curSign);
+                const pSame = getOffsetEndpointByKey(nxt, e.toEnd, curSign);
+                const pFlip = getOffsetEndpointByKey(nxt, e.toEnd, -curSign);
+                if (!pCur || !pSame || !pFlip) continue;
+                const dSame = Math.hypot(Number(pCur.x) - Number(pSame.x), Number(pCur.y) - Number(pSame.y));
+                const dFlip = Math.hypot(Number(pCur.x) - Number(pFlip.x), Number(pCur.y) - Number(pFlip.y));
+                setSign(nxt, (dSame <= dFlip) ? curSign : -curSign);
+                unvisited.delete(nxt);
+                q.push(nxt);
+            }
+        }
+    }
+
+    return { lineSigns: outLine, arcSigns: outArc };
+}
+
+function computeSingleModeGlobalSign(bases, mousePt) {
+    if (!Array.isArray(bases) || !bases.length || !mousePt) return 1;
+    const lineBases = bases.filter(s => s && s.type === "line");
+    if (lineBases.length) {
+        let best = null;
+        let bestDist = Infinity;
+        for (const s of lineBases) {
+            const x1 = Number(s.x1), y1 = Number(s.y1), x2 = Number(s.x2), y2 = Number(s.y2);
+            const dx = x2 - x1, dy = y2 - y1;
+            const len = Math.hypot(dx, dy);
+            if (len <= 1e-9) continue;
+            const tx = dx / len, ty = dy / len;
+            const nx = -ty, ny = tx;
+            const t = Math.max(0, Math.min(len, (mousePt.x - x1) * tx + (mousePt.y - y1) * ty));
+            const qx = x1 + tx * t, qy = y1 + ty * t;
+            const dist = Math.hypot(Number(mousePt.x) - qx, Number(mousePt.y) - qy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = ((mousePt.x - qx) * nx + (mousePt.y - qy) * ny) >= 0 ? 1 : -1;
+            }
+        }
+        if (best === 1 || best === -1) return best;
+    }
+    // Fallback for circle/arc-only selection.
+    let best = 1;
+    let bestDist = Infinity;
+    for (const s of bases) {
+        if (!s || (s.type !== "circle" && s.type !== "arc")) continue;
+        const cx = Number(s.cx), cy = Number(s.cy), r0 = Number(s.r);
+        if (![cx, cy, r0].every(Number.isFinite)) continue;
+        const d = Math.hypot(Number(mousePt.x) - cx, Number(mousePt.y) - cy);
+        const dr = Math.abs(d - r0);
+        if (dr < bestDist) {
+            bestDist = dr;
+            best = d >= r0 ? 1 : -1;
+        }
+    }
+    return (best === -1) ? -1 : 1;
 }
 
 function findAdjacentBaseLinePairs(lines, tol = 1e-4) {
@@ -506,12 +1035,20 @@ export function buildDoubleLinePreview(state, mousePt = null) {
     const off = Number(state.dlineSettings?.offset) || 10;
     const mode = state.dlineSettings?.mode || 'both';
     const lineBases = bases.filter(s => s.type === 'line');
-    const signsMap = (mode === 'single' && mousePt) ? computeDoubleLineSideSigns(lineBases, mousePt) : null;
+    const arcBases = bases.filter(s => s.type === 'arc');
+    const globalSingleSign = (mode === 'single') ? computeSingleModeGlobalSign(bases, mousePt) : 1;
+    const mixedSigns = (mode === 'single' && mousePt)
+        ? computeConnectedSingleMixedSigns(lineBases, arcBases, mousePt, off)
+        : null;
+    const signsMap = mixedSigns?.lineSigns || null;
+    const arcSignsMap = mixedSigns?.arcSigns || null;
     const offsets = [];
     for (const s of bases) {
         if (s.type === 'line') {
             if (mode === 'single') {
-                const sg = (signsMap && signsMap[s.id]) ? signsMap[s.id] : 1;
+                const sg = (signsMap && (signsMap[s.id] === 1 || signsMap[s.id] === -1))
+                    ? Number(signsMap[s.id])
+                    : ((globalSingleSign === -1) ? -1 : 1);
                 const o = buildOffsetLineData(s, sg, off);
                 if (o) offsets.push(o);
             } else {
@@ -526,9 +1063,7 @@ export function buildDoubleLinePreview(state, mousePt = null) {
             const cx = Number(s.cx), cy = Number(s.cy), r0 = Number(s.r);
             if (!Number.isFinite(cx) || !Number.isFinite(cy) || !Number.isFinite(r0)) continue;
             const pickSign = () => {
-                if (!mousePt) return 1;
-                const d = Math.hypot(Number(mousePt.x) - cx, Number(mousePt.y) - cy);
-                return d >= r0 ? 1 : -1;
+                return (globalSingleSign === -1) ? -1 : 1;
             };
             const pushCircle = (sg) => {
                 const r = r0 + sg * off;
@@ -545,9 +1080,9 @@ export function buildDoubleLinePreview(state, mousePt = null) {
             const ccw = !!s.ccw;
             if (![cx, cy, r0, a1, a2].every(Number.isFinite)) continue;
             const pickSign = () => {
-                if (!mousePt) return 1;
-                const d = Math.hypot(Number(mousePt.x) - cx, Number(mousePt.y) - cy);
-                return d >= r0 ? 1 : -1;
+                const sg = arcSignsMap ? Number(arcSignsMap[s.id]) : NaN;
+                if (sg === 1 || sg === -1) return sg;
+                return (globalSingleSign === -1) ? -1 : 1;
             };
             const pushArc = (sg) => {
                 const r = r0 + sg * off;
@@ -559,7 +1094,6 @@ export function buildDoubleLinePreview(state, mousePt = null) {
             continue;
         }
     }
-    const arcBases = bases.filter(s => s.type === 'arc');
     const pairs = findAdjacentBaseLinePairs(lineBases);
     const lineArcPairs = findAdjacentLineArcPairs(lineBases, arcBases);
     // Sort pairs to ensure deterministic processing order
@@ -575,7 +1109,8 @@ export function buildDoubleLinePreview(state, mousePt = null) {
         o.fullY2 = Number(o.y2);
     }
     if (!state.dlineSettings?.noTrim) {
-        trimOffsetLineConnections(lineOffsets, pairs);
+        // Trim mode: resolve connected line segments by intersection-first geometry.
+        trimOffsetLineConnections(lineOffsets, pairs, lineBases, Math.abs(off));
         connectLineArcOffsets(offsets, lineArcPairs);
         trimExtendedOffsetsByTargetIntersections(lineOffsets, bases, pairs);
     }
@@ -706,6 +1241,70 @@ export function buildDoubleLineTargetLineIntersections(preview, targetBases, eps
         for (const o of preview) {
             if (!o) continue;
             addIntersections(t, o);
+        }
+    }
+    return out;
+}
+
+export function buildDoubleLineLineTrimMarkers(preview, targetBases, offsetDist = 0, mode = "both", eps = 1e-6) {
+    const out = [];
+    const e = Math.max(1e-9, Number(eps) || 1e-6);
+    const targets = (targetBases || []).filter((s) => s && String(s.type || "") === "line");
+    if (!Array.isArray(preview) || !preview.length || !targets.length) return out;
+    const pushPoint = (x, y) => {
+        const px = Number(x), py = Number(y);
+        if (!Number.isFinite(px) || !Number.isFinite(py)) return;
+        for (const p of out) {
+            if (Math.hypot(Number(p.x) - px, Number(p.y) - py) <= e) return;
+        }
+        out.push({ x: px, y: py });
+    };
+    const half = Math.max(0, Number(offsetDist) * 0.5);
+    const isBoth = String(mode || "both") === "both";
+    for (const o of preview) {
+        if (!o || String(o.type || "") !== "line") continue;
+        const x1 = Number.isFinite(Number(o.fullX1)) ? Number(o.fullX1) : Number(o.x1);
+        const y1 = Number.isFinite(Number(o.fullY1)) ? Number(o.fullY1) : Number(o.y1);
+        const x2 = Number.isFinite(Number(o.fullX2)) ? Number(o.fullX2) : Number(o.x2);
+        const y2 = Number.isFinite(Number(o.fullY2)) ? Number(o.fullY2) : Number(o.y2);
+        if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.hypot(dx, dy);
+        const tx = (len > 1e-9) ? (dx / len) : 1;
+        const ty = (len > 1e-9) ? (dy / len) : 0;
+        const a1 = { x: x1, y: y1 };
+        const a2 = { x: x2, y: y2 };
+        const cuts = [];
+        const pushCut = (ip) => {
+            if (!ip || !Number.isFinite(Number(ip.t))) return;
+            const t = Math.max(0, Math.min(1, Number(ip.t)));
+            for (const c of cuts) {
+                if (Math.abs(Number(c.t) - t) <= e) return;
+            }
+            cuts.push({ t, x: Number(ip.x), y: Number(ip.y) });
+        };
+        for (const s of targets) {
+            const b1 = { x: Number(s.x1), y: Number(s.y1) };
+            const b2 = { x: Number(s.x2), y: Number(s.y2) };
+            if (![b1.x, b1.y, b2.x, b2.y].every(Number.isFinite)) continue;
+            pushCut(segmentIntersectionParamPoint(a1, a2, b1, b2));
+        }
+        if (!cuts.length) continue;
+        cuts.sort((u, v) => Number(u.t) - Number(v.t));
+        if (isBoth) {
+            for (const c of cuts) {
+                if (Number(c.t) <= e || Number(c.t) >= 1 - e) continue;
+                pushPoint(Number(c.x) - tx * half, Number(c.y) - ty * half);
+                pushPoint(Number(c.x) + tx * half, Number(c.y) + ty * half);
+            }
+        } else {
+            const tStart = cuts.find((c) => Number(c.t) > e) || null;
+            let tEnd = null;
+            for (let i = cuts.length - 1; i >= 0; i--) {
+                if (Number(cuts[i].t) < 1 - e) { tEnd = cuts[i]; break; }
+            }
+            if (tStart) pushPoint(Number(tStart.x) - tx * half, Number(tStart.y) - ty * half);
+            if (tEnd) pushPoint(Number(tEnd.x) + tx * half, Number(tEnd.y) + ty * half);
         }
     }
     return out;

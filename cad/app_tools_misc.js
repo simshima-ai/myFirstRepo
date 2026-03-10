@@ -1,16 +1,27 @@
 import { addGroup, nextGroupId, getGroup, nextShapeId, pushHistory, setSelection } from "./state.js";
 import { getSelectedShapes, ensureUngroupedShapesHaveGroups } from "./app_selection.js";
+import { isHatchBoundaryShape, validateHatchBoundaryEndpoints } from "./hatch_geom.js";
 export function executeHatch(state, helpers) {
     const { setStatus, draw, addShape, nextShapeId, buildHatchLoopsFromBoundaryIds } = helpers;
     try {
-        const ids = state.hatchDraft?.boundaryIds || [];
+        const rawIds = state.hatchDraft?.boundaryIds || [];
+        const ids = rawIds
+            .map((id) => Number(id))
+            .filter((id) => Number.isFinite(id))
+            .filter((id) => {
+                const s = (state.shapes || []).find((x) => Number(x?.id) === Number(id));
+                return !!s && isHatchBoundaryShape(s);
+            });
+        if (state.hatchDraft && Array.isArray(state.hatchDraft.boundaryIds)) {
+            state.hatchDraft.boundaryIds = ids.slice();
+        }
         if (ids.length === 0) {
-            if (setStatus) setStatus("Hatch: 蠅・阜繧帝∈謚槭＠縺ｦ縺上□縺輔＞");
+            if (setStatus) setStatus("Hatch: select boundary objects first");
             return;
         }
         const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, ids, state.view.scale);
         if (!parsed.ok) {
-            if (setStatus) setStatus(`Hatch Error: ${parsed.error || "蠅・阜縺碁哩縺倥※縺・∪縺帙ｓ"}`);
+            if (setStatus) setStatus(`Hatch Error: ${parsed.error || "Boundary is not closed"}`);
             if (draw) draw();
             return;
         }
@@ -85,12 +96,38 @@ export function executeHatch(state, helpers) {
         }
 
         state.hatchDraft.boundaryIds = [];
+        if (state.input) state.input.hatchValidation = null;
         if (setStatus) setStatus(`Hatch #${shape.id} created (${ids.length} boundaries)`);
         if (draw) draw();
     } catch (err) {
         if (setStatus) setStatus(`Hatch Error: ${err?.message || err}`);
         if (draw) draw();
     }
+}
+
+export function validateHatchBoundary(state, helpers) {
+    const { setStatus, draw } = helpers;
+    try {
+        const result = validateHatchBoundaryEndpoints(
+            state.shapes || [],
+            state.hatchDraft?.boundaryIds || [],
+            state.view?.scale
+        );
+        if (state.input) state.input.hatchValidation = result;
+        const openCount = Number(result?.openNodes?.length || 0);
+        const nearCount = Number(result?.nearMissPairs?.length || 0);
+        if (!result?.loopOk) {
+            if (setStatus) setStatus(`Hatch boundary check: NG (${result?.loopError || "Boundary is not closed"})`);
+        } else if (openCount === 0) {
+            if (setStatus) setStatus("Hatch boundary check: endpoint match OK");
+        } else if (setStatus) {
+            setStatus(`Hatch boundary check: ${openCount} open endpoint(s), ${nearCount} near-miss pair(s)`);
+        }
+    } catch (err) {
+        if (state.input) state.input.hatchValidation = null;
+        if (setStatus) setStatus(`Hatch boundary check error: ${err?.message || err}`);
+    }
+    if (draw) draw();
 }
 
 export function exportJsonObject(state, helpers) {
@@ -233,9 +270,9 @@ export function loadJsonFromFileDialog(state, dom) {
     if (!dom.jsonFileInput) return;
     const mode = String(state.ui?.jsonFileMode || "replace");
     if (mode === "import" || mode === "append") {
-        dom.jsonFileInput.accept = ".json,application/json,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,image/*";
+        dom.jsonFileInput.accept = ".json,application/json,.dxf,.svg,.png,.jpg,.jpeg,.webp,.gif,.bmp,image/*";
     } else {
-        dom.jsonFileInput.accept = ".json,application/json";
+        dom.jsonFileInput.accept = ".json,application/json,.dxf,.svg";
     }
     dom.jsonFileInput.value = "";
     dom.jsonFileInput.click();
@@ -368,6 +405,7 @@ export function createDim(patch) {
     return {
         id: 0,
         type: "dim",
+        color: "#0f172a",
         dimOffset: 24,
         extOffset: 2,
         extOver: 2,
@@ -414,4 +452,3 @@ export function applyRectInput(state, helpers, w, h) {
     if (setStatus) setStatus(`Applied Rect Input (W=${w}, H=${h})`);
     if (draw) draw();
 }
-

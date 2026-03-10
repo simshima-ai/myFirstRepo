@@ -44,6 +44,10 @@ export function bindGroupListInitEvents({
 
   const showLayerRestrictionMessage = (reason) => {
     const lang = String(state.ui?.language || "en").toLowerCase();
+    if (reason === "hidden") {
+      actions.setStatus?.(lang === "en" ? "Group is hidden." : "グループが非表示です。");
+      return;
+    }
     if (reason === "locked") {
       actions.setStatus?.(lang === "en" ? "Layer is locked." : "レイヤーがロックされています。");
       return;
@@ -59,8 +63,33 @@ export function bindGroupListInitEvents({
     };
   };
   const isEditOnlyActiveLayer = () => !!state.ui?.layerView?.editOnlyActive;
+  const isGroupVisibleFromId = (groupId) => {
+    const gid = Number(groupId);
+    if (!Number.isFinite(gid)) return true;
+    const byId = new Map((state.groups || []).map((g) => [Number(g?.id), g]));
+    let cur = byId.get(gid);
+    let guard = 0;
+    while (cur && guard < 10000) {
+      if (cur.visible === false) return false;
+      const pid = (cur.parentId == null) ? null : Number(cur.parentId);
+      if (!Number.isFinite(pid)) return true;
+      cur = byId.get(pid);
+      guard += 1;
+    }
+    return true;
+  };
+  const resolveShapeGroupId = (shape) => {
+    const sid = Number(shape?.id);
+    if (!Number.isFinite(sid)) return Number(shape?.groupId);
+    for (const g of (state.groups || [])) {
+      const shapeIds = Array.isArray(g?.shapeIds) ? g.shapeIds : [];
+      if (shapeIds.some((id) => Number(id) === sid)) return Number(g.id);
+    }
+    return Number(shape?.groupId);
+  };
   const getShapePickDenyReason = (shape) => {
     if (!shape) return "outside";
+    if (!isGroupVisibleFromId(resolveShapeGroupId(shape))) return "hidden";
     const activeLayerId = Number(state.activeLayerId);
     const lid = Number(shape.layerId ?? activeLayerId);
     const meta = getLayerMeta(lid);
@@ -101,6 +130,7 @@ export function bindGroupListInitEvents({
       seen.add(cur);
       const g = groupById.get(cur);
       if (!g) continue;
+      if (g.visible === false) return false;
       for (const sidRaw of g.shapeIds || []) {
         const sid = Number(sidRaw);
         if (!Number.isFinite(sid)) continue;
@@ -136,6 +166,7 @@ export function bindGroupListInitEvents({
       seen.add(cur);
       const g = groupById.get(cur);
       if (!g) continue;
+      if (g.visible === false) return "hidden";
       for (const sidRaw of g.shapeIds || []) {
         const sid = Number(sidRaw);
         if (!Number.isFinite(sid)) continue;

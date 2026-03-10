@@ -1,94 +1,37 @@
-export function setupColorPaletteUi(params) {
+﻿export function setupColorPaletteUi(params) {
   const { state, dom, getUiLanguage, getViewportSizeForUi } = params;
 
   const normalizeHexColor = (v, fallback = "#0f172a") => {
     const s = String(v || "").trim();
     return /^#[0-9a-fA-F]{6}$/.test(s) ? s.toLowerCase() : fallback;
   };
-  const rgbToHex = (r, g, b) => `#${[r, g, b].map((n) => {
-    const v = Math.max(0, Math.min(255, Math.round(Number(n) || 0)));
-    return v.toString(16).padStart(2, "0");
-  }).join("")}`;
-  const hexToRgb = (hex) => {
-    const c = normalizeHexColor(hex, "#000000");
-    return {
-      r: parseInt(c.slice(1, 3), 16),
-      g: parseInt(c.slice(3, 5), 16),
-      b: parseInt(c.slice(5, 7), 16),
-    };
-  };
-  const rgbToHsv = (r, g, b) => {
-    const rn = (Number(r) || 0) / 255;
-    const gn = (Number(g) || 0) / 255;
-    const bn = (Number(b) || 0) / 255;
-    const max = Math.max(rn, gn, bn);
-    const min = Math.min(rn, gn, bn);
-    const d = max - min;
-    let h = 0;
-    if (d > 1e-9) {
-      if (max === rn) h = 60 * (((gn - bn) / d) % 6);
-      else if (max === gn) h = 60 * (((bn - rn) / d) + 2);
-      else h = 60 * (((rn - gn) / d) + 4);
+
+  const FIXED_PALETTE = [
+    "#0f172a", "#334155", "#64748b", "#dc2626", "#ea580c", "#ca8a04",
+    "#16a34a", "#059669", "#0891b2", "#2563eb", "#7c3aed", "#db2777",
+  ];
+
+  const getRecentColors = () => {
+    if (!state.ui) state.ui = {};
+    const src = Array.isArray(state.ui.recentColors) ? state.ui.recentColors : [];
+    const out = [];
+    for (const c of src) {
+      const n = normalizeHexColor(c, "");
+      if (!n) continue;
+      if (!out.includes(n)) out.push(n);
+      if (out.length >= 8) break;
     }
-    if (h < 0) h += 360;
-    const s = (max <= 1e-9) ? 0 : (d / max) * 100;
-    const v = max * 100;
-    return { h, s, v };
-  };
-  const hsvToRgb = (h, s, v) => {
-    const hn = ((Number(h) || 0) % 360 + 360) % 360;
-    const sn = Math.max(0, Math.min(100, Number(s) || 0)) / 100;
-    const vn = Math.max(0, Math.min(100, Number(v) || 0)) / 100;
-    const c = vn * sn;
-    const x = c * (1 - Math.abs(((hn / 60) % 2) - 1));
-    const m = vn - c;
-    let rp = 0;
-    let gp = 0;
-    let bp = 0;
-    if (hn < 60) { rp = c; gp = x; bp = 0; }
-    else if (hn < 120) { rp = x; gp = c; bp = 0; }
-    else if (hn < 180) { rp = 0; gp = c; bp = x; }
-    else if (hn < 240) { rp = 0; gp = x; bp = c; }
-    else if (hn < 300) { rp = x; gp = 0; bp = c; }
-    else { rp = c; gp = 0; bp = x; }
-    return {
-      r: Math.round((rp + m) * 255),
-      g: Math.round((gp + m) * 255),
-      b: Math.round((bp + m) * 255),
-    };
+    state.ui.recentColors = out.slice();
+    return out;
   };
 
-  const getFileColorPalette = () => {
+  const pushRecentColor = (color) => {
+    const c = normalizeHexColor(color, "");
+    if (!c) return;
+    const prev = getRecentColors();
+    const next = [c, ...prev.filter((x) => x !== c)].slice(0, 8);
     if (!state.ui) state.ui = {};
-    if (!Array.isArray(state.ui.colorPalette) || state.ui.colorPalette.length === 0) {
-      state.ui.colorPalette = ["#000000", "#404040", "#808080", "#bfbfbf", "#ffffff", null, null, null, null, null];
-    }
-    const src = state.ui.colorPalette || [];
-    const next = [];
-    for (let i = 0; i < 10; i += 1) {
-      const c = src[i];
-      if (c == null || c === "") next.push(null);
-      else {
-        const n = normalizeHexColor(c, "");
-        next.push(n || null);
-      }
-    }
-    state.ui.colorPalette = next;
-    return next;
-  };
-  const getPaletteSlots = () => {
-    const p = getFileColorPalette().slice(0, 10);
-    while (p.length < 10) p.push(null);
-    return p;
-  };
-  const setPaletteSlot = (idx, colorOrNull) => {
-    if (!state.ui) state.ui = {};
-    const slots = getPaletteSlots();
-    if (!Number.isFinite(Number(idx))) return;
-    const i = Math.max(0, Math.min(9, Number(idx)));
-    const c = (colorOrNull == null) ? null : normalizeHexColor(colorOrNull, "");
-    slots[i] = c || null;
-    state.ui.colorPalette = slots.slice(0, 10);
+    state.ui.recentColors = next;
   };
 
   let colorPaletteHideTimer = null;
@@ -102,6 +45,7 @@ export function setupColorPaletteUi(params) {
     if (dom.colorPalettePopup) dom.colorPalettePopup.style.display = "none";
     colorPopupCtx = null;
   };
+
   const scheduleHideColorPalettePopup = () => {
     if (colorPaletteHideTimer) clearTimeout(colorPaletteHideTimer);
     colorPaletteHideTimer = setTimeout(() => hideColorPalettePopup(), 160);
@@ -114,183 +58,187 @@ export function setupColorPaletteUi(params) {
       clearTimeout(colorPaletteHideTimer);
       colorPaletteHideTimer = null;
     }
-    const slots = getPaletteSlots();
     const lang = getUiLanguage(state);
+    const current = normalizeHexColor(inputEl.value, "#0f172a");
+    if (!state.ui) state.ui = {};
+    const livePreview = state.ui.colorPopupLivePreview !== false;
+
     dom.colorPalettePopup.innerHTML = "";
     dom.colorPalettePopup.style.display = "flex";
     dom.colorPalettePopup.style.flexDirection = "column";
-    dom.colorPalettePopup.style.gap = "6px";
-    dom.colorPalettePopup.style.minWidth = "180px";
-    const current = normalizeHexColor(inputEl.value, "#0f172a");
-    const paletteWrap = document.createElement("div");
-    paletteWrap.style.display = "grid";
-    paletteWrap.style.gridTemplateColumns = "repeat(5, 18px)";
-    paletteWrap.style.gap = "4px";
-    if (!Number.isFinite(Number(colorPopupCtx.selectedPaletteIndex))) {
-      const foundIdx = slots.findIndex((c) => c === current);
-      colorPopupCtx.selectedPaletteIndex = (foundIdx >= 0) ? foundIdx : 0;
-    }
-    for (let i = 0; i < slots.length; i += 1) {
-      const c = slots[i];
+    dom.colorPalettePopup.style.gap = "10px";
+    dom.colorPalettePopup.style.minWidth = "280px";
+    dom.colorPalettePopup.style.maxWidth = "340px";
+    dom.colorPalettePopup.style.padding = "10px";
+
+    const pending = normalizeHexColor(colorPopupCtx.pendingColor || current, current);
+    colorPopupCtx.pendingColor = pending;
+
+    const applyAndTrack = (hex, commit = false) => {
+      const c = normalizeHexColor(hex, "#0f172a");
+      colorPopupCtx.pendingColor = c;
+      inputEl.value = c;
+      if (livePreview || commit) {
+        applyColor(c);
+        pushRecentColor(c);
+      }
+    };
+
+    const mkSectionLabel = (text) => {
+      const el = document.createElement("div");
+      el.textContent = text;
+      el.style.fontSize = "12px";
+      el.style.fontWeight = "700";
+      el.style.color = "#334155";
+      return el;
+    };
+
+    const preview = document.createElement("div");
+    preview.style.height = "34px";
+    preview.style.border = "1px solid #94a3b8";
+    preview.style.borderRadius = "8px";
+    preview.style.background = pending;
+    dom.colorPalettePopup.appendChild(preview);
+
+    const hexRow = document.createElement("div");
+    hexRow.style.display = "grid";
+    hexRow.style.gridTemplateColumns = "1fr auto";
+    hexRow.style.gap = "8px";
+
+    const hexInput = document.createElement("input");
+    hexInput.type = "text";
+    hexInput.value = pending;
+    hexInput.maxLength = 7;
+    hexInput.style.fontSize = "14px";
+    hexInput.style.fontWeight = "700";
+    hexInput.style.padding = "8px 10px";
+    hexInput.style.border = "1px solid #94a3b8";
+    hexInput.style.borderRadius = "8px";
+
+    const applyBtn = document.createElement("button");
+    applyBtn.type = "button";
+    applyBtn.textContent = (lang === "en") ? "Apply" : "適用";
+    applyBtn.style.minHeight = "34px";
+    applyBtn.style.padding = "6px 12px";
+    applyBtn.style.fontSize = "13px";
+
+    applyBtn.addEventListener("click", () => {
+      const c = normalizeHexColor(hexInput.value, colorPopupCtx.pendingColor || current);
+      hexInput.value = c;
+      preview.style.background = c;
+      applyAndTrack(c, true);
+      renderColorPalettePopupContents();
+    });
+
+    hexInput.addEventListener("input", () => {
+      const c = normalizeHexColor(hexInput.value, "");
+      if (!c) return;
+      preview.style.background = c;
+      applyAndTrack(c, false);
+    });
+
+    hexInput.addEventListener("keydown", (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      applyBtn.click();
+    });
+
+    hexRow.append(hexInput, applyBtn);
+    dom.colorPalettePopup.appendChild(hexRow);
+
+    const mkChip = (c) => {
       const btn = document.createElement("button");
       btn.type = "button";
-      btn.title = c || ((lang === "en") ? "Empty Slot" : "空スロット");
-      btn.style.width = "18px";
-      btn.style.height = "18px";
-      btn.style.padding = "0";
-      btn.style.borderRadius = "3px";
-      const isSelectedSlot = Number(colorPopupCtx.selectedPaletteIndex) === i;
-      btn.style.border = isSelectedSlot ? "2px solid #4f46e5" : "1px solid #475569";
-      btn.style.background = c || "#ffffff";
-      if (!c) btn.style.backgroundImage = "linear-gradient(45deg,#e2e8f0 25%,transparent 25%,transparent 50%,#e2e8f0 50%,#e2e8f0 75%,transparent 75%,transparent)";
-      if (!c) btn.style.backgroundSize = "8px 8px";
+      btn.style.width = "44px";
+      btn.style.height = "32px";
+      btn.style.borderRadius = "8px";
+      btn.style.border = "1px solid #64748b";
+      btn.style.background = c;
       btn.style.touchAction = "manipulation";
       btn.style.userSelect = "none";
       btn.addEventListener("mousedown", (ev) => ev.preventDefault());
       btn.addEventListener("click", () => {
-        colorPopupCtx.selectedPaletteIndex = i;
-        if (c) applyColor(c);
-        renderColorPalettePopupContents();
+        hexInput.value = c;
+        preview.style.background = c;
+        applyAndTrack(c, false);
       });
-      paletteWrap.appendChild(btn);
-    }
-    dom.colorPalettePopup.appendChild(paletteWrap);
+      return btn;
+    };
 
-    if (colorPopupCtx.mode === "picker") {
-      const hsv = colorPopupCtx.hsv || (() => {
-        const rgb = hexToRgb(current);
-        return rgbToHsv(rgb.r, rgb.g, rgb.b);
-      })();
-      colorPopupCtx.hsv = { h: hsv.h, s: hsv.s, v: hsv.v };
-      const pickerPanel = document.createElement("div");
-      pickerPanel.style.display = "grid";
-      pickerPanel.style.gridTemplateColumns = "auto 1fr auto";
-      pickerPanel.style.gap = "4px 6px";
-      pickerPanel.style.alignItems = "center";
-      const preview = document.createElement("div");
-      preview.style.gridColumn = "1 / -1";
-      preview.style.height = "20px";
-      preview.style.border = "1px solid #94a3b8";
-      preview.style.borderRadius = "4px";
-      const hexLabel = document.createElement("div");
-      hexLabel.style.gridColumn = "1 / -1";
-      hexLabel.style.fontSize = "11px";
-      hexLabel.style.color = "#334155";
-      const mkSlider = (label, min, max, step, value) => {
-        const l = document.createElement("span");
-        l.textContent = label;
-        l.style.fontSize = "11px";
-        const r = document.createElement("input");
-        r.type = "range";
-        r.min = String(min);
-        r.max = String(max);
-        r.step = String(step);
-        r.value = String(value);
-        const v = document.createElement("span");
-        v.style.fontSize = "11px";
-        v.textContent = String(Math.round(Number(value) || 0));
-        return { l, r, v };
-      };
-      const hRow = mkSlider((lang === "en") ? "Hue" : "色相", 0, 360, 1, colorPopupCtx.hsv.h);
-      const sRow = mkSlider((lang === "en") ? "Sat" : "彩度", 0, 100, 1, colorPopupCtx.hsv.s);
-      const vRow = mkSlider((lang === "en") ? "Val" : "明度", 0, 100, 1, colorPopupCtx.hsv.v);
-      const applyHsv = () => {
-        colorPopupCtx.hsv.h = Number(hRow.r.value) || 0;
-        colorPopupCtx.hsv.s = Number(sRow.r.value) || 0;
-        colorPopupCtx.hsv.v = Number(vRow.r.value) || 0;
-        hRow.v.textContent = String(Math.round(colorPopupCtx.hsv.h));
-        sRow.v.textContent = String(Math.round(colorPopupCtx.hsv.s));
-        vRow.v.textContent = String(Math.round(colorPopupCtx.hsv.v));
-        const rgb = hsvToRgb(colorPopupCtx.hsv.h, colorPopupCtx.hsv.s, colorPopupCtx.hsv.v);
-        const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-        preview.style.background = hex;
-        hexLabel.textContent = hex;
-        applyColor(hex);
-      };
-      hRow.r.addEventListener("input", applyHsv);
-      sRow.r.addEventListener("input", applyHsv);
-      vRow.r.addEventListener("input", applyHsv);
-      pickerPanel.append(preview, hexLabel, hRow.l, hRow.r, hRow.v, sRow.l, sRow.r, sRow.v, vRow.l, vRow.r, vRow.v);
-      applyHsv();
-      const cmdRow = document.createElement("div");
-      cmdRow.style.display = "flex";
-      cmdRow.style.gap = "6px";
-      cmdRow.style.justifyContent = "flex-end";
-      const regBtn = document.createElement("button");
-      regBtn.type = "button";
-      regBtn.textContent = (lang === "en") ? "Register This Color" : "この色を登録";
-      regBtn.style.fontSize = "11px";
-      regBtn.style.padding = "2px 8px";
-      regBtn.addEventListener("click", () => {
-        const rgb = hsvToRgb(colorPopupCtx.hsv.h, colorPopupCtx.hsv.s, colorPopupCtx.hsv.v);
-        const hex = rgbToHex(rgb.r, rgb.g, rgb.b);
-        const idx = Number.isFinite(Number(colorPopupCtx.selectedPaletteIndex))
-          ? Number(colorPopupCtx.selectedPaletteIndex)
-          : 0;
-        setPaletteSlot(idx, hex);
-        applyColor(hex);
-        colorPopupCtx.mode = "palette";
-        renderColorPalettePopupContents();
-      });
-      const cancelBtn = document.createElement("button");
-      cancelBtn.type = "button";
-      cancelBtn.textContent = (lang === "en") ? "Cancel" : "キャンセル";
-      cancelBtn.style.fontSize = "11px";
-      cancelBtn.style.padding = "2px 8px";
-      cancelBtn.addEventListener("click", () => {
-        colorPopupCtx.mode = "palette";
-        renderColorPalettePopupContents();
-      });
-      cmdRow.append(regBtn, cancelBtn);
-      dom.colorPalettePopup.append(pickerPanel, cmdRow);
-    } else {
-      const cmdRow = document.createElement("div");
-      cmdRow.style.display = "flex";
-      cmdRow.style.gap = "6px";
-      cmdRow.style.justifyContent = "flex-end";
-      const openRegBtn = document.createElement("button");
-      openRegBtn.type = "button";
-      openRegBtn.textContent = (lang === "en") ? "Register" : "登録";
-      openRegBtn.style.fontSize = "11px";
-      openRegBtn.style.padding = "2px 8px";
-      openRegBtn.addEventListener("click", () => {
-        const idx = Number.isFinite(Number(colorPopupCtx.selectedPaletteIndex))
-          ? Number(colorPopupCtx.selectedPaletteIndex)
-          : 0;
-        const slotColor = slots[idx] || current;
-        const rgb = hexToRgb(slotColor);
-        colorPopupCtx.hsv = rgbToHsv(rgb.r, rgb.g, rgb.b);
-        colorPopupCtx.mode = "picker";
-        renderColorPalettePopupContents();
-      });
-      const delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.textContent = (lang === "en") ? "Delete" : "削除";
-      delBtn.style.fontSize = "11px";
-      delBtn.style.padding = "2px 8px";
-      delBtn.addEventListener("click", () => {
-        const idx = Number.isFinite(Number(colorPopupCtx.selectedPaletteIndex))
-          ? Number(colorPopupCtx.selectedPaletteIndex)
-          : 0;
-        setPaletteSlot(idx, null);
-        renderColorPalettePopupContents();
-      });
-      cmdRow.append(openRegBtn, delBtn);
-      dom.colorPalettePopup.appendChild(cmdRow);
+    dom.colorPalettePopup.appendChild(mkSectionLabel((lang === "en") ? "Palette" : "基本色"));
+    const fixedWrap = document.createElement("div");
+    fixedWrap.style.display = "grid";
+    fixedWrap.style.gridTemplateColumns = "repeat(6, 44px)";
+    fixedWrap.style.gap = "8px";
+    for (const c of FIXED_PALETTE) fixedWrap.appendChild(mkChip(c));
+    dom.colorPalettePopup.appendChild(fixedWrap);
+
+    dom.colorPalettePopup.appendChild(mkSectionLabel((lang === "en") ? "Recent" : "最近使った色"));
+    const recentWrap = document.createElement("div");
+    recentWrap.style.display = "grid";
+    recentWrap.style.gridTemplateColumns = "repeat(4, 44px)";
+    recentWrap.style.gap = "8px";
+    const recents = getRecentColors();
+    for (let i = 0; i < 8; i += 1) {
+      const c = recents[i] || "#ffffff";
+      const chip = mkChip(c);
+      if (!recents[i]) {
+        chip.disabled = true;
+        chip.style.opacity = "0.35";
+      }
+      recentWrap.appendChild(chip);
     }
+    dom.colorPalettePopup.appendChild(recentWrap);
+
+    const optRow = document.createElement("label");
+    optRow.style.display = "inline-flex";
+    optRow.style.alignItems = "center";
+    optRow.style.gap = "6px";
+    optRow.style.fontSize = "12px";
+    optRow.textContent = (lang === "en") ? "Live Preview" : "ライブプレビュー";
+    const liveToggle = document.createElement("input");
+    liveToggle.type = "checkbox";
+    liveToggle.checked = livePreview;
+    liveToggle.addEventListener("change", () => {
+      if (!state.ui) state.ui = {};
+      state.ui.colorPopupLivePreview = !!liveToggle.checked;
+      if (liveToggle.checked) applyAndTrack(hexInput.value, false);
+    });
+    optRow.appendChild(liveToggle);
+    dom.colorPalettePopup.appendChild(optRow);
+
+    const cmdRow = document.createElement("div");
+    cmdRow.style.display = "flex";
+    cmdRow.style.gap = "8px";
+    cmdRow.style.justifyContent = "flex-end";
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.textContent = (lang === "en") ? "Close" : "閉じる";
+    closeBtn.style.minHeight = "34px";
+    closeBtn.style.padding = "6px 12px";
+    closeBtn.style.fontSize = "13px";
+    closeBtn.addEventListener("click", () => hideColorPalettePopup());
+    cmdRow.append(closeBtn);
+    dom.colorPalettePopup.appendChild(cmdRow);
   };
 
   const showColorPalettePopupForInput = (inputEl, applyColor) => {
     if (!dom.colorPalettePopup || !inputEl || typeof applyColor !== "function") return;
     const sameInput = colorPopupCtx && colorPopupCtx.inputEl === inputEl;
-    colorPopupCtx = { inputEl, applyColor, selectedPaletteIndex: null, mode: "palette", hsv: null };
+    colorPopupCtx = {
+      inputEl,
+      applyColor,
+      pendingColor: normalizeHexColor(inputEl.value, "#0f172a"),
+    };
     renderColorPalettePopupContents();
     if (!sameInput) {
       const r = inputEl.getBoundingClientRect();
       const popup = dom.colorPalettePopup;
       const vp = getViewportSizeForUi();
-      const left = Math.max(8, Math.min(vp.width - 170, Math.round(r.left)));
-      const top = Math.max(8, Math.min(vp.height - 120, Math.round(r.bottom + 6)));
+      const popupW = Math.max(280, Number(popup.offsetWidth) || 280);
+      const popupH = Math.max(240, Number(popup.offsetHeight) || 240);
+      const left = Math.max(8, Math.min(vp.width - popupW - 8, Math.round(r.left)));
+      const top = Math.max(8, Math.min(vp.height - popupH - 8, Math.round(r.bottom + 6)));
       popup.style.left = `${left}px`;
       popup.style.top = `${top}px`;
     }
@@ -302,6 +250,7 @@ export function setupColorPaletteUi(params) {
       const c = normalizeHexColor(inputEl.value, "#0f172a");
       inputEl.value = c;
       applyColor(c);
+      pushRecentColor(c);
     };
     const openPopup = () => showColorPalettePopupForInput(inputEl, (c) => {
       inputEl.value = c;
@@ -330,6 +279,7 @@ export function setupColorPaletteUi(params) {
     });
     dom.colorPalettePopup.addEventListener("mouseleave", scheduleHideColorPalettePopup);
   }
+
   document.addEventListener("mousedown", (e) => {
     const t = e.target;
     if (!t) return;

@@ -304,19 +304,23 @@
     return null;
   })();
   const toolStrokeSync = [
-    { cfg: state.lineSettings, width: dom.lineToolLineWidthInput, type: dom.lineToolLineTypeInput },
-    { cfg: state.rectSettings, width: dom.rectToolLineWidthInput, type: dom.rectToolLineTypeInput },
-    { cfg: state.circleSettings, width: dom.circleToolLineWidthInput, type: dom.circleToolLineTypeInput },
-    { cfg: state.filletSettings, width: dom.filletToolLineWidthInput, type: dom.filletToolLineTypeInput },
-    { cfg: state.positionSettings, width: dom.positionToolLineWidthInput, type: dom.positionToolLineTypeInput },
-    { cfg: state.textSettings, width: dom.textToolLineWidthInput, type: dom.textToolLineTypeInput },
-    { cfg: (selectedDim || state.dimSettings), width: dom.dimToolLineWidthInput, type: dom.dimToolLineTypeInput },
-    { cfg: (selectedHatchForStroke || state.hatchSettings), width: dom.hatchToolLineWidthInput, type: null },
-    { cfg: state.dlineSettings, width: dom.dlineToolLineWidthInput, type: dom.dlineToolLineTypeInput },
+    { cfg: state.lineSettings, width: dom.lineToolLineWidthInput, type: dom.lineToolLineTypeInput, color: dom.lineToolColorInput },
+    { cfg: state.rectSettings, width: dom.rectToolLineWidthInput, type: dom.rectToolLineTypeInput, color: dom.rectToolColorInput },
+    { cfg: state.circleSettings, width: dom.circleToolLineWidthInput, type: dom.circleToolLineTypeInput, color: dom.circleToolColorInput },
+    { cfg: state.filletSettings, width: dom.filletToolLineWidthInput, type: dom.filletToolLineTypeInput, color: null },
+    { cfg: state.positionSettings, width: dom.positionToolLineWidthInput, type: dom.positionToolLineTypeInput, color: dom.positionToolColorInput },
+    { cfg: state.textSettings, width: dom.textToolLineWidthInput, type: dom.textToolLineTypeInput, color: null },
+    { cfg: (selectedDim || state.dimSettings), width: dom.dimToolLineWidthInput, type: dom.dimToolLineTypeInput, color: dom.dimToolColorInput },
+    { cfg: (selectedHatchForStroke || state.hatchSettings), width: dom.hatchToolLineWidthInput, type: null, color: null },
+    { cfg: state.dlineSettings, width: dom.dlineToolLineWidthInput, type: dom.dlineToolLineTypeInput, color: null },
   ];
   for (const it of toolStrokeSync) {
     if (it.width) syncInputValue(it.width, normalizeLineWidthPreset(it.cfg?.lineWidthMm ?? 0.25));
     if (it.type) it.type.value = normalizeLineTypePreset(it.cfg?.lineType ?? "solid");
+    if (it.color) {
+      const c = String(it.cfg?.color || "#0f172a");
+      it.color.value = /^#[0-9a-fA-F]{6}$/.test(c) ? c : "#0f172a";
+    }
   }
   if (dom.pageShowFrameToggle) {
     dom.pageShowFrameToggle.checked = state.pageSetup?.showFrame !== false;

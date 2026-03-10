@@ -108,6 +108,10 @@ export function createSelectionGroupTransformOps(config) {
       if (t.type === "line" || t.type === "rect") {
         t.x1 = b.x1 + dx; t.y1 = b.y1 + dy;
         t.x2 = b.x2 + dx; t.y2 = b.y2 + dy;
+      } else if (t.type === "polyline") {
+        if (Array.isArray(b.points)) {
+          t.points = b.points.map((pt) => ({ x: Number(pt?.x) + dx, y: Number(pt?.y) + dy }));
+        }
       } else if (t.type === "circle") {
         t.cx = b.cx + dx; t.cy = b.cy + dy;
         t.r = b.r;
@@ -187,6 +191,10 @@ export function createSelectionGroupTransformOps(config) {
         const p1 = rotatePointAround(b.x1, b.y1, ox, oy, delta);
         const p2 = rotatePointAround(b.x2, b.y2, ox, oy, delta);
         t.x1 = p1.x; t.y1 = p1.y; t.x2 = p2.x; t.y2 = p2.y;
+      } else if (t.type === "polyline") {
+        if (Array.isArray(b.points)) {
+          t.points = b.points.map((pt) => rotatePointAround(Number(pt?.x), Number(pt?.y), ox, oy, delta));
+        }
       } else if (t.type === "circle") {
         const c = rotatePointAround(b.cx, b.cy, ox, oy, delta);
         t.cx = c.x; t.cy = c.y; t.r = b.r;

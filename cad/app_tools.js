@@ -1,4 +1,4 @@
-﻿export { executeDoubleLine, buildDoubleLineTrimDeleteCandidates, buildDoubleLineTargetLineIntersections } from "./dline_geom.js";
+﻿export { buildDoubleLinePreview, executeDoubleLine, buildDoubleLineTrimDeleteCandidates, buildDoubleLineTargetLineIntersections } from "./dline_geom.js";
 
 export {
     splitLineForFillet, tryCreateLineLineFillet, getFilletSelectionPair, computeLineCircleAutoTrimPlan,
@@ -8,7 +8,7 @@ export {
 } from "./app_tools_fillet.js";
 
 export {
-    executeHatch, exportJsonObject, importJsonObject, saveJsonToFile, saveJsonAsToFile, loadJsonFromFileDialog, importJsonObjectAppend,
+    executeHatch, validateHatchBoundary, exportJsonObject, importJsonObject, saveJsonToFile, saveJsonAsToFile, loadJsonFromFileDialog, importJsonObjectAppend,
     createLine, createRect, createCircle, createPosition, createText, createDim, createArc,
     applyLineInput, applyRectInput
 } from "./app_tools_misc.js";
@@ -24,7 +24,7 @@ export {
     setGridAuto, setGridAutoThresholds, setLayerColorize, setGroupColorize, setEditOnlyActiveLayer,
     setGroupRotateSnap, setVertexLinkCoincident, setLineInputs, setLineSizeLocked, setLineAnchor,
     setRectInputs, setRectSizeLocked, setRectAnchor, setCircleRadiusInput, setCircleMode,
-    setCircleRadiusLocked, setPositionSize, setLineWidthMm, setToolLineType, setSelectedLineWidthMm,
+    setCircleRadiusLocked, setPositionSize, setLineWidthMm, setToolLineType, setToolColor, setSelectedLineWidthMm,
     setSelectedLineType, setSelectedColor, setSelectionCircleCenterMark, setFilletRadius,
     setFilletLineMode, setFilletNoTrim, setVertexMoveInputs, updateSelectedImageSettings
 } from "./app_tools_settings.js";
@@ -32,9 +32,10 @@ export {
 export {
     moveSelectedShapes, mergeSelectedShapesToGroup, cycleLayerMode, moveActiveGroupOrder, moveActiveLayerOrder,
     renameActiveLayer, deleteActiveLayer, renameActiveGroup, moveSelectionToLayer, deleteActiveGroup,
-    unparentActiveGroup, moveActiveGroup, updateSelectedTextSettings, moveSelectedVertices
+    unparentActiveGroup, moveActiveGroup, updateSelectedTextSettings, moveSelectedVertices, lineToPolyline
 } from "./app_tools_structure.js";
 
 export { exportPdf, exportSvg, exportDxf } from "./app_tools_export.js";
 
 export { setPatternCopyMode, setPatternCopyCenterFromSelection, clearPatternCopyCenter, setPatternCopyAxisFromSelection, clearPatternCopyAxis, executePatternCopy } from "./app_tools_patterncopy.js";
+

@@ -167,15 +167,15 @@ export function bindPageAndPatternEvents(state, dom, actions, helpers) {
     });
   }
   const toolStrokeControls = [
-    { tool: "line", width: dom.lineToolLineWidthInput, type: dom.lineToolLineTypeInput },
-    { tool: "rect", width: dom.rectToolLineWidthInput, type: dom.rectToolLineTypeInput },
-    { tool: "circle", width: dom.circleToolLineWidthInput, type: dom.circleToolLineTypeInput },
-    { tool: "fillet", width: dom.filletToolLineWidthInput, type: dom.filletToolLineTypeInput },
-    { tool: "position", width: dom.positionToolLineWidthInput, type: dom.positionToolLineTypeInput },
-    { tool: "text", width: dom.textToolLineWidthInput, type: dom.textToolLineTypeInput },
-    { tool: "dim", width: dom.dimToolLineWidthInput, type: dom.dimToolLineTypeInput },
-    { tool: "hatch", width: dom.hatchToolLineWidthInput, type: null },
-    { tool: "doubleline", width: dom.dlineToolLineWidthInput, type: dom.dlineToolLineTypeInput },
+    { tool: "line", width: dom.lineToolLineWidthInput, type: dom.lineToolLineTypeInput, color: dom.lineToolColorInput },
+    { tool: "rect", width: dom.rectToolLineWidthInput, type: dom.rectToolLineTypeInput, color: dom.rectToolColorInput },
+    { tool: "circle", width: dom.circleToolLineWidthInput, type: dom.circleToolLineTypeInput, color: dom.circleToolColorInput },
+    { tool: "fillet", width: dom.filletToolLineWidthInput, type: dom.filletToolLineTypeInput, color: null },
+    { tool: "position", width: dom.positionToolLineWidthInput, type: dom.positionToolLineTypeInput, color: dom.positionToolColorInput },
+    { tool: "text", width: dom.textToolLineWidthInput, type: dom.textToolLineTypeInput, color: null },
+    { tool: "dim", width: dom.dimToolLineWidthInput, type: dom.dimToolLineTypeInput, color: dom.dimToolColorInput },
+    { tool: "hatch", width: dom.hatchToolLineWidthInput, type: null, color: null },
+    { tool: "doubleline", width: dom.dlineToolLineWidthInput, type: dom.dlineToolLineTypeInput, color: null },
   ];
   for (const ctl of toolStrokeControls) {
     if (ctl.width) {
@@ -201,6 +201,14 @@ export function bindPageAndPatternEvents(state, dom, actions, helpers) {
       };
       ctl.type.addEventListener("change", applyLineType);
       ctl.type.addEventListener("input", applyLineType);
+    }
+    if (ctl.color) {
+      bindColorInputPalette(ctl.color, (c) => {
+        actions.setToolColor?.(c, ctl.tool);
+        if (ctl.tool === "dim") {
+          actions.applyDimSettingsToSelection?.({ color: c });
+        }
+      });
     }
   }
   if (dom.pageShowFrameToggle) {
@@ -251,6 +259,9 @@ export function bindPageAndPatternEvents(state, dom, actions, helpers) {
   }
   if (dom.applyHatchBtn) {
     dom.applyHatchBtn.addEventListener("click", () => actions.executeHatch());
+  }
+  if (dom.hatchValidateBtn) {
+    dom.hatchValidateBtn.addEventListener("click", () => actions.validateHatchBoundary?.());
   }
   if (dom.dlineOffsetInput) {
     dom.dlineOffsetInput.addEventListener("input", () => {

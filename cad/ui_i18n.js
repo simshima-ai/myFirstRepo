@@ -128,6 +128,7 @@ export function applyLanguageUi(state, dom) {
       trim: "トリム",
       doubleline: "二重線",
       patterncopy: "パターンコピー",
+      lineToPolyline: "線→ポリライン",
       undo: "Undo",
       redo: "Redo",
       del: "削除",
@@ -136,6 +137,20 @@ export function applyLanguageUi(state, dom) {
       saveAs: "別名保存",
       load: "読込",
       import: "インポート",
+      traceImage: "画像トレース(実験)",
+      tracePanelTitle: "画像トレース(実験)",
+      traceTargetNone: "インポート済み画像を選択してください",
+      traceMaxDim: "解像度上限",
+      traceEdgePercent: "エッジ量",
+      traceSimplify: "簡略化",
+      traceMinSeg: "最小線分",
+      traceMaxSeg: "最大線分数",
+      traceOffsetX: "オフセットX",
+      traceOffsetY: "オフセットY",
+      traceInvert: "反転",
+      importDxfAsPolyline: "DXFをポリライン化",
+      traceRegenerate: "再生成",
+      close: "閉じる",
       export: "出力",
       settings: "設定",
       manualGuide: "使い方ガイド",
@@ -227,6 +242,7 @@ export function applyLanguageUi(state, dom) {
       preview: "プレビュー",
       precision: "精度",
       hatchApply: "選択境界でハッチング作成",
+      hatchValidate: "端点一致チェック",
       patternCopyRun: "コピー実行",
       dlineApply: "適用",
       dlineTrimExecute: "トリム実行",
@@ -249,6 +265,10 @@ export function applyLanguageUi(state, dom) {
       lineModeSegment: "線分",
       lineModeContinuous: "連続線",
       lineModeFreehand: "Bスプライン",
+      vertexMode: "モード",
+      vertexModeMove: "頂点移動",
+      vertexModeInsert: "頂点挿入",
+      vertexDelete: "頂点削除",
       length: "長さ",
       anchor: "基準",
       endpointA: "端点A",
@@ -352,6 +372,7 @@ export function applyLanguageUi(state, dom) {
       trim: "Trim",
       doubleline: "Double Line",
       patterncopy: "Pattern Copy",
+      lineToPolyline: "Line->Polyline",
       undo: "Undo",
       redo: "Redo",
       del: "Delete",
@@ -360,6 +381,20 @@ export function applyLanguageUi(state, dom) {
       saveAs: "Save As",
       load: "Load",
       import: "Import",
+      traceImage: "Image Trace (Exp)",
+      tracePanelTitle: "Image Trace (Exp)",
+      traceTargetNone: "Select an imported image object",
+      traceMaxDim: "Max Resolution",
+      traceEdgePercent: "Edge Amount",
+      traceSimplify: "Simplify",
+      traceMinSeg: "Min Segment",
+      traceMaxSeg: "Max Segments",
+      traceOffsetX: "Offset X",
+      traceOffsetY: "Offset Y",
+      traceInvert: "Invert",
+      importDxfAsPolyline: "Polylineize DXF",
+      traceRegenerate: "Regenerate",
+      close: "Close",
       export: "Export",
       settings: "Settings",
       manualGuide: "User Guide",
@@ -451,6 +486,7 @@ export function applyLanguageUi(state, dom) {
       preview: "Preview",
       precision: "Precision",
       hatchApply: "Create Hatching",
+      hatchValidate: "Check Endpoint Match",
       patternCopyRun: "Run Copy",
       dlineApply: "Apply",
       dlineTrimExecute: "Trim Execute",
@@ -473,6 +509,10 @@ export function applyLanguageUi(state, dom) {
       lineModeSegment: "Segment",
       lineModeContinuous: "Continuous",
       lineModeFreehand: "B-Spline",
+      vertexMode: "Mode",
+      vertexModeMove: "Move Vertex",
+      vertexModeInsert: "Insert Vertex",
+      vertexDelete: "Delete Vertex",
       length: "Length",
       anchor: "Anchor",
       endpointA: "Endpoint A",
@@ -604,6 +644,8 @@ export function applyLanguageUi(state, dom) {
       else if (id === "saveJsonAs") btn.textContent = t.saveAs;
       else if (id === "loadJson") btn.textContent = t.load;
       else if (id === "importJson") btn.textContent = t.import;
+      else if (id === "traceImage") btn.textContent = t.traceImage;
+      else if (id === "lineToPolyline") btn.textContent = t.lineToPolyline;
       else if (id === "export") btn.textContent = t.export;
       else if (id === "pdf") btn.textContent = "PDF";
       else if (id === "svg") btn.textContent = "SVG";
@@ -624,6 +666,20 @@ export function applyLanguageUi(state, dom) {
   setText(".section[data-context='hatch'] .section-title", t.hatch);
   setText(".section[data-context='doubleline'] .section-title", t.doubleline);
   setText(".section[data-context='text'] .section-title", t.text);
+  setText(".section[data-context='trace'] .section-title", t.tracePanelTitle);
+  setText("#traceMaxDimLabel", t.traceMaxDim);
+  setText("#traceEdgePercentLabel", t.traceEdgePercent);
+  setText("#traceSimplifyLabel", t.traceSimplify);
+  setText("#traceMinSegLabel", t.traceMinSeg);
+  setText("#traceMaxSegLabel", t.traceMaxSeg);
+  setText("#traceOffsetXLabel", t.traceOffsetX);
+  setText("#traceOffsetYLabel", t.traceOffsetY);
+  setText("#importDxfAsPolylineLabel", t.importDxfAsPolyline);
+  setText("#traceLineWidthLabel", t.lineWidth);
+  setText("#traceLineTypeLabel", t.lineType);
+  setText("#traceInvertLabel", t.traceInvert);
+  setButtonById("traceRegenerateBtn", t.traceRegenerate);
+  setButtonById("traceClosePanelBtn", t.close);
   setText(".section[data-context='patterncopy'] .section-title", t.patterncopy);
   if (dom.selectPickObjectBtn) dom.selectPickObjectBtn.textContent = t.objectPick;
   if (dom.selectPickGroupBtn) dom.selectPickGroupBtn.textContent = t.groupPick;
@@ -660,6 +716,10 @@ export function applyLanguageUi(state, dom) {
   setOptionText("lineModeSelect", "segment", t.lineModeSegment);
   setOptionText("lineModeSelect", "continuous", t.lineModeContinuous);
   setOptionText("lineModeSelect", "freehand", t.lineModeFreehand);
+  setPrevSpanByControl("vertexModeSelect", t.vertexMode);
+  setOptionText("vertexModeSelect", "move", t.vertexModeMove);
+  setOptionText("vertexModeSelect", "insert", t.vertexModeInsert);
+  setButtonById("deleteVertexBtn", t.vertexDelete);
   setPrevSpanByControl("lineLengthInput", t.length);
   setPrevSpanByControl("lineAngleInput", t.angle);
   setPrevSpanByControl("lineAnchorSelect", t.anchor);
@@ -668,6 +728,7 @@ export function applyLanguageUi(state, dom) {
   setOptionText("lineAnchorSelect", "center", t.centerPoint);
   setPrevSpanByControl("lineToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("lineToolLineTypeInput", t.lineType);
+  setPrevSpanByControl("lineToolColorInput", t.color);
   setPrevSpanByControl("rectWidthInput", t.width);
   setPrevSpanByControl("rectHeightInput", t.height);
   setPrevSpanByControl("rectAnchorSelect", t.basePoint);
@@ -682,6 +743,7 @@ export function applyLanguageUi(state, dom) {
   setOptionText("rectAnchorSelect", "br", t.bottomRight);
   setPrevSpanByControl("rectToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("rectToolLineTypeInput", t.lineType);
+  setPrevSpanByControl("rectToolColorInput", t.color);
   setLabelByControl("circleRadiusInput", t.radius);
   setPrevSpanByControl("circleModeSelect", t.circleMode);
   setOptionText("circleModeSelect", "drag", t.circleModeDrag);
@@ -693,6 +755,7 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("circleCenterMarkToggle", t.showCenterMark);
   setPrevSpanByControl("circleToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("circleToolLineTypeInput", t.lineType);
+  setPrevSpanByControl("circleToolColorInput", t.color);
   setPrevSpanByControl("filletToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("filletToolLineTypeInput", t.lineType);
   setPrevSpanByControl("selectionCircleRadiusInput", t.radius);
@@ -721,6 +784,7 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("dimROvershootInput", t.dimOvershoot);
   setLabelByControl("dimToolLineWidthInput", t.lineWidth);
   setLabelByControl("dimToolLineTypeInput", t.lineType);
+  setLabelByControl("dimToolColorInput", t.color);
   setOptionText("dimArrowTypeSelect", "open", t.dimArrowOpen);
   setOptionText("dimArrowTypeSelect", "closed", t.dimArrowClosed);
   setOptionText("dimArrowTypeSelect", "hollow", t.dimArrowHollow);
@@ -734,6 +798,7 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("dimSelectionColorInput", t.color);
   setPrevSpanByControl("positionToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("positionToolLineTypeInput", t.lineType);
+  setPrevSpanByControl("positionToolColorInput", t.color);
   setPrevSpanByControl("textToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("textToolLineTypeInput", t.lineType);
   setPrevSpanByControl("hatchToolLineWidthInput", t.lineWidth);
@@ -807,6 +872,7 @@ export function applyLanguageUi(state, dom) {
   if (dom.selectionApplyCircleRadiusBtn) dom.selectionApplyCircleRadiusBtn.textContent = t.apply;
   if (dom.applyDLineBtn) dom.applyDLineBtn.textContent = t.dlineApply;
   if (dom.applyHatchBtn) dom.applyHatchBtn.textContent = t.hatchApply;
+  if (dom.hatchValidateBtn) dom.hatchValidateBtn.textContent = t.hatchValidate;
   if (dom.patternCopyApplyBtn) dom.patternCopyApplyBtn.textContent = t.patternCopyRun;
   if (dom.patternCopySetCenterBtn) dom.patternCopySetCenterBtn.textContent = t.setAsCenter;
   if (dom.patternCopySetAxisBtn) dom.patternCopySetAxisBtn.textContent = t.setAsAxis;

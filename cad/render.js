@@ -290,6 +290,20 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
     ctx.lineTo(p2.x, p2.y);
     ctx.stroke();
   }
+  if (shape.type === "polyline") {
+    const pts = Array.isArray(shape.points) ? shape.points : [];
+    if (pts.length >= 2) {
+      const p0 = worldToScreen(state.view, { x: Number(pts[0].x), y: Number(pts[0].y) });
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i < pts.length; i++) {
+        const p = worldToScreen(state.view, { x: Number(pts[i].x), y: Number(pts[i].y) });
+        ctx.lineTo(p.x, p.y);
+      }
+      if (shape.closed) ctx.closePath();
+      ctx.stroke();
+    }
+  }
   if (shape.type === "bspline") {
     const sampled = sampleBSplinePoints(shape.controlPoints, Number(shape.degree) || 3);
     if (sampled.length >= 2) {
@@ -346,6 +360,32 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
         ctx.strokeRect(-sw * 0.5, -sh * 0.5, sw, sh);
       }
       ctx.restore();
+    }
+  }
+  if (shape.type === "imagetrace") {
+    const segs = Array.isArray(shape.segments) ? shape.segments : [];
+    if (segs.length > 0) {
+      ctx.beginPath();
+      for (const seg of segs) {
+        const p1 = worldToScreen(state.view, { x: Number(seg.x1), y: Number(seg.y1) });
+        const p2 = worldToScreen(state.view, { x: Number(seg.x2), y: Number(seg.y2) });
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+      }
+      ctx.stroke();
+      if (selected || groupActive || isHovered) {
+        const x = Number(shape.x), y = Number(shape.y);
+        const w = Number(shape.width), h = Number(shape.height);
+        if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) {
+          const p1 = worldToScreen(state.view, { x, y });
+          const p2 = worldToScreen(state.view, { x: x + w, y: y + h });
+          ctx.save();
+          ctx.setLineDash([4, 4]);
+          ctx.lineWidth = 1;
+          ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
+          ctx.restore();
+        }
+      }
     }
   }
   if (shape.type === "rect") {

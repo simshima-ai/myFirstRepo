@@ -112,6 +112,40 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
     dom.applyHatchBtn.style.display = touchMode ? "none" : "";
     dom.applyHatchBtn.disabled = !(state.tool === "hatch" && state.hatchDraft?.boundaryIds?.length > 0);
   }
+  if (dom.hatchValidateBtn) {
+    dom.hatchValidateBtn.disabled = !(state.tool === "hatch" && state.hatchDraft?.boundaryIds?.length > 0);
+  }
+  if (dom.hatchValidateResult) {
+    const v = state.input?.hatchValidation;
+    const currentIds = Array.from(new Set((state.hatchDraft?.boundaryIds || []).map((id) => Number(id)).filter(Number.isFinite))).sort((a, b) => a - b);
+    const currentKey = currentIds.join(",");
+    const lang = String(state.ui?.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
+    if (!v || String(v.idsKey || "") !== currentKey) {
+      dom.hatchValidateResult.textContent = "";
+      dom.hatchValidateResult.style.color = "#64748b";
+    } else {
+      const openCount = Number(v.openNodes?.length || 0);
+      const nearCount = Number(v.nearMissPairs?.length || 0);
+      const loopOk = (v.loopOk !== false);
+      if (!loopOk) {
+        const err = String(v.loopError || (lang === "ja" ? "境界ループを構築できません" : "Boundary loop build failed"));
+        dom.hatchValidateResult.textContent = (lang === "ja")
+          ? `端点一致: NG (${err})`
+          : `Endpoint match: NG (${err})`;
+        dom.hatchValidateResult.style.color = "#b91c1c";
+      } else if (openCount === 0) {
+        dom.hatchValidateResult.textContent = (lang === "ja")
+          ? "端点一致: 問題ありません"
+          : "Endpoint match: OK";
+        dom.hatchValidateResult.style.color = "#15803d";
+      } else {
+        dom.hatchValidateResult.textContent = (lang === "ja")
+          ? `端点一致: 未接続 ${openCount} / 近接 ${nearCount}`
+          : `Endpoint match: open ${openCount} / near ${nearCount}`;
+        dom.hatchValidateResult.style.color = "#b91c1c";
+      }
+    }
+  }
 
   if (dom.patternCopyModeSelect) dom.patternCopyModeSelect.value = state.patternCopySettings.mode;
   if (dom.patternCopyArrayOptions) dom.patternCopyArrayOptions.style.display = state.patternCopySettings.mode === "array" ? "block" : "none";
@@ -158,6 +192,88 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
     if (mode === "mirror") ok = ok && !!state.input.patternCopyFlow.axisLineId;
     dom.patternCopyApplyBtn.disabled = !ok;
   }
+
+  const selectedImage = (() => {
+    const shapeMap = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+    const ids = new Set((state.selection?.ids || []).map(Number));
+    if (!ids.size) return null;
+    for (const s of (state.shapes || [])) {
+      if (!ids.has(Number(s.id))) continue;
+      if (String(s.type || "") === "image") return s;
+    }
+    for (const s of (state.shapes || [])) {
+      if (!ids.has(Number(s.id))) continue;
+      if (String(s.type || "") !== "imagetrace") continue;
+      const srcId = Number(s.traceSourceImageId);
+      if (!Number.isFinite(srcId)) continue;
+      const src = shapeMap.get(srcId);
+      if (src && String(src.type || "") === "image") return src;
+    }
+    return null;
+  })();
+  const traceBase = state.ui?.imageTraceParams || selectedImage?.traceParams || null;
+  if (dom.traceTargetInfo) {
+    if (selectedImage) {
+      const traceShapeIds = Array.isArray(selectedImage.traceShapeIds)
+        ? selectedImage.traceShapeIds.map(Number).filter(Number.isFinite)
+        : [];
+      let count = 0;
+      if (traceShapeIds.length > 0) {
+        const shapeMap = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+        for (const sid of traceShapeIds) {
+          const tr = shapeMap.get(Number(sid));
+          if (!tr || String(tr.type || "") !== "imagetrace") continue;
+          count += Array.isArray(tr.segments) ? tr.segments.length : 0;
+        }
+      } else {
+        count = Array.isArray(selectedImage.traceLineIds) ? selectedImage.traceLineIds.length : 0;
+      }
+      dom.traceTargetInfo.textContent = (panelLang === "en")
+        ? `Target: image #${Number(selectedImage.id)} (${count} lines)`
+        : `対象: 画像 #${Number(selectedImage.id)} (${count} 本)`;
+    } else {
+      dom.traceTargetInfo.textContent = (panelLang === "en")
+        ? "Select an imported image object"
+        : "インポート済み画像を選択してください";
+    }
+  }
+  const setIfNotEditing = (el, v) => {
+    if (!el) return;
+    if (document.activeElement === el) return;
+    el.value = String(v);
+  };
+  if (traceBase) {
+    if (dom.traceMaxDimInput) setIfNotEditing(dom.traceMaxDimInput, Math.round(Number(traceBase.maxDim ?? 420) || 420));
+    if (dom.traceEdgePercentInput) setIfNotEditing(dom.traceEdgePercentInput, Number(traceBase.edgePercent ?? 72));
+    if (dom.traceSimplifyInput) setIfNotEditing(dom.traceSimplifyInput, Number(traceBase.simplify ?? 1.25));
+    if (dom.traceMinSegInput) setIfNotEditing(dom.traceMinSegInput, Number(traceBase.minSeg ?? 1.2));
+    if (dom.traceMaxSegmentsInput) setIfNotEditing(dom.traceMaxSegmentsInput, Math.round(Number(traceBase.maxSegments ?? 12000) || 12000));
+    if (dom.traceOffsetXInput) setIfNotEditing(dom.traceOffsetXInput, Number(traceBase.offsetX ?? 0));
+    if (dom.traceOffsetYInput) setIfNotEditing(dom.traceOffsetYInput, Number(traceBase.offsetY ?? 0));
+    if (dom.traceLineWidthInput) setIfNotEditing(dom.traceLineWidthInput, Number(traceBase.lineWidthMm ?? 0.1));
+    if (dom.traceLineTypeInput && document.activeElement !== dom.traceLineTypeInput) {
+      dom.traceLineTypeInput.value = String(traceBase.lineType || "solid");
+    }
+    if (dom.traceInvertToggle) dom.traceInvertToggle.checked = Number(traceBase.invert || 0) >= 1;
+  }
+  if (dom.traceRegenerateBtn) dom.traceRegenerateBtn.disabled = !selectedImage;
+
+  const importAdjust = state.ui?.importAdjust || null;
+  const importAdjustActive = !!importAdjust?.active;
+  const importAdjustParams = importAdjust?.params || { scale: 1, dx: 0, dy: 0, flipX: false, flipY: false };
+  if (dom.importAdjustScaleInput) setIfNotEditing(dom.importAdjustScaleInput, Number(importAdjustParams.scale ?? 1));
+  if (dom.importAdjustDxInput) setIfNotEditing(dom.importAdjustDxInput, Number(importAdjustParams.dx ?? 0));
+  if (dom.importAdjustDyInput) setIfNotEditing(dom.importAdjustDyInput, Number(importAdjustParams.dy ?? 0));
+  if (dom.importAdjustFlipXToggle) dom.importAdjustFlipXToggle.checked = !!importAdjustParams.flipX;
+  if (dom.importAdjustFlipYToggle) dom.importAdjustFlipYToggle.checked = !!importAdjustParams.flipY;
+  if (dom.importDxfAsPolylineToggle) dom.importDxfAsPolylineToggle.checked = !!state.ui?.importDxfAsPolyline;
+  if (dom.importAdjustScaleInput) dom.importAdjustScaleInput.disabled = !importAdjustActive;
+  if (dom.importAdjustDxInput) dom.importAdjustDxInput.disabled = !importAdjustActive;
+  if (dom.importAdjustDyInput) dom.importAdjustDyInput.disabled = !importAdjustActive;
+  if (dom.importAdjustFlipXToggle) dom.importAdjustFlipXToggle.disabled = !importAdjustActive;
+  if (dom.importAdjustFlipYToggle) dom.importAdjustFlipYToggle.disabled = !importAdjustActive;
+  if (dom.importAdjustApplyBtn) dom.importAdjustApplyBtn.disabled = !importAdjustActive;
+  if (dom.importAdjustCancelBtn) dom.importAdjustCancelBtn.disabled = !importAdjustActive;
 
   const _selIdSet = new Set((state.selection?.ids || []).map(Number));
   const selectedShapes = _selIdSet.size > 0 ? (state.shapes || []).filter(s => _selIdSet.has(Number(s.id))) : [];

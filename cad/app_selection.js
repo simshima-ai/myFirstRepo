@@ -67,6 +67,7 @@ const selectionBoxOps = createSelectionBoxOps({
     collectGroupTreeShapeIds,
     isLayerVisible,
     isLayerLocked,
+    isGroupVisible,
     sampleBSplinePoints,
     getImageCornersWorld
 });
@@ -80,6 +81,7 @@ const trimFilletHoverOps = createTrimFilletHoverOps({
     arcParamAlong,
     normalizeRad,
     nearestPointOnSegment,
+    sampleBSplinePoints,
     getSelectedShapes,
     solveLineLineFillet,
     solveLineCircleFillet,
@@ -95,7 +97,9 @@ const selectionVertexOps = createSelectionVertexOps({
     getObjectSnapPoint,
     solveTangentSnapPoints,
     getEffectiveGridSize,
-    snapPoint
+    snapPoint,
+    sampleBSplinePoints,
+    findConnectedLinesChain
 });
 const hitTestOps = createHitTestOps({
     isGroupVisible,
@@ -230,6 +234,18 @@ export function moveSelectedVerticesByDelta(state, dx, dy, helpers) {
     return selectionVertexOps.moveSelectedVerticesByDelta(state, dx, dy, helpers);
 }
 
+export function deleteSelectedPolylineVertices(state, helpers) {
+    return selectionVertexOps.deleteSelectedPolylineVertices(state, helpers);
+}
+
+export function getVertexInsertCandidate(state, world) {
+    return selectionVertexOps.getVertexInsertCandidate(state, world);
+}
+
+export function insertVertexAtCandidate(state, candidate, helpers) {
+    return selectionVertexOps.insertVertexAtCandidate(state, candidate, helpers);
+}
+
 export function beginGroupOriginDrag(state, group, worldRaw) {
     return groupTransformOps.beginGroupOriginDrag(state, group, worldRaw);
 }
@@ -249,6 +265,16 @@ function resolveFollowPointFromAttrib(state, attrib) {
         return (attrib.refKey === "p2")
             ? { x: Number(ref.x2), y: Number(ref.y2) }
             : { x: Number(ref.x1), y: Number(ref.y1) };
+    }
+    if (attrib.refType === "polyline_vertex" && ref.type === "polyline") {
+        const pts = Array.isArray(ref.points) ? ref.points : [];
+        const m = String(attrib.refKey || "").match(/^v(\d+)$/);
+        const idx = m ? Number(m[1]) : NaN;
+        if (Number.isFinite(idx) && idx >= 0 && idx < pts.length) {
+            const p = pts[idx];
+            return { x: Number(p.x), y: Number(p.y) };
+        }
+        return null;
     }
     if (attrib.refType === "dim_endpoint" && ref.type === "dim") {
         return (attrib.refKey === "p2")
@@ -739,12 +765,27 @@ export function getShapeEndpoints(s) {
         const x1 = Number(s.x1), y1 = Number(s.y1), x2 = Number(s.x2), y2 = Number(s.y2);
         return [{ x: x1, y: y1 }, { x: x2, y: y1 }, { x: x2, y: y2 }, { x: x1, y: y2 }];
     }
+    if (s.type === "polyline") {
+        const pts = Array.isArray(s.points) ? s.points : [];
+        if (pts.length < 2) return [];
+        if (s.closed) {
+            return pts
+                .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
+                .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+        }
+        const a = pts[0];
+        const b = pts[pts.length - 1];
+        return [
+            { x: Number(a?.x), y: Number(a?.y) },
+            { x: Number(b?.x), y: Number(b?.y) }
+        ].filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    }
     return [];
 }
 
 export function findConnectedLinesChain(state, startShapeId) {
     const startShape = state.shapes.find(s => Number(s.id) === Number(startShapeId));
-    if (!startShape || (startShape.type !== "line" && startShape.type !== "arc" && startShape.type !== "rect")) return [Number(startShapeId)];
+    if (!startShape || (startShape.type !== "line" && startShape.type !== "arc" && startShape.type !== "rect" && startShape.type !== "polyline")) return [Number(startShapeId)];
 
     const visited = new Set([Number(startShapeId)]);
     const queue = [Number(startShapeId)];
@@ -775,7 +816,7 @@ export function findConnectedLinesChain(state, startShapeId) {
             for (const other of state.shapes) {
                 const oid = Number(other.id);
                 if (visited.has(oid)) continue;
-                if (other.type !== "line" && other.type !== "arc" && other.type !== "rect") continue;
+                if (other.type !== "line" && other.type !== "arc" && other.type !== "rect" && other.type !== "polyline") continue;
                 if (!isLayerVisible(state, other.layerId) || isLayerLocked(state, other.layerId)) continue;
                 if (!isGroupVisible(state, resolveGroupId(other))) continue;
 
@@ -807,8 +848,8 @@ export function endSelectionBox(state, helpers) {
     return selectionBoxOps.endSelectionBox(state, helpers);
 }
 
-export function getTrimHoverCandidate(state, worldRaw, dom) {
-    return trimFilletHoverOps.getTrimHoverCandidate(state, worldRaw, dom);
+export function getTrimHoverCandidate(state, worldRaw, dom, options = null) {
+    return trimFilletHoverOps.getTrimHoverCandidate(state, worldRaw, dom, options);
 }
 
 export function getTrimHoverCandidateForArc(state, worldRaw, arc) {

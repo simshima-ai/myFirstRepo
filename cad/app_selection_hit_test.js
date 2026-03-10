@@ -61,6 +61,21 @@ export function createHitTestOps(config) {
       if (!isGroupVisible(state, resolveGroupId(s))) continue;
       if (state.ui?.layerView?.editOnlyActive && Number(s.layerId ?? state.activeLayerId) !== Number(state.activeLayerId)) continue;
       if (s.type === "line" && hitTestLine(world, s, tol)) return s;
+      if (s.type === "polyline") {
+        const pts = Array.isArray(s.points) ? s.points : [];
+        if (pts.length >= 2) {
+          for (let pi = 1; pi < pts.length; pi++) {
+            const a = pts[pi - 1];
+            const b = pts[pi];
+            if (distancePointToSegment(world, a, b) <= tol) return s;
+          }
+          if (s.closed) {
+            const a = pts[pts.length - 1];
+            const b = pts[0];
+            if (distancePointToSegment(world, a, b) <= tol) return s;
+          }
+        }
+      }
       if (s.type === "bspline") {
         const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
         for (let pi = 1; pi < sampled.length; pi++) {
@@ -197,6 +212,20 @@ export function createHitTestOps(config) {
       }
       if (s.type === "image") {
         if (pointInImageBounds(s, world, tol)) return s;
+      }
+      if (s.type === "imagetrace") {
+        const segs = Array.isArray(s.segments) ? s.segments : [];
+        for (const seg of segs) {
+          if (hitTestLine(world, { x1: Number(seg.x1), y1: Number(seg.y1), x2: Number(seg.x2), y2: Number(seg.y2) }, tol)) {
+            return s;
+          }
+        }
+        const x = Number(s.x), y = Number(s.y), w = Number(s.width), h = Number(s.height);
+        if ([x, y, w, h].every(Number.isFinite) && w > 0 && h > 0) {
+          if (world.x >= (x - tol) && world.x <= (x + w + tol) && world.y >= (y - tol) && world.y <= (y + h + tol)) {
+            return s;
+          }
+        }
       }
       if (s.type === "hatch") {
         if (state.tool === "dim") continue;

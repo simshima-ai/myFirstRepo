@@ -255,6 +255,18 @@ export function exportSvg(state, helpers) {
             parts.push(`<line x1="${fmt(s.x1)}" y1="${fmt(s.y1)}" x2="${fmt(s.x2)}" y2="${fmt(s.y2)}"/>`);
             continue;
         }
+        if (s.type === "polyline") {
+            const pts = Array.isArray(s.points) ? s.points : [];
+            if (pts.length >= 2) {
+                const list = pts.map((p) => `${fmt(p.x)},${fmt(p.y)}`).join(" ");
+                if (s.closed) {
+                    parts.push(`<polygon points="${list}"/>`);
+                } else {
+                    parts.push(`<polyline points="${list}"/>`);
+                }
+            }
+            continue;
+        }
         if (s.type === "rect") {
             const x = Math.min(Number(s.x1), Number(s.x2));
             const y = Math.min(Number(s.y1), Number(s.y2));
@@ -602,6 +614,22 @@ export function exportDxf(state, helpers) {
             exportedShapeCount += 1;
             continue;
         }
+        if (s.type === "polyline") {
+            const pts = Array.isArray(s.points) ? s.points : [];
+            if (pts.length < 2) { skippedShapeCount += 1; continue; }
+            const pairs = [
+                [8, layerName],
+                [90, String(pts.length)],
+                [70, s.closed ? "1" : "0"],
+            ];
+            for (const p of pts) {
+                pairs.push([10, fmt(p.x)]);
+                pairs.push([20, fmt(p.y)]);
+            }
+            addEntity("LWPOLYLINE", pairs);
+            exportedShapeCount += 1;
+            continue;
+        }
         if (s.type === "rect") {
             const x1 = Number(s.x1), y1 = Number(s.y1), x2 = Number(s.x2), y2 = Number(s.y2);
             const minX = Math.min(x1, x2), maxX = Math.max(x1, x2);
@@ -723,4 +751,3 @@ export function exportDxf(state, helpers) {
         setStatus(`Exported ${name} (DXF R12) / shapes ${exportedShapeCount}${suffix}`);
     }
 }
-

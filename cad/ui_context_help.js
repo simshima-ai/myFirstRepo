@@ -1,4 +1,23 @@
 export function getTopContextHelpText(state, tool, lang) {
+  if (state.ui?.importAdjust?.active) {
+    return (lang === "en")
+      ? "Adjust imported geometry scale/offset, then click Apply or Cancel."
+      : "インポート図形の縮尺と移動を調整し、Apply か Cancel で確定してください。";
+  }
+  const hasTraceSelected = (() => {
+    const ids = new Set((state.selection?.ids || []).map(Number));
+    if (!ids.size) return false;
+    for (const s of (state.shapes || [])) {
+      if (!ids.has(Number(s.id))) continue;
+      if (String(s.type || "") === "imagetrace") return true;
+    }
+    return false;
+  })();
+  if (state.ui?.tracePanelOpen || hasTraceSelected) {
+    return (lang === "en")
+      ? "Select an imported image, tune parameters, then click Regenerate."
+      : "インポート済み画像を選択し、パラメータ調整後に再生成を押してください。";
+  }
   const isTouchMode = !!state.ui?.touchMode;
   const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
   const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";

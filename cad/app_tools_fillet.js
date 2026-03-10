@@ -1,5 +1,5 @@
 import { pushHistory, setSelection } from "./state.js";
-import { solveLineLineFillet, solveLineCircleFillet, solveArcArcFillet, chooseTrimSideForIntersectionByT, chooseEndsForLineByKeepEnd } from "./solvers.js";
+import { solveLineLineFillet, solveLineCircleFillet, solveArcArcFillet, chooseTrimSideForIntersectionByT, chooseEndsForLineByKeepEnd, segmentCircleIntersectionPoints, isAngleOnArc } from "./solvers.js";
 import { getSelectedShapes, getTrimHoverCandidate } from "./app_selection.js";
 export function splitLineForFillet(line, p) {
     const ax = Number(line.x1), ay = Number(line.y1), bx = Number(line.x2), by = Number(line.y2);
@@ -117,6 +117,12 @@ function autoTrimNormPi(a) {
     while (x > Math.PI) x -= AUTO_TRIM_TAU;
     return x;
 }
+function autoTrimNormTau(a) {
+    let x = Number(a) || 0;
+    while (x < 0) x += AUTO_TRIM_TAU;
+    while (x >= AUTO_TRIM_TAU) x -= AUTO_TRIM_TAU;
+    return x;
+}
 function autoTrimSpan(a1, a2, ccw) {
     const s1 = Number(a1) || 0;
     const s2 = Number(a2) || 0;
@@ -130,14 +136,26 @@ function autoTrimPickArcCutKey(arcShape, tangentPoint, towardPoint = null) {
     if (!arcShape || arcShape.type !== "arc") return "a1";
     const a1 = Number(arcShape.a1) || 0;
     const a2 = Number(arcShape.a2) || 0;
+    const cx = Number(arcShape.cx), cy = Number(arcShape.cy), rr = Math.abs(Number(arcShape.r) || 0);
+    const ccw = arcShape.ccw !== false;
+    const th = Math.atan2(Number(tangentPoint?.y) - Number(arcShape.cy), Number(tangentPoint?.x) - Number(arcShape.cx));
+    const removedMidPoint = (cutKey) => {
+        const start = (cutKey === "a1") ? a1 : th;
+        const end = (cutKey === "a1") ? th : a2;
+        const span = ccw
+            ? (((end - start) + AUTO_TRIM_TAU) % AUTO_TRIM_TAU)
+            : (((start - end) + AUTO_TRIM_TAU) % AUTO_TRIM_TAU);
+        const mid = ccw ? (start + span * 0.5) : (start - span * 0.5);
+        return autoTrimArcPoint(arcShape, mid);
+    };
     if (towardPoint && Number.isFinite(Number(towardPoint.x)) && Number.isFinite(Number(towardPoint.y))) {
-        const p1 = autoTrimArcPoint(arcShape, a1);
-        const p2 = autoTrimArcPoint(arcShape, a2);
-        const d1 = Math.hypot(Number(towardPoint.x) - p1.x, Number(towardPoint.y) - p1.y);
-        const d2 = Math.hypot(Number(towardPoint.x) - p2.x, Number(towardPoint.y) - p2.y);
+        const p1 = removedMidPoint("a1");
+        const p2 = removedMidPoint("a2");
+        const d1 = Math.hypot(Number(towardPoint.x) - Number(p1.x), Number(towardPoint.y) - Number(p1.y));
+        const d2 = Math.hypot(Number(towardPoint.x) - Number(p2.x), Number(towardPoint.y) - Number(p2.y));
         return (d1 <= d2) ? "a1" : "a2";
     }
-    const th = Math.atan2(Number(tangentPoint?.y) - Number(arcShape.cy), Number(tangentPoint?.x) - Number(arcShape.cx));
+    if (![cx, cy, rr].every(Number.isFinite) || !(rr > 1e-9)) return "a1";
     const d1 = Math.abs(autoTrimNormPi(th - a1));
     const d2 = Math.abs(autoTrimNormPi(th - a2));
     return (d1 <= d2) ? "a1" : "a2";
@@ -182,7 +200,77 @@ function withSuppressedShape(state, shapeId, fn) {
         arr.splice(idx, 0, removed);
     }
 }
-export function computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, keepEnd, suppressShapeId = null) {
+
+function pickLineArcIntersectionTowardPoint(lineRef, arcRef, sol, fallbackPoint = null) {
+    const sx = Number(sol?.sharedIntersection?.x);
+    const sy = Number(sol?.sharedIntersection?.y);
+    if (Number.isFinite(sx) && Number.isFinite(sy)) return { x: sx, y: sy };
+    if (!lineRef || lineRef.type !== "line" || !arcRef || arcRef.type !== "arc") return fallbackPoint;
+    const a = { x: Number(lineRef.x1), y: Number(lineRef.y1) };
+    const b = { x: Number(lineRef.x2), y: Number(lineRef.y2) };
+    const ips = segmentCircleIntersectionPoints(a, b, arcRef) || [];
+    const cand = [];
+    for (const ip of ips) {
+        const x = Number(ip?.x), y = Number(ip?.y);
+        if (![x, y].every(Number.isFinite)) continue;
+        const th = Math.atan2(y - Number(arcRef.cy), x - Number(arcRef.cx));
+        if (!isAngleOnArc(th, Number(arcRef.a1) || 0, Number(arcRef.a2) || 0, arcRef.ccw !== false)) continue;
+        cand.push({ x, y });
+    }
+    if (!cand.length) return fallbackPoint;
+    if (cand.length === 1) return cand[0];
+    const hint = (sol?.arcMid && Number.isFinite(Number(sol.arcMid.x)) && Number.isFinite(Number(sol.arcMid.y)))
+        ? { x: Number(sol.arcMid.x), y: Number(sol.arcMid.y) }
+        : (fallbackPoint && Number.isFinite(Number(fallbackPoint.x)) && Number.isFinite(Number(fallbackPoint.y))
+            ? { x: Number(fallbackPoint.x), y: Number(fallbackPoint.y) }
+            : null);
+    if (!hint) return cand[0];
+    cand.sort((p, q) =>
+        Math.hypot(Number(p.x) - Number(hint.x), Number(p.y) - Number(hint.y))
+        - Math.hypot(Number(q.x) - Number(hint.x), Number(q.y) - Number(hint.y))
+    );
+    return cand[0];
+}
+
+function splitArcAtAngleKeepEndpointsFromSnapshot(arcSnap, splitAngle) {
+    if (!arcSnap || !Number.isFinite(Number(splitAngle))) return null;
+    const a1Old = autoTrimNormTau(Number(arcSnap.a1) || 0);
+    const a2Old = autoTrimNormTau(Number(arcSnap.a2) || 0);
+    const ccw = arcSnap.ccw !== false;
+    const th = autoTrimNormTau(Number(splitAngle));
+    const eps = 1e-5;
+    const angDiff = (u, v) => Math.abs(autoTrimNormPi((Number(u) || 0) - (Number(v) || 0)));
+    if (!isAngleOnArc(th, a1Old, a2Old, ccw)) return null;
+    // Do not allow split angle to collapse to either endpoint.
+    if (angDiff(th, a1Old) <= 1e-4 || angDiff(th, a2Old) <= 1e-4) return null;
+    const oldSpan = autoTrimSpan(a1Old, a2Old, ccw);
+    const span1 = autoTrimSpan(a1Old, th, ccw);
+    const span2 = autoTrimSpan(th, a2Old, ccw);
+    if (!(oldSpan > eps && oldSpan < AUTO_TRIM_TAU - eps)) return null;
+    if (!(span1 > eps && span2 > eps)) return null;
+    if (!(span1 < oldSpan - eps && span2 < oldSpan - eps)) return null;
+    // Split verification and guard against near full-circle segments.
+    if (Math.abs((span1 + span2) - oldSpan) > 1e-4) return null;
+    if (span1 >= AUTO_TRIM_TAU - 1e-4 || span2 >= AUTO_TRIM_TAU - 1e-4) return null;
+    return {
+        seg1: { a1: a1Old, a2: th, ccw, span: span1 },
+        seg2: { a1: th, a2: a2Old, ccw, span: span2 },
+    };
+}
+
+function chooseKeepSegByIntersectionA(split, arcSnap, pointA) {
+    if (!split || !arcSnap || !pointA) return null;
+    const cx = Number(arcSnap.cx), cy = Number(arcSnap.cy);
+    const thA = Math.atan2(Number(pointA.y) - cy, Number(pointA.x) - cx);
+    if (!Number.isFinite(thA)) return null;
+    const on1 = isAngleOnArc(thA, Number(split.seg1?.a1), Number(split.seg1?.a2), split.seg1?.ccw !== false);
+    const on2 = isAngleOnArc(thA, Number(split.seg2?.a1), Number(split.seg2?.a2), split.seg2?.ccw !== false);
+    if (on1 && !on2) return split.seg2; // remove seg1 (A-side), keep opposite.
+    if (on2 && !on1) return split.seg1; // remove seg2 (A-side), keep opposite.
+    // Fallback: keep longer side to avoid over-trim.
+    return (Number(split.seg1?.span) >= Number(split.seg2?.span)) ? split.seg1 : split.seg2;
+}
+export function computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, keepEnd, suppressShapeId = null, towardPoint = null) {
     const result = {
         okLine: false,
         okArc: (circleRef?.type !== "arc"),
@@ -237,23 +325,35 @@ export function computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, ke
     result.okLine = !!result.lineCandidate;
 
     if (circleRef.type === "arc") {
-        const nearFullEps = 0.02; // rad: reject almost-full-circle trims and retry opposite side.
+        const nearFullEps = 1e-4;
+        const minSpanEps = 1e-5;
+        const minShrinkEps = 1e-5;
+        const maxRemovedSpan = Math.PI * 0.5 + 1e-4; // line-arc fillet should trim only a small side.
         const oldA1 = Number(circleRef.a1) || 0;
         const oldA2 = Number(circleRef.a2) || 0;
         const ccw = circleRef.ccw !== false;
         const oldSpan = autoTrimSpan(oldA1, oldA2, ccw);
+        const th = Math.atan2(Number(sol?.tCircle?.y) - Number(circleRef.cy), Number(sol?.tCircle?.x) - Number(circleRef.cx));
+        const angDiff = (u, v) => Math.abs(autoTrimNormPi((Number(u) || 0) - (Number(v) || 0)));
+        const nearEq = (u, v, eps = 1e-4) => angDiff(u, v) <= eps;
         const validateArcCandidate = (cand) => {
             if (!cand) return false;
             const k1 = Number(cand.keepA1);
             const k2 = Number(cand.keepA2);
             if (![k1, k2].every(Number.isFinite)) return false;
             const span = autoTrimSpan(k1, k2, (cand.remCCW !== false));
-            if (!(span > 1e-5)) return false;
+            const removed = oldSpan - span;
+            if (!(span > minSpanEps)) return false;
             if (span >= AUTO_TRIM_TAU - nearFullEps) return false;
-            if (span >= oldSpan - 1e-6) return false;
+            if (!(removed > minShrinkEps)) return false;
+            if (removed > maxRemovedSpan) return false;
+            // Tangent point on source arc must become one of new arc endpoints.
+            if (!(nearEq(k1, th) || nearEq(k2, th))) return false;
+            const cutKey = (cand.cutKey === "a1" || cand.cutKey === "a2") ? cand.cutKey : null;
+            if (cutKey === "a1" && !(nearEq(k1, th) && nearEq(k2, oldA2))) return false;
+            if (cutKey === "a2" && !(nearEq(k1, oldA1) && nearEq(k2, th))) return false;
             return true;
         };
-        const th = Math.atan2(Number(sol?.tCircle?.y) - Number(circleRef.cy), Number(sol?.tCircle?.x) - Number(circleRef.cx));
         const buildDeterministicArcCandidate = (cutKey) => {
             const keepA1 = (cutKey === "a1") ? th : oldA1;
             const keepA2 = (cutKey === "a1") ? oldA2 : th;
@@ -277,6 +377,7 @@ export function computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, ke
                     if (cand.targetType !== "arc") continue;
                     if (Number(cand.arc?.id) !== Number(circleRef.id)) continue;
                     if (cand.mode !== "arc-remove-arc") continue;
+                    cand.cutKey = cutKey;
                     if (!validateArcCandidate(cand)) continue;
                     return cand;
                 }
@@ -284,13 +385,15 @@ export function computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, ke
             });
             if (picked) return { candidate: picked, clicks };
             const det = buildDeterministicArcCandidate(cutKey);
+            det.cutKey = cutKey;
             if (validateArcCandidate(det)) return { candidate: det, clicks };
             return { candidate: null, clicks };
         };
 
-        const initialCutKey = (sol.arcCutKey === "a1" || sol.arcCutKey === "a2")
-            ? sol.arcCutKey
-            : autoTrimPickArcCutKey(circleRef, sol.tCircle, sol.sharedIntersection || sol.arcMid || null);
+        const toward = (towardPoint && Number.isFinite(Number(towardPoint.x)) && Number.isFinite(Number(towardPoint.y)))
+            ? { x: Number(towardPoint.x), y: Number(towardPoint.y) }
+            : (sol.sharedIntersection || sol.arcMid || null);
+        const initialCutKey = autoTrimPickArcCutKey(circleRef, sol.tCircle, toward);
         const altCutKey = (initialCutKey === "a1") ? "a2" : "a1";
         let arcTry = tryCutKey(initialCutKey);
         let acceptedCutKey = initialCutKey;
@@ -685,10 +788,14 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
         const arcSnap = (circleRef.type === "arc")
             ? { a1: Number(circleRef.a1), a2: Number(circleRef.a2), ccw: circleRef.ccw !== false }
             : null;
-        const plan = computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, keepEnd, arc.id);
-        let okAll = !!plan?.okAll;
+        const clickTowardPoint = (sol.sharedIntersection || sol.arcMid || null);
+        const trimTowardPoint = (circleRef.type === "arc")
+            ? pickLineArcIntersectionTowardPoint(lineRef, circleRef, sol, clickTowardPoint)
+            : clickTowardPoint;
+        const plan = computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, keepEnd, arc.id, trimTowardPoint);
+        let okAll = !!plan?.okLine;
         const lineCand = plan?.lineCandidate || null;
-        if (!okAll || !lineCand) {
+        if (!lineCand) {
             okAll = false;
         } else {
             if (lineCand.mode === "p1") {
@@ -702,17 +809,29 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
             if (!(ll > 1e-6)) okAll = false;
         }
         if (okAll && circleRef.type === "arc") {
-            const arcCand = plan?.arcCandidate || null;
-            if (!arcCand) {
+            const B = { x: Number(sol?.tCircle?.x), y: Number(sol?.tCircle?.y) };
+            const th = Math.atan2(Number(B.y) - Number(circleRef.cy), Number(B.x) - Number(circleRef.cx));
+            if (![B.x, B.y, th].every(Number.isFinite)) {
                 okAll = false;
             } else {
-                circleRef.a1 = Number(arcCand.keepA1);
-                circleRef.a2 = Number(arcCand.keepA2);
-                circleRef.ccw = (arcCand.remCCW !== false);
-                const oldSpan = autoTrimSpan(arcSnap.a1, arcSnap.a2, arcSnap.ccw);
-                const newSpan = autoTrimSpan(circleRef.a1, circleRef.a2, circleRef.ccw !== false);
-                const nearFullEps = 0.02;
-                if (!(newSpan > 1e-5 && newSpan < AUTO_TRIM_TAU - nearFullEps && newSpan < oldSpan - 1e-6)) okAll = false;
+                const split = splitArcAtAngleKeepEndpointsFromSnapshot(arcSnap, th);
+                if (!split) {
+                    okAll = false;
+                } else {
+                    const A = pickLineArcIntersectionTowardPoint(lineRef, circleRef, sol, trimTowardPoint);
+                    const keepSeg = chooseKeepSegByIntersectionA(split, {
+                        cx: Number(circleRef.cx),
+                        cy: Number(circleRef.cy),
+                    }, A);
+                    const keepSpan = Number(keepSeg?.span);
+                    if (!A || !Number.isFinite(keepSpan) || !(keepSpan > 1e-5 && keepSpan < AUTO_TRIM_TAU - 1e-4)) {
+                        okAll = false;
+                    } else {
+                        circleRef.a1 = autoTrimNormTau(Number(keepSeg.a1));
+                        circleRef.a2 = autoTrimNormTau(Number(keepSeg.a2));
+                        circleRef.ccw = keepSeg.ccw !== false;
+                    }
+                }
             }
         }
         if (!okAll) {

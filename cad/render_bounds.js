@@ -37,6 +37,9 @@ export function createRenderBoundsOps(deps) {
         maxY: Math.max(y1, y2),
       };
     }
+    if (shape.type === "polyline") {
+      return boundsFromPoints(shape.points || []);
+    }
     if (shape.type === "image") {
       const x = Number(shape.x);
       const y = Number(shape.y);

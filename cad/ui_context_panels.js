@@ -1,4 +1,7 @@
 export function resolveTopActiveContext(state, tool) {
+  if (state.ui?.importAdjust?.active) return "importadjust";
+  // Double line tool must keep its own context panel regardless of selection types.
+  if (tool === "doubleline") return "doubleline";
   const selIds = state.selection?.ids || [];
   let selShapeTypeMap = null;
   const getSelShapeTypes = () => {

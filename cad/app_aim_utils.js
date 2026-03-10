@@ -44,6 +44,12 @@ export function rotateShapeAroundForAim(shape, ox, oy, deltaDeg) {
     shape.x1 = p1.x; shape.y1 = p1.y; shape.x2 = p2.x; shape.y2 = p2.y;
     return;
   }
+  if (shape.type === "polyline") {
+    if (Array.isArray(shape.points)) {
+      shape.points = shape.points.map((pt) => rotatePointAroundDeg(Number(pt?.x), Number(pt?.y), ox, oy, deltaDeg));
+    }
+    return;
+  }
   if (shape.type === "circle") {
     const c = rotatePointAroundDeg(shape.cx, shape.cy, ox, oy, deltaDeg);
     shape.cx = c.x; shape.cy = c.y;

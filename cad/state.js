@@ -12,6 +12,7 @@
   "hatch",
   "doubleline",
   "patterncopy",
+  "vertex_mode_toggle",
   "delete",
 ]);
 
@@ -29,6 +30,7 @@ export const DEFAULT_TOOL_SHORTCUTS = Object.freeze({
   hatch: "H",
   doubleline: "B",
   patterncopy: "Y",
+  vertex_mode_toggle: "\\",
   delete: "DEL",
 });
 
@@ -36,6 +38,7 @@ export function normalizeShortcutKey(v) {
   if (v == null) return "";
   const key = String(v).trim().toUpperCase();
   if (key === "DELETE" || key === "DEL") return "DEL";
+  if (key === "\\") return "\\";
   return /^[A-Z0-9]$/.test(key) ? key : "";
 }
 
@@ -102,6 +105,7 @@ export function createState() {
       anchor: "endpoint_a", // "endpoint_a" | "endpoint_b" | "center"
       lineWidthMm: 0.25,
       lineType: "solid",
+      color: "#0f172a",
     },
     rectSettings: {
       width: 100,
@@ -110,6 +114,7 @@ export function createState() {
       anchor: "c",
       lineWidthMm: 0.25,
       lineType: "solid",
+      color: "#0f172a",
     },
     circleSettings: {
       mode: "drag", // "drag" | "fixed" | "threepoint"
@@ -118,21 +123,24 @@ export function createState() {
       showCenterMark: false,
       lineWidthMm: 0.25,
       lineType: "solid",
+      color: "#0f172a",
     },
     filletSettings: {
       radius: 20,
-      lineMode: "split",
+      lineMode: "trim",
       noTrim: false,
       lineWidthMm: 0.25,
       lineType: "solid",
+      color: "#0f172a",
     },
     trimSettings: {
       noDelete: false,
     },
     positionSettings: {
-      size: 20,
-      lineWidthMm: 0.25,
+      size: 3,
+      lineWidthMm: 0.1,
       lineType: "solid",
+      color: "#0f172a",
     },
     textSettings: {
       content: "Text",
@@ -174,10 +182,14 @@ export function createState() {
       lineType: "solid",
     },
     dlinePreview: null, // [{x1,y1,x2,y2}]
+    dlineSingleSidePickPoint: null, // {x,y} in single mode after side decision click
     dlineTrimPending: false,
     dlineTrimPendingPreview: null,
     dlineTrimCandidates: null,
     dlineTrimIntersections: null,
+    dlineTrimStepTargets: null,
+    dlineTrimStepCreatedIds: null,
+    dlineTrimStepTotal: 0,
     groups: [],
     nextGroupId: 1,
     activeGroupId: null,
@@ -208,9 +220,12 @@ export function createState() {
       },
     },
     vertexEdit: {
+      mode: "move", // "move" | "insert"
       moveDx: 0,
       moveDy: 0,
       linkCoincident: true,
+      insertCandidate: null,
+      targetShapeIds: [],
       selectedVertices: [], // [{ shapeId, key }]
       activeVertex: null, // last-picked convenience handle
       filterShapeId: null, // if set, only show/interact with vertices of this shape
@@ -363,7 +378,9 @@ export function createState() {
       filletHover: null,
       filletFlow: null,
       hatchHover: null,
+      hatchValidation: null,
       dimHoveredShapeId: null,
+      dimHoveredSegmentIndex: null,
       dimSessionGroupId: null,
       patternCopyFlow: {
         centerPositionId: null,
@@ -408,6 +425,7 @@ export function createState() {
       menuScalePct: 100,
       touchMode: false,
       touchMultiSelect: false,
+      importDxfAsPolyline: false,
       showFps: false,
       showObjectCount: false,
       autoBackupEnabled: true,
@@ -552,7 +570,10 @@ export function setTool(state, tool) {
   if (tool === "hatch" && prevTool !== "hatch") {
     if (!state.hatchDraft) state.hatchDraft = { boundaryIds: [] };
     state.hatchDraft.boundaryIds = [];
-    if (state.input) state.input.hatchHover = null;
+    if (state.input) {
+      state.input.hatchHover = null;
+      state.input.hatchValidation = null;
+    }
   }
   if (tool !== "circle" && state.input) {
     state.input.circleThreePointRefs = [];
@@ -566,10 +587,72 @@ export function setTool(state, tool) {
     state.input.dimSessionGroupId = null;
   }
   if (tool !== "doubleline") {
+    state.dlineSingleSidePickPoint = null;
     state.dlineTrimPending = false;
     state.dlineTrimPendingPreview = null;
     state.dlineTrimCandidates = null;
     state.dlineTrimIntersections = null;
+    state.dlineTrimStepTargets = null;
+    state.dlineTrimStepCreatedIds = null;
+    state.dlineTrimStepTotal = 0;
+  }
+  if (tool === "vertex" && prevTool !== "vertex") {
+    const editableTypeSet = new Set(["line", "rect", "arc", "polyline", "bspline"]);
+    const shapeById = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+    const targetIds = new Set();
+    for (const sidRaw of (state.selection?.ids || [])) {
+      const sid = Number(sidRaw);
+      if (!Number.isFinite(sid)) continue;
+      const s = shapeById.get(sid);
+      if (!s || !editableTypeSet.has(String(s.type || "").toLowerCase())) continue;
+      targetIds.add(sid);
+    }
+    const selectedGroupIds = new Set();
+    for (const gidRaw of (state.selection?.groupIds || [])) {
+      const gid = Number(gidRaw);
+      if (Number.isFinite(gid)) selectedGroupIds.add(gid);
+    }
+    if (state.activeGroupId != null && Number.isFinite(Number(state.activeGroupId))) {
+      selectedGroupIds.add(Number(state.activeGroupId));
+    }
+    if (selectedGroupIds.size) {
+      const childrenByParent = new Map();
+      for (const g of (state.groups || [])) {
+        const pid = (g?.parentId == null) ? null : Number(g.parentId);
+        if (!childrenByParent.has(pid)) childrenByParent.set(pid, []);
+        childrenByParent.get(pid).push(Number(g.id));
+      }
+      const groupTreeIds = new Set();
+      const walk = (gid) => {
+        if (!Number.isFinite(gid) || groupTreeIds.has(gid)) return;
+        groupTreeIds.add(gid);
+        for (const cid of (childrenByParent.get(gid) || [])) walk(Number(cid));
+      };
+      for (const gid of selectedGroupIds) walk(Number(gid));
+      for (const g of (state.groups || [])) {
+        if (!groupTreeIds.has(Number(g?.id))) continue;
+        for (const sidRaw of (g?.shapeIds || [])) {
+          const sid = Number(sidRaw);
+          const s = shapeById.get(sid);
+          if (!s || !editableTypeSet.has(String(s.type || "").toLowerCase())) continue;
+          targetIds.add(sid);
+        }
+      }
+    }
+    state.vertexEdit.targetShapeIds = Array.from(targetIds);
+    state.vertexEdit.filterShapeId = (state.vertexEdit.targetShapeIds.length === 1)
+      ? Number(state.vertexEdit.targetShapeIds[0])
+      : null;
+    state.vertexEdit.insertCandidate = null;
+    state.vertexEdit.selectedVertices = [];
+    state.vertexEdit.activeVertex = null;
+  }
+  if (tool !== "vertex" && prevTool === "vertex") {
+    state.vertexEdit.insertCandidate = null;
+    state.vertexEdit.filterShapeId = null;
+    state.vertexEdit.selectedVertices = [];
+    state.vertexEdit.activeVertex = null;
+    state.vertexEdit.targetShapeIds = [];
   }
 }
 
@@ -577,11 +660,13 @@ export function clearSelection(state) {
   state.selection.ids = [];
   state.selection.groupIds = [];
   state.activeGroupId = null;
+  state.dlineSingleSidePickPoint = null;
 }
 
 export function setSelection(state, ids) {
   state.selection.ids = Array.from(new Set(ids.map(Number)));
   state.selection.groupIds = [];
+  state.dlineSingleSidePickPoint = null;
 }
 
 export function isSelected(state, id) {
@@ -625,6 +710,20 @@ export function addShape(state, shape) {
     } else if (shape.type === "circle" || shape.type === "arc") {
       ox = shape.cx;
       oy = shape.cy;
+    } else if (shape.type === "polyline") {
+      if (Array.isArray(shape.points) && shape.points.length) {
+        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+        for (const p of shape.points) {
+          const x = Number(p?.x), y = Number(p?.y);
+          if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+          minX = Math.min(minX, x); minY = Math.min(minY, y);
+          maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+        }
+        if (Number.isFinite(minX) && Number.isFinite(minY) && Number.isFinite(maxX) && Number.isFinite(maxY)) {
+          ox = (minX + maxX) * 0.5;
+          oy = (minY + maxY) * 0.5;
+        }
+      }
     } else if (shape.type === "image") {
       ox = Number(shape.x) + Number(shape.width) * 0.5;
       oy = Number(shape.y) + Number(shape.height) * 0.5;
@@ -672,6 +771,13 @@ export function addShapesAsGroup(state, shapes) {
     if (s.type === "line" || s.type === "rect") {
       minX = Math.min(minX, s.x1, s.x2); minY = Math.min(minY, s.y1, s.y2);
       maxX = Math.max(maxX, s.x1, s.x2); maxY = Math.max(maxY, s.y1, s.y2);
+    } else if (s.type === "polyline") {
+      for (const p of (s.points || [])) {
+        const x = Number(p?.x), y = Number(p?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      }
     } else if (s.type === "circle" || s.type === "arc") {
       minX = Math.min(minX, s.cx - s.r); minY = Math.min(minY, s.cy - s.r);
       maxX = Math.max(maxX, s.cx + s.r); maxY = Math.max(maxY, s.cy + s.r);
@@ -732,6 +838,16 @@ export function translateShape(shape, dx, dy) {
     shape.x2 += dx; shape.y2 += dy;
     return;
   }
+  if (shape.type === "polyline") {
+    if (Array.isArray(shape.points)) {
+      for (const p of shape.points) {
+        if (!p) continue;
+        p.x = Number(p.x) + dx;
+        p.y = Number(p.y) + dy;
+      }
+    }
+    return;
+  }
   if (shape.type === "circle") {
     shape.cx += dx; shape.cy += dy;
     return;
@@ -775,6 +891,20 @@ export function translateShape(shape, dx, dy) {
     if (Number.isFinite(Number(shape.x)) && Number.isFinite(Number(shape.y))) {
       shape.x += dx; shape.y += dy;
     }
+    return;
+  }
+  if (shape.type === "imagetrace") {
+    if (Array.isArray(shape.segments)) {
+      for (const seg of shape.segments) {
+        if (!seg) continue;
+        if (Number.isFinite(Number(seg.x1))) seg.x1 = Number(seg.x1) + dx;
+        if (Number.isFinite(Number(seg.y1))) seg.y1 = Number(seg.y1) + dy;
+        if (Number.isFinite(Number(seg.x2))) seg.x2 = Number(seg.x2) + dx;
+        if (Number.isFinite(Number(seg.y2))) seg.y2 = Number(seg.y2) + dy;
+      }
+    }
+    if (Number.isFinite(Number(shape.x))) shape.x += dx;
+    if (Number.isFinite(Number(shape.y))) shape.y += dy;
     return;
   }
 }
@@ -905,6 +1035,13 @@ export function createGroupFromSelection(state, name) {
     if (s.type === "line" || s.type === "rect") {
       minX = Math.min(minX, s.x1, s.x2); minY = Math.min(minY, s.y1, s.y2);
       maxX = Math.max(maxX, s.x1, s.x2); maxY = Math.max(maxY, s.y1, s.y2);
+    } else if (s.type === "polyline") {
+      for (const p of (s.points || [])) {
+        const x = Number(p?.x), y = Number(p?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        minX = Math.min(minX, x); minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x); maxY = Math.max(maxY, y);
+      }
     } else if (s.type === "circle" || s.type === "arc") {
       minX = Math.min(minX, s.cx - s.r); minY = Math.min(minY, s.cy - s.r);
       maxX = Math.max(maxX, s.cx + s.r); maxY = Math.max(maxY, s.cy + s.r);

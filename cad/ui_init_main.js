@@ -664,6 +664,77 @@ export function initUiMain(state, dom, actions, deps = {}) {
       });
     }
   }
+  {
+    const applyTraceParamsFromUi = () => {
+      actions.setTraceParams?.({
+        maxDim: Number(dom.traceMaxDimInput?.value),
+        edgePercent: Number(dom.traceEdgePercentInput?.value),
+        simplify: Number(dom.traceSimplifyInput?.value),
+        minSeg: Number(dom.traceMinSegInput?.value),
+        maxSegments: Number(dom.traceMaxSegmentsInput?.value),
+        offsetX: Number(dom.traceOffsetXInput?.value),
+        offsetY: Number(dom.traceOffsetYInput?.value),
+        invert: dom.traceInvertToggle?.checked ? 1 : 0,
+        lineWidthMm: Number(dom.traceLineWidthInput?.value),
+        lineType: normalizeLineTypePreset(dom.traceLineTypeInput?.value || "solid"),
+      });
+    };
+    for (const el of [
+      dom.traceMaxDimInput,
+      dom.traceEdgePercentInput,
+      dom.traceSimplifyInput,
+      dom.traceMinSegInput,
+      dom.traceMaxSegmentsInput,
+      dom.traceOffsetXInput,
+      dom.traceOffsetYInput,
+      dom.traceLineWidthInput,
+      dom.traceLineTypeInput,
+      dom.traceInvertToggle,
+    ]) {
+      if (!el) continue;
+      el.addEventListener("change", applyTraceParamsFromUi);
+      el.addEventListener("input", applyTraceParamsFromUi);
+    }
+    if (dom.traceRegenerateBtn) {
+      dom.traceRegenerateBtn.addEventListener("click", () => actions.traceRegenerate?.());
+    }
+    if (dom.traceClosePanelBtn) {
+      dom.traceClosePanelBtn.addEventListener("click", () => actions.closeTracePanel?.());
+    }
+  }
+  {
+    const applyImportAdjustFromUi = () => {
+      actions.setImportAdjustParam?.({
+        scale: Number(dom.importAdjustScaleInput?.value),
+        dx: Number(dom.importAdjustDxInput?.value),
+        dy: Number(dom.importAdjustDyInput?.value),
+        flipX: !!dom.importAdjustFlipXToggle?.checked,
+        flipY: !!dom.importAdjustFlipYToggle?.checked,
+      });
+    };
+    for (const el of [
+      dom.importAdjustScaleInput,
+      dom.importAdjustDxInput,
+      dom.importAdjustDyInput,
+      dom.importAdjustFlipXToggle,
+      dom.importAdjustFlipYToggle,
+    ]) {
+      if (!el) continue;
+      el.addEventListener("change", applyImportAdjustFromUi);
+      el.addEventListener("input", applyImportAdjustFromUi);
+    }
+    if (dom.importAdjustApplyBtn) {
+      dom.importAdjustApplyBtn.addEventListener("click", () => actions.applyImportAdjust?.());
+    }
+    if (dom.importAdjustCancelBtn) {
+      dom.importAdjustCancelBtn.addEventListener("click", () => actions.cancelImportAdjust?.());
+    }
+    if (dom.importDxfAsPolylineToggle) {
+      dom.importDxfAsPolylineToggle.addEventListener("change", () => {
+        actions.setImportDxfAsPolyline?.(!!dom.importDxfAsPolylineToggle.checked);
+      });
+    }
+  }
   if (dom.activeLayerSelect) {
     dom.activeLayerSelect.addEventListener("change", () => actions.setActiveLayer(Number(dom.activeLayerSelect.value)));
   }

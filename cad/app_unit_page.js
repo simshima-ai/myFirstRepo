@@ -51,6 +51,9 @@ export function clearDoubleLineTrimPendingState(state) {
   state.dlineTrimPendingPreview = null;
   state.dlineTrimCandidates = null;
   state.dlineTrimIntersections = null;
+  state.dlineTrimStepTargets = null;
+  state.dlineTrimStepCreatedIds = null;
+  state.dlineTrimStepTotal = 0;
 }
 
 export function hasAnyVertexSnapBinding(state) {
@@ -117,6 +120,7 @@ export function convertStateUnitKeepingPhysicalSize(state, fromUnit, toUnit) {
     state.input.hatchHover = null;
     state.input.dimHoverPreview = null;
     state.input.dimHoveredShapeId = null;
+    state.input.dimHoveredSegmentIndex = null;
     state.input.dragStartWorld = null;
     if (state.input.groupDrag) state.input.groupDrag.active = false;
     if (state.input.groupRotate) state.input.groupRotate.active = false;

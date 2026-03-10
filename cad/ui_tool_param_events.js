@@ -43,6 +43,11 @@ export function bindToolParameterEvents(params) {
       actions.moveSelectedVertices(dx, dy);
     });
   }
+  if (dom.deleteVertexBtn) {
+    dom.deleteVertexBtn.addEventListener("click", () => {
+      actions.deleteSelectedVertices?.();
+    });
+  }
   const runVertexMoveByEnter = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
@@ -61,6 +66,15 @@ export function bindToolParameterEvents(params) {
       actions.setVertexMoveInputs(null, Number(dom.vertexMoveDyInput.value || 0));
     });
     dom.vertexMoveDyInput.addEventListener("keydown", runVertexMoveByEnter);
+  }
+  if (dom.vertexModeSelect) {
+    dom.vertexModeSelect.addEventListener("change", () => {
+      const v = String(dom.vertexModeSelect.value || "move").toLowerCase();
+      if (!state.vertexEdit) state.vertexEdit = {};
+      state.vertexEdit.mode = (v === "insert") ? "insert" : "move";
+      if (state.vertexEdit.mode !== "insert") state.vertexEdit.insertCandidate = null;
+      actions.draw?.();
+    });
   }
   if (dom.vertexLinkCoincidentToggle) {
     dom.vertexLinkCoincidentToggle.checked = state.vertexEdit?.linkCoincident !== false;

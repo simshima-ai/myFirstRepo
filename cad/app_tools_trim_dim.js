@@ -1,7 +1,193 @@
-﻿import { normalizeRad, isAngleOnArc } from "./solvers.js";
+﻿import { normalizeRad, isAngleOnArc, segmentIntersectionParamPoint, segmentCircleIntersectionPoints } from "./solvers.js";
 import { mmPerUnit } from "./geom.js";
-import { getGroup } from "./state.js";
+import { getGroup, isLayerVisible } from "./state.js";
 import { createDim, createLine } from "./app_tools_misc.js";
+import { sampleBSplinePoints } from "./bspline_utils.js";
+
+function getNearestPolylineSegment(poly, world) {
+    if (!poly || poly.type !== "polyline" || !Array.isArray(poly.points)) return null;
+    const pts = poly.points;
+    if (pts.length < 2) return null;
+    const wx = Number(world?.x), wy = Number(world?.y);
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) return null;
+    let best = null;
+    const segCount = pts.length - 1 + (poly.closed ? 1 : 0);
+    for (let si = 0; si < segCount; si++) {
+        const i1 = si;
+        const i2 = (si + 1) % pts.length;
+        const a = pts[i1], b = pts[i2];
+        const x1 = Number(a?.x), y1 = Number(a?.y), x2 = Number(b?.x), y2 = Number(b?.y);
+        if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+        const vx = x2 - x1, vy = y2 - y1;
+        const vv = vx * vx + vy * vy;
+        if (vv <= 1e-12) continue;
+        let t = ((wx - x1) * vx + (wy - y1) * vy) / vv;
+        if (t < 0) t = 0;
+        if (t > 1) t = 1;
+        const px = x1 + vx * t;
+        const py = y1 + vy * t;
+        const d2 = (wx - px) * (wx - px) + (wy - py) * (wy - py);
+        if (!best || d2 < best.d2) {
+            best = {
+                segIndex: si,
+                i1,
+                i2,
+                p1: { x: x1, y: y1 },
+                p2: { x: x2, y: y2 },
+                proj: { x: px, y: py },
+                d2
+            };
+        }
+    }
+    return best;
+}
+
+function getForcedLineTrimCandidate(state, line, worldRaw, excludedShapeIds = null) {
+    if (!line || String(line.type || "") !== "line") return null;
+    const excluded = excludedShapeIds instanceof Set ? excludedShapeIds : new Set();
+    const a1 = { x: Number(line.x1), y: Number(line.y1) };
+    const a2 = { x: Number(line.x2), y: Number(line.y2) };
+    if (![a1.x, a1.y, a2.x, a2.y].every(Number.isFinite)) return null;
+    const dx = a2.x - a1.x;
+    const dy = a2.y - a1.y;
+    const len2 = dx * dx + dy * dy;
+    if (len2 <= 1e-12) return null;
+
+    const intersections = [];
+    for (const s of (state.shapes || [])) {
+        if (!s || Number(s.id) === Number(line.id)) continue;
+        if (excluded.has(Number(s.id))) continue;
+        if (!isLayerVisible(state, s.layerId)) continue;
+        if (String(s.type || "") === "line") {
+            const ip = segmentIntersectionParamPoint(a1, a2, { x: Number(s.x1), y: Number(s.y1) }, { x: Number(s.x2), y: Number(s.y2) });
+            if (ip) intersections.push(ip);
+        } else if (String(s.type || "") === "circle") {
+            for (const ip of segmentCircleIntersectionPoints(a1, a2, s)) intersections.push(ip);
+        } else if (String(s.type || "") === "arc") {
+            for (const ip of segmentCircleIntersectionPoints(a1, a2, s)) {
+                const th = Math.atan2(Number(ip.y) - Number(s.cy), Number(ip.x) - Number(s.cx));
+                if (isAngleOnArc(th, Number(s.a1) || 0, Number(s.a2) || 0, s.ccw !== false)) intersections.push(ip);
+            }
+        } else if (String(s.type || "") === "rect") {
+            const b1 = { x: Number(s.x1), y: Number(s.y1) };
+            const b2 = { x: Number(s.x2), y: Number(s.y1) };
+            const b3 = { x: Number(s.x2), y: Number(s.y2) };
+            const b4 = { x: Number(s.x1), y: Number(s.y2) };
+            const ip12 = segmentIntersectionParamPoint(a1, a2, b1, b2); if (ip12) intersections.push(ip12);
+            const ip23 = segmentIntersectionParamPoint(a1, a2, b2, b3); if (ip23) intersections.push(ip23);
+            const ip34 = segmentIntersectionParamPoint(a1, a2, b3, b4); if (ip34) intersections.push(ip34);
+            const ip41 = segmentIntersectionParamPoint(a1, a2, b4, b1); if (ip41) intersections.push(ip41);
+        }
+    }
+
+    const cuts = intersections
+        .map((ip) => Number(ip.t))
+        .filter((t) => Number.isFinite(t) && t > 1e-7 && t < 1 - 1e-7)
+        .sort((a, b) => a - b);
+    const dedupCuts = [];
+    for (const t of cuts) {
+        if (dedupCuts.length === 0 || Math.abs(Number(dedupCuts[dedupCuts.length - 1]) - Number(t)) > 1e-7) dedupCuts.push(t);
+    }
+    const wx = Number(worldRaw?.x), wy = Number(worldRaw?.y);
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) return null;
+    const tClick = Math.max(0, Math.min(1, ((wx - a1.x) * dx + (wy - a1.y) * dy) / len2));
+    const breaks = [0, ...dedupCuts, 1];
+    let k = -1;
+    for (let i = 0; i < breaks.length - 1; i++) {
+        if (tClick >= Number(breaks[i]) - 1e-7 && tClick <= Number(breaks[i + 1]) + 1e-7) {
+            k = i;
+            break;
+        }
+    }
+    if (k < 0) return null;
+    const t0 = Number(breaks[k]);
+    const t1 = Number(breaks[k + 1]);
+    if (t1 - t0 < 1e-5) return null;
+    const p0 = { x: a1.x + dx * t0, y: a1.y + dy * t0 };
+    const p1 = { x: a1.x + dx * t1, y: a1.y + dy * t1 };
+    let mode = "middle";
+    if (t0 <= 1e-7 && t1 >= 1 - 1e-7) mode = "delete-line";
+    else if (t0 <= 1e-7) mode = "p1";
+    else if (t1 >= 1 - 1e-7) mode = "p2";
+    return {
+        targetType: "line", line, mode, t0, t1,
+        x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y,
+        ip1: { x: p0.x, y: p0.y, t: t0 }, ip2: { x: p1.x, y: p1.y, t: t1 },
+        ip: (mode === "p1") ? { x: p1.x, y: p1.y, t: t1 } : { x: p0.x, y: p0.y, t: t0 },
+        trimEnd: (mode === "p1") ? "p1" : "p2"
+    };
+}
+
+function samplePointAtGlobalT(sampled, t) {
+    const pts = Array.isArray(sampled) ? sampled : [];
+    if (pts.length < 2) return null;
+    const segCount = pts.length - 1;
+    const clamped = Math.max(0, Math.min(1, Number(t) || 0));
+    const idxF = clamped * segCount;
+    const idx = Math.max(0, Math.min(segCount - 1, Math.floor(idxF)));
+    const lt = Math.max(0, Math.min(1, idxF - idx));
+    const a = pts[idx];
+    const b = pts[idx + 1];
+    return {
+        x: Number(a.x) + (Number(b.x) - Number(a.x)) * lt,
+        y: Number(a.y) + (Number(b.y) - Number(a.y)) * lt,
+    };
+}
+
+function sampleSlicePoints(sampled, t0, t1) {
+    const pts = Array.isArray(sampled) ? sampled : [];
+    if (pts.length < 2) return [];
+    const a = Math.max(0, Math.min(1, Number(t0) || 0));
+    const b = Math.max(0, Math.min(1, Number(t1) || 0));
+    if (b - a < 1e-6) return [];
+    const segCount = pts.length - 1;
+    const pStart = samplePointAtGlobalT(pts, a);
+    const pEnd = samplePointAtGlobalT(pts, b);
+    if (!pStart || !pEnd) return [];
+    const out = [pStart];
+    const iStart = Math.floor(a * segCount);
+    const iEnd = Math.floor(b * segCount);
+    for (let i = iStart + 1; i <= iEnd; i++) {
+        if (i >= 0 && i < pts.length - 1) out.push({ x: Number(pts[i].x), y: Number(pts[i].y) });
+    }
+    out.push(pEnd);
+    const dedup = [];
+    for (const p of out) {
+        const x = Number(p?.x), y = Number(p?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const last = dedup[dedup.length - 1];
+        if (!last || Math.hypot(Number(last.x) - x, Number(last.y) - y) > 1e-8) dedup.push({ x, y });
+    }
+    return dedup;
+}
+
+function bsplineShapeFromSample(base, points, id) {
+    const cps = Array.isArray(points) ? points : [];
+    if (cps.length < 2) return null;
+    const srcDegree = Math.max(1, Math.min(5, Number(base?.degree) || 3));
+    const targetCount = Math.max(srcDegree + 1, Math.min(40, Math.max(4, Math.round(cps.length / 3))));
+    const decimate = (arr, count) => {
+        if (arr.length <= count) return arr.slice();
+        const out = [arr[0]];
+        const body = count - 2;
+        const span = arr.length - 1;
+        for (let i = 1; i <= body; i++) {
+            const idx = Math.max(1, Math.min(arr.length - 2, Math.round((i * span) / (body + 1))));
+            out.push(arr[idx]);
+        }
+        out.push(arr[arr.length - 1]);
+        return out;
+    };
+    const fitCps = decimate(cps, targetCount).map((p) => ({ x: Number(p.x), y: Number(p.y) }));
+    const fitDegree = Math.max(1, Math.min(srcDegree, fitCps.length - 1));
+    return {
+        ...base,
+        id: Number(id),
+        type: "bspline",
+        controlPoints: fitCps,
+        degree: fitDegree,
+    };
+}
 
 export function trimClickedLineAtNearestIntersection(state, worldRaw, helpers, options = null) {
     const { setStatus, pushHistory, nextShapeId, addShape, removeShapeById, clearSelection, setSelection, getTrimHoverCandidate, hitTestShapes } = helpers;
@@ -13,18 +199,31 @@ export function trimClickedLineAtNearestIntersection(state, worldRaw, helpers, o
     const allowedTargetTypes = Array.isArray(options?.allowedTargetTypes)
         ? new Set(options.allowedTargetTypes.map(v => String(v || "").toLowerCase()))
         : null;
+    const forceTargetShapeId = Number(options?.forceTargetShapeId);
     const probeState = (excludedShapeIds.size > 0)
         ? { ...state, shapes: (state.shapes || []).filter(s => !excludedShapeIds.has(Number(s?.id))) }
         : state;
-    const cand = getTrimHoverCandidate(probeState, worldRaw);
+    let cand = null;
+    if (Number.isFinite(forceTargetShapeId)) {
+        const forcedLine = (probeState.shapes || []).find((s) => Number(s?.id) === forceTargetShapeId && String(s?.type || "") === "line");
+        cand = getForcedLineTrimCandidate(probeState, forcedLine, worldRaw, excludedShapeIds);
+    }
+    const hasForcedTarget = Number.isFinite(forceTargetShapeId);
+    if (!cand && !hasForcedTarget) cand = getTrimHoverCandidate(probeState, worldRaw);
+    const isNoDelete = !!state.trimSettings?.noDelete;
     if (cand && allowedTargetTypes) {
         const t = String(cand.targetType || "line").toLowerCase();
         if (!allowedTargetTypes.has(t)) return false;
     }
     if (!cand) {
+        if (hasForcedTarget) return false;
         const hit = hitTestShapes(probeState, worldRaw);
         if (!hit || hit.type !== "line") return false;
         if (allowedTargetTypes && !allowedTargetTypes.has("line")) return false;
+        if (isNoDelete) {
+            if (!silent && setStatus) setStatus("Split only mode: no intersection to split");
+            return false;
+        }
         if (!skipHistory) pushHistory();
         const id = Number(hit.id);
         removeShapeById(id);
@@ -32,7 +231,7 @@ export function trimClickedLineAtNearestIntersection(state, worldRaw, helpers, o
         if (!silent && setStatus) setStatus(`Trim deleted line #${id}`);
         return true;
     }
-    const isNoDelete = !!state.trimSettings?.noDelete;
+
     if (cand.targetType === "circle" || cand.targetType === "arc") {
         if (!skipHistory) pushHistory();
         const a = cand.arc || cand.circle;
@@ -70,6 +269,102 @@ export function trimClickedLineAtNearestIntersection(state, worldRaw, helpers, o
 
         if (keepIds.length) setSelection(keepIds);
         if (!silent && setStatus) setStatus(isNoDelete ? `Split ${a.type} #${a.id}` : `Trimmed ${a.type} #${a.id}`);
+        return true;
+    }
+
+    if (cand.targetType === "bspline") {
+        const spline = cand.spline;
+        if (!spline) return false;
+        if (!skipHistory) pushHistory();
+        const inGroups = (state.groups || []).filter(g => (g.shapeIds || []).some(id => Number(id) === Number(spline.id)));
+        const sampled = (Array.isArray(cand.sampled) && cand.sampled.length >= 2)
+            ? cand.sampled
+            : sampleBSplinePoints(spline.controlPoints, Number(spline.degree) || 3);
+        if (!Array.isArray(sampled) || sampled.length < 2) return false;
+        const t0 = Number(cand.t0);
+        const t1 = Number(cand.t1);
+        const leftPts = sampleSlicePoints(sampled, 0, Math.max(0, Math.min(1, t0)));
+        const midPts = sampleSlicePoints(sampled, Math.max(0, Math.min(1, t0)), Math.max(0, Math.min(1, t1)));
+        const rightPts = sampleSlicePoints(sampled, Math.max(0, Math.min(1, t1)), 1);
+        const keepIds = [];
+
+        if (cand.mode === "delete-line") {
+            if (!isNoDelete) {
+                removeShapeById(Number(spline.id));
+                setSelection([]);
+            } else {
+                keepIds.push(Number(spline.id));
+            }
+        } else if (cand.mode === "p1") {
+            if (isNoDelete && leftPts.length >= 2) {
+                const cut = bsplineShapeFromSample(spline, leftPts, nextShapeId());
+                if (cut) {
+                    addShape(cut);
+                    for (const g of inGroups) g.shapeIds.push(Number(cut.id));
+                    keepIds.push(Number(cut.id));
+                }
+            }
+            const keep = rightPts.length >= 2 ? rightPts : midPts;
+            if (keep.length >= 2) {
+                const rebuilt = bsplineShapeFromSample(spline, keep, spline.id);
+                if (rebuilt) {
+                    spline.controlPoints = rebuilt.controlPoints;
+                    spline.degree = rebuilt.degree;
+                }
+                keepIds.unshift(Number(spline.id));
+            } else if (!isNoDelete) {
+                removeShapeById(Number(spline.id));
+            }
+        } else if (cand.mode === "p2") {
+            if (isNoDelete && rightPts.length >= 2) {
+                const cut = bsplineShapeFromSample(spline, rightPts, nextShapeId());
+                if (cut) {
+                    addShape(cut);
+                    for (const g of inGroups) g.shapeIds.push(Number(cut.id));
+                    keepIds.push(Number(cut.id));
+                }
+            }
+            const keep = leftPts.length >= 2 ? leftPts : midPts;
+            if (keep.length >= 2) {
+                const rebuilt = bsplineShapeFromSample(spline, keep, spline.id);
+                if (rebuilt) {
+                    spline.controlPoints = rebuilt.controlPoints;
+                    spline.degree = rebuilt.degree;
+                }
+                keepIds.unshift(Number(spline.id));
+            } else if (!isNoDelete) {
+                removeShapeById(Number(spline.id));
+            }
+        } else if (cand.mode === "middle") {
+            if (isNoDelete && midPts.length >= 2) {
+                const cutMid = bsplineShapeFromSample(spline, midPts, nextShapeId());
+                if (cutMid) {
+                    addShape(cutMid);
+                    for (const g of inGroups) g.shapeIds.push(Number(cutMid.id));
+                    keepIds.push(Number(cutMid.id));
+                }
+            }
+            if (leftPts.length >= 2) {
+                const rebuilt = bsplineShapeFromSample(spline, leftPts, spline.id);
+                if (rebuilt) {
+                    spline.controlPoints = rebuilt.controlPoints;
+                    spline.degree = rebuilt.degree;
+                }
+                keepIds.unshift(Number(spline.id));
+            } else if (!isNoDelete) {
+                removeShapeById(Number(spline.id));
+            }
+            if (rightPts.length >= 2) {
+                const right = bsplineShapeFromSample(spline, rightPts, nextShapeId());
+                if (right) {
+                    addShape(right);
+                    for (const g of inGroups) g.shapeIds.push(Number(right.id));
+                    keepIds.push(Number(right.id));
+                }
+            }
+        }
+        setSelection(keepIds.filter((id, i, arr) => arr.indexOf(id) === i));
+        if (!silent && setStatus) setStatus(isNoDelete ? `Split bspline #${spline.id}` : `Trimmed bspline #${spline.id}`);
         return true;
     }
 
@@ -145,15 +440,33 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
             if (setStatus) setStatus("角度寸法: 1本目のラインをクリック");
             return "noop";
         }
-        // Object mode: clicking a line creates a linear dimension from line endpoints immediately.
-        if (lineObjectPickEnabled && linearMode !== "chain" && hit && hit.type === "line") {
-            state.dimDraft = {
-                p1: { x: Number(hit.x1), y: Number(hit.y1) },
-                p2: { x: Number(hit.x2), y: Number(hit.y2) },
-                place: { x: world.x, y: world.y },
-                sourceLineId: Number(hit.id),
-            };
-            return "place";
+        // Object mode: clicking a line/polyline segment creates a linear dimension from segment endpoints immediately.
+        if (lineObjectPickEnabled && linearMode !== "chain" && hit && (hit.type === "line" || hit.type === "polyline")) {
+            if (hit.type === "line") {
+                state.dimDraft = {
+                    p1: { x: Number(hit.x1), y: Number(hit.y1) },
+                    p2: { x: Number(hit.x2), y: Number(hit.y2) },
+                    place: { x: world.x, y: world.y },
+                    sourceLineId: Number(hit.id),
+                    sourceRefType: "line_endpoint",
+                    sourceRefKey1: "p1",
+                    sourceRefKey2: "p2",
+                };
+                return "place";
+            }
+            const seg = getNearestPolylineSegment(hit, worldRaw);
+            if (seg) {
+                state.dimDraft = {
+                    p1: { x: Number(seg.p1.x), y: Number(seg.p1.y) },
+                    p2: { x: Number(seg.p2.x), y: Number(seg.p2.y) },
+                    place: { x: world.x, y: world.y },
+                    sourceLineId: Number(hit.id),
+                    sourceRefType: "polyline_vertex",
+                    sourceRefKey1: `v${Number(seg.i1)}`,
+                    sourceRefKey2: `v${Number(seg.i2)}`,
+                };
+                return "place";
+            }
         }
         if (hit && (hit.type === 'circle' || hit.type === 'arc')) {
             const cx = Number(hit.cx), cy = Number(hit.cy), r = Number(hit.r);
@@ -266,13 +579,13 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
     const { setStatus, hitTestShapes } = helpers;
     const world = worldSnapped ? { x: worldSnapped.x, y: worldSnapped.y } : { x: worldRaw.x, y: worldRaw.y };
     const { snapMode, circleMode, linearMode } = state.dimSettings;
-    const lineObjectPickEnabled = (String(snapMode || "endpoint") === "object" || String(snapMode || "endpoint") === "endpoint");
     const circleArrowSide = state.dimSettings?.circleArrowSide === "inside" ? "inside" : "outside";
 
     if (!state.dimDraft) {
         const hit = hitTestShapes(state, worldRaw);
-        // Dim tool candidate marker on mouse-over (line/circle/arc), independent from object-snap toggle.
+        // Dim tool candidate marker on mouse-over (line/polyline/circle/arc), independent from object-snap toggle.
         let hoverCandidate = null;
+        state.input.dimHoveredSegmentIndex = null;
         if (hit && hit.type === "line") {
             const x1 = Number(hit.x1), y1 = Number(hit.y1), x2 = Number(hit.x2), y2 = Number(hit.y2);
             const vx = x2 - x1, vy = y2 - y1;
@@ -284,6 +597,12 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
                 hoverCandidate = { x: x1 + vx * t, y: y1 + vy * t, kind: "nearest" };
             } else {
                 hoverCandidate = { x: x1, y: y1, kind: "nearest" };
+            }
+        } else if (hit && hit.type === "polyline") {
+            const seg = getNearestPolylineSegment(hit, worldRaw);
+            if (seg) {
+                hoverCandidate = { x: Number(seg.proj.x), y: Number(seg.proj.y), kind: "nearest" };
+                state.input.dimHoveredSegmentIndex = Number(seg.segIndex);
             }
         } else if (hit && (hit.type === "circle" || hit.type === "arc")) {
             const cx = Number(hit.cx), cy = Number(hit.cy), r = Math.abs(Number(hit.r) || 0);
@@ -301,34 +620,13 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
                 }
             }
         }
-        // In single mode, always show a target marker before first click,
-        // even when not hovering an object.
-        if (!hoverCandidate && String(linearMode || "single") !== "chain") {
-            hoverCandidate = { x: Number(world.x), y: Number(world.y), kind: "nearest" };
-        }
         state.input.objectSnapHover = hoverCandidate;
 
+        state.input.dimHoverPreview = null;
         if (hit && (hit.type === "circle" || hit.type === "arc")) {
-            const cx = Number(hit.cx), cy = Number(hit.cy), r = Number(hit.r);
-            const ang = Math.atan2(world.y - cy, world.x - cx);
-            const ux = Math.cos(ang), uy = Math.sin(ang);
-            const textOff = r + 20 / Math.max(1e-9, state.view.scale);
-            // Radial/Diameter Preview on hover
             state.input.dimHoveredShapeId = Number(hit.id);
-            state.input.dimHoverPreview = {
-                type: "circleDim",
-                dimRef: { targetId: Number(hit.id) },
-                kind: circleMode === "diameter" ? "diameter" : "radius",
-                circleArrowSide,
-                ang: ang,
-                off1: r + 20 / state.view.scale,
-                off2: circleMode === "diameter" ? -r : 0,
-                tdx: ux * textOff, tdy: uy * textOff
-            };
-            if (setStatus) setStatus("繧ｯ繝ｪ繝・け縺ｧ蟇ｸ豕穂ｽ懈・");
+            if (setStatus) setStatus("円/円弧をクリックして寸法を作成");
             return;
-        } else {
-            state.input.dimHoverPreview = null;
         }
 
         if (String(linearMode || "single") === "angle") {
@@ -339,22 +637,24 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
                 state.input.dimHoveredShapeId = null;
                 if (setStatus) setStatus("角度寸法: ライン上にマウスオーバーしてクリック");
             }
-        } else if (lineObjectPickEnabled) {
-            if (hit && hit.type === "line") {
-                state.input.dimHoveredShapeId = Number(hit.id);
-                if (setStatus) setStatus("Dim: line selected. Press Enter to confirm.");
-            } else {
-                state.input.dimHoveredShapeId = null;
-                if (setStatus) setStatus("蟇ｸ豕包ｼ壼ｯｾ雎｡繧帝∈謚槭☆繧九°1轤ｹ逶ｮ繧偵け繝ｪ繝・け");
-            }
+            state.input.dimHoveredSegmentIndex = null;
+        } else if (hit && (hit.type === "line" || hit.type === "circle" || hit.type === "arc")) {
+            state.input.dimHoveredShapeId = Number(hit.id);
+            state.input.dimHoveredSegmentIndex = null;
+            if (setStatus) setStatus("寸法対象をクリック");
+        } else if (hit && hit.type === "polyline") {
+            state.input.dimHoveredShapeId = Number(hit.id);
+            if (setStatus) setStatus("ポリライン辺をクリックして寸法を作成");
         } else {
             state.input.dimHoveredShapeId = null;
-            if (setStatus) setStatus("蟇ｸ豕包ｼ・轤ｹ逶ｮ繧偵け繝ｪ繝・け");
+            state.input.dimHoveredSegmentIndex = null;
+            if (setStatus) setStatus("寸法対象へマウスオーバーしてクリック");
         }
         return;
     }
 
     state.input.dimHoveredShapeId = null;
+    state.input.dimHoveredSegmentIndex = null;
     state.input.dimHoverPreview = null;
 
     if (state.dimDraft.type === "dimangle") {
@@ -398,6 +698,7 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
 
 export function cancelDimDraft(state) {
     state.dimDraft = null;
+    state.input.dimHoveredSegmentIndex = null;
 }
 
 export function finalizeDimDraft(state, helpers) {
@@ -462,22 +763,25 @@ export function finalizeDimDraft(state, helpers) {
             px: d.place.x, py: d.place.y,
             layerId: state.activeLayerId
         });
-        // Single-mode object-pick from line: bind dim endpoints to source line endpoints.
+        // Single-mode object-pick from line/polyline: bind dim endpoints to source endpoints.
         if (Number.isFinite(Number(d.sourceLineId))) {
             const srcId = Number(d.sourceLineId);
-            dim.p1Attrib = { type: "followPoint", shapeId: srcId, refType: "line_endpoint", refKey: "p1" };
-            dim.p2Attrib = { type: "followPoint", shapeId: srcId, refType: "line_endpoint", refKey: "p2" };
+            const refType = String(d.sourceRefType || "line_endpoint");
+            const refKey1 = String(d.sourceRefKey1 || "p1");
+            const refKey2 = String(d.sourceRefKey2 || "p2");
+            dim.p1Attrib = { type: "followPoint", shapeId: srcId, refType, refKey: refKey1 };
+            dim.p2Attrib = { type: "followPoint", shapeId: srcId, refType, refKey: refKey2 };
             if (!Array.isArray(dim.attributes)) dim.attributes = [];
             dim.attributes.push({
                 id: `attr_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
                 name: "keep_snap",
-                value: `follow:line_endpoint:${srcId}:p1`,
+                value: `follow:${refType}:${srcId}:${refKey1}`,
                 target: "vertex:p1"
             });
             dim.attributes.push({
                 id: `attr_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
                 name: "keep_snap",
-                value: `follow:line_endpoint:${srcId}:p2`,
+                value: `follow:${refType}:${srcId}:${refKey2}`,
                 target: "vertex:p2"
             });
         }
@@ -497,6 +801,7 @@ export function finalizeDimDraft(state, helpers) {
         if (ds.circleArrowSide !== undefined) dim.circleArrowSide = (ds.circleArrowSide === "inside" ? "inside" : "outside");
         dim.lineWidthMm = Math.max(0.01, Number(ds.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
         dim.lineType = String(ds.lineType || "solid");
+        dim.color = String(ds.color || "#0f172a");
     }
 
     if (dim) {
@@ -530,6 +835,7 @@ export function finalizeDimDraft(state, helpers) {
         setSelection([dim.id]);
         state.dimDraft = null;
         state.input.dimHoveredShapeId = null;
+        state.input.dimHoveredSegmentIndex = null;
         state.input.dimHoverPreview = null;
         return true;
     }
@@ -580,6 +886,7 @@ export function finalizePolylineDraft(state, helpers) {
         line.id = nextShapeId();
         line.lineWidthMm = Math.max(0.01, Number(state.lineSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
         line.lineType = String(state.lineSettings?.lineType || "solid");
+        line.color = String(state.lineSettings?.color || "#0f172a");
         lines.push(line);
         createdIds.push(line.id);
     }
@@ -709,5 +1016,6 @@ export function applyDimSettingsToSelection(state, helpers, patch) {
         if (draw) draw();
     }
 }
+
 
 

@@ -1,8 +1,8 @@
-import { dist } from "./geom.js";
+﻿import { dist } from "./geom.js";
 import { sampleBSplinePoints } from "./bspline_utils.js";
 
 /**
- * Normalize angle to [0, 2π)
+ * Normalize angle to [0, 2ﾏ)
  */
 export function normPos(a) {
     const twoPi = Math.PI * 2;
@@ -31,7 +31,21 @@ export function angleOnArc(a, start, end, ccw, eps = 1e-6) {
 
 export function isHatchBoundaryShape(s) {
     if (!s) return false;
-    return s.type === "line" || s.type === "arc" || s.type === "circle" || s.type === "rect" || s.type === "bspline";
+    return s.type === "line" || s.type === "arc" || s.type === "circle" || s.type === "rect" || s.type === "bspline" || s.type === "polyline";
+}
+
+export function normalizeHatchBoundaryIds(boundaryIds) {
+    return Array.from(
+        new Set(
+            (boundaryIds || [])
+                .map((v) => Number(v))
+                .filter((v) => Number.isFinite(v))
+        )
+    ).sort((a, b) => a - b);
+}
+
+export function hatchBoundaryIdsKey(boundaryIds) {
+    return normalizeHatchBoundaryIds(boundaryIds).join(",");
 }
 
 function hatchEndpointNode(nodes, p, eps) {
@@ -65,6 +79,115 @@ function hatchLoopNodePoint(loop, nodeIdx) {
         }
     }
     return null;
+}
+
+function collectBoundaryAnchorPoints(shapes) {
+    const out = [];
+    const push = (x, y) => {
+        const nx = Number(x), ny = Number(y);
+        if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;
+        out.push({ x: nx, y: ny });
+    };
+    for (const s of (shapes || [])) {
+        if (!s) continue;
+        if (s.type === "line") {
+            push(s.x1, s.y1);
+            push(s.x2, s.y2);
+        } else if (s.type === "arc") {
+            const cx = Number(s.cx), cy = Number(s.cy), r = Number(s.r);
+            const a1 = Number(s.a1), a2 = Number(s.a2);
+            if ([cx, cy, r, a1, a2].every(Number.isFinite)) {
+                push(cx + Math.cos(a1) * r, cy + Math.sin(a1) * r);
+                push(cx + Math.cos(a2) * r, cy + Math.sin(a2) * r);
+            }
+        } else if (s.type === "rect") {
+            push(s.x1, s.y1);
+            push(s.x2, s.y1);
+            push(s.x2, s.y2);
+            push(s.x1, s.y2);
+        } else if (s.type === "polyline") {
+            const pts = Array.isArray(s.points) ? s.points : [];
+            if (pts.length > 0) {
+                push(pts[0]?.x, pts[0]?.y);
+                push(pts[pts.length - 1]?.x, pts[pts.length - 1]?.y);
+            }
+        }
+    }
+    return out;
+}
+
+function nearestPointOnSegment(a, b, p) {
+    const ax = Number(a?.x), ay = Number(a?.y);
+    const bx = Number(b?.x), by = Number(b?.y);
+    const px = Number(p?.x), py = Number(p?.y);
+    if (![ax, ay, bx, by, px, py].every(Number.isFinite)) return null;
+    const vx = bx - ax, vy = by - ay;
+    const vv = vx * vx + vy * vy;
+    if (vv <= 1e-18) return null;
+    let t = ((px - ax) * vx + (py - ay) * vy) / vv;
+    t = Math.max(0, Math.min(1, t));
+    const x = ax + vx * t, y = ay + vy * t;
+    return { t, x, y, d: Math.hypot(px - x, py - y) };
+}
+
+function buildTempPolylineFromBspline(bspline, anchors, eps) {
+    const sampled = sampleBSplinePoints(bspline.controlPoints, Number(bspline.degree) || 3);
+    if (!Array.isArray(sampled) || sampled.length < 2) return null;
+    const insertsBySeg = new Map();
+    const addInsert = (segIdx, t, x, y) => {
+        if (!Number.isInteger(segIdx) || segIdx < 0 || segIdx >= sampled.length - 1) return;
+        const nx = Number(x), ny = Number(y), nt = Number(t);
+        if (![nx, ny, nt].every(Number.isFinite)) return;
+        const arr = insertsBySeg.get(segIdx) || [];
+        for (const it of arr) {
+            if (Math.hypot(Number(it.x) - nx, Number(it.y) - ny) <= eps) return;
+        }
+        arr.push({ t: nt, x: nx, y: ny });
+        insertsBySeg.set(segIdx, arr);
+    };
+    for (const ap of (anchors || [])) {
+        let best = null;
+        for (let i = 1; i < sampled.length; i++) {
+            const hit = nearestPointOnSegment(sampled[i - 1], sampled[i], ap);
+            if (!hit) continue;
+            if (!best || hit.d < best.d) best = { ...hit, segIdx: i - 1 };
+        }
+        if (best && best.d <= eps * 1.5) addInsert(best.segIdx, best.t, ap.x, ap.y);
+    }
+    const out = [];
+    const pushUnique = (x, y) => {
+        const nx = Number(x), ny = Number(y);
+        if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;
+        const last = out[out.length - 1];
+        if (last && Math.hypot(Number(last.x) - nx, Number(last.y) - ny) <= eps * 0.5) return;
+        out.push({ x: nx, y: ny });
+    };
+    pushUnique(sampled[0].x, sampled[0].y);
+    for (let i = 1; i < sampled.length; i++) {
+        const segIdx = i - 1;
+        const ins = (insertsBySeg.get(segIdx) || []).slice().sort((a, b) => Number(a.t) - Number(b.t));
+        for (const it of ins) pushUnique(it.x, it.y);
+        pushUnique(sampled[i].x, sampled[i].y);
+    }
+    if (out.length < 2) return null;
+    return {
+        id: Number(bspline.id),
+        type: "polyline",
+        points: out,
+        closed: false,
+        layerId: bspline.layerId,
+        groupId: bspline.groupId,
+    };
+}
+
+function preprocessHatchBoundaryShapes(boundaryShapes, viewScale) {
+    const scale = Math.max(1e-9, Number(viewScale) || 1);
+    const eps = Math.max(1e-4, 2 / scale);
+    const anchors = collectBoundaryAnchorPoints(boundaryShapes);
+    return (boundaryShapes || []).map((s) => {
+        if (!s || s.type !== "bspline") return s;
+        return buildTempPolylineFromBspline(s, anchors, eps) || s;
+    });
 }
 
 export function hatchBoundaryToEdges(boundaryShapes, viewScale) {
@@ -122,6 +245,35 @@ export function hatchBoundaryToEdges(boundaryShapes, viewScale) {
                 });
             }
         }
+        if (s.type === "polyline") {
+            const pts = Array.isArray(s.points) ? s.points : [];
+            if (pts.length < 2) continue;
+            for (let i = 1; i < pts.length; i++) {
+                const a = pts[i - 1], b = pts[i];
+                const n1 = hatchEndpointNode(nodes, { x: Number(a.x), y: Number(a.y) }, eps);
+                const n2 = hatchEndpointNode(nodes, { x: Number(b.x), y: Number(b.y) }, eps);
+                edges.push({
+                    type: "line",
+                    n1,
+                    n2,
+                    s: { x1: Number(a.x), y1: Number(a.y), x2: Number(b.x), y2: Number(b.y) },
+                    sourceShapeId: s.id,
+                });
+            }
+            if (s.closed && pts.length >= 3) {
+                const a = pts[pts.length - 1];
+                const b = pts[0];
+                const n1 = hatchEndpointNode(nodes, { x: Number(a.x), y: Number(a.y) }, eps);
+                const n2 = hatchEndpointNode(nodes, { x: Number(b.x), y: Number(b.y) }, eps);
+                edges.push({
+                    type: "line",
+                    n1,
+                    n2,
+                    s: { x1: Number(a.x), y1: Number(a.y), x2: Number(b.x), y2: Number(b.y) },
+                    sourceShapeId: s.id,
+                });
+            }
+        }
         if (s.type === "bspline") {
             const pts = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
             if (pts.length < 2) continue;
@@ -148,11 +300,12 @@ export function buildHatchLoopsFromBoundaryIds(shapes, boundaryIds, viewScale) {
             (boundaryIds || []).map((v) => Number(v)).filter((v) => Number.isFinite(v))
         )
     );
-    const boundaryShapes = ids
+    const boundaryShapesRaw = ids
         .map((id) => shapes.find((s) => s.id === id))
         .filter(Boolean);
-    if (boundaryShapes.length === 0)
-        return { ok: false, error: "境界が未選択です" };
+    if (boundaryShapesRaw.length === 0)
+        return { ok: false, error: "No boundary selected" };
+    const boundaryShapes = preprocessHatchBoundaryShapes(boundaryShapesRaw, viewScale);
 
     const { nodes, edges } = hatchBoundaryToEdges(boundaryShapes, viewScale);
     const loops = [];
@@ -168,15 +321,15 @@ export function buildHatchLoopsFromBoundaryIds(shapes, boundaryIds, viewScale) {
     }
 
     if (edges.length > 0) {
-        if (edges.length < 2) return { ok: false, error: "閉領域になっていません" };
+        if (edges.length < 2) return { ok: false, error: "Not enough boundary edges" };
         const adj = nodes.map(() => []);
         edges.forEach((e, idx) => {
             adj[e.n1].push(idx);
             adj[e.n2].push(idx);
         });
         for (let i = 0; i < adj.length; i++) {
-            if (adj[i].length !== 2)
-                return { ok: false, error: "閉領域になっていません" };
+            if (adj[i].length < 2)
+                return { ok: false, error: "Boundary has open endpoint(s)" };
         }
 
         const used = new Array(edges.length).fill(false);
@@ -190,7 +343,21 @@ export function buildHatchLoopsFromBoundaryIds(shapes, boundaryIds, viewScale) {
             let guard = 0;
             while (nextNode !== first.n1 && guard++ < edges.length + 5) {
                 const cand = adj[nextNode];
-                const nextEdgeIdx = cand[0] === prevEdge ? cand[1] : cand[0];
+                let nextEdgeIdx = -1;
+                for (const ci of cand) {
+                    if (ci === prevEdge) continue;
+                    if (!used[ci]) {
+                        nextEdgeIdx = ci;
+                        break;
+                    }
+                }
+                if (nextEdgeIdx < 0) {
+                    for (const ci of cand) {
+                        if (ci === prevEdge) continue;
+                        nextEdgeIdx = ci;
+                        break;
+                    }
+                }
                 if (!Number.isInteger(nextEdgeIdx) || nextEdgeIdx < 0) break;
                 if (used[nextEdgeIdx]) break;
                 const ne = edges[nextEdgeIdx];
@@ -201,7 +368,7 @@ export function buildHatchLoopsFromBoundaryIds(shapes, boundaryIds, viewScale) {
                 nextNode = to;
             }
             if (nextNode !== first.n1)
-                return { ok: false, error: "閉領域の追跡に失敗しました" };
+                return { ok: false, error: "Failed to close boundary loop" };
             const src = new Set();
             for (const st of steps) {
                 if (st.edge && Number.isFinite(Number(st.edge.sourceShapeId)))
@@ -211,7 +378,7 @@ export function buildHatchLoopsFromBoundaryIds(shapes, boundaryIds, viewScale) {
         }
     }
 
-    if (loops.length === 0) return { ok: false, error: "閉領域になっていません" };
+    if (loops.length === 0) return { ok: false, error: "髢蛾伜沺縺ｫ縺ｪ縺｣縺ｦ縺・∪縺帙ｓ" };
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const loop of loops) {
@@ -380,4 +547,76 @@ export function isPointInHatch(shapes, hatchShape, p, viewScale) {
         }
     }
     return (insideCount % 2) === 1;
+}
+
+export function validateHatchBoundaryEndpoints(shapes, boundaryIds, viewScale) {
+    const ids = normalizeHatchBoundaryIds(boundaryIds);
+    const boundaryShapes = ids
+        .map((id) => (shapes || []).find((s) => Number(s?.id) === Number(id)))
+        .filter((s) => !!s && isHatchBoundaryShape(s));
+
+    const edgeShapes = boundaryShapes.filter((s) => s.type !== "circle");
+    if (edgeShapes.length === 0) {
+        return {
+            ok: true,
+            ids,
+            idsKey: hatchBoundaryIdsKey(ids),
+            openNodes: [],
+            nearMissPairs: [],
+            endpointNearToleranceWorld: 0,
+        };
+    }
+
+    const scale = Math.max(1e-9, Number(viewScale) || 1);
+    const endpointNearToleranceWorld = 10 / scale; // ~10px
+    const { nodes, edges } = hatchBoundaryToEdges(edgeShapes, scale);
+    const degree = new Array(nodes.length).fill(0);
+    for (const e of edges) {
+        degree[e.n1] += 1;
+        degree[e.n2] += 1;
+    }
+
+    const openNodeIdx = [];
+    for (let i = 0; i < nodes.length; i++) {
+        // Endpoint-match check focuses on dangling endpoints only.
+        // Branch points (degree >= 3) are noisy for this diagnostic.
+        if (degree[i] === 1) openNodeIdx.push(i);
+    }
+    const openNodes = openNodeIdx.map((idx) => ({
+        x: Number(nodes[idx].x),
+        y: Number(nodes[idx].y),
+        degree: 1,
+    }));
+
+    const nearMissPairs = [];
+    for (let i = 0; i < openNodeIdx.length; i++) {
+        const ia = openNodeIdx[i];
+        for (let j = i + 1; j < openNodeIdx.length; j++) {
+            const ib = openNodeIdx[j];
+            const a = nodes[ia];
+            const b = nodes[ib];
+            const d = dist(a, b);
+            if (!(d > 1e-9 && d <= endpointNearToleranceWorld)) continue;
+            nearMissPairs.push({
+                a: { x: Number(a.x), y: Number(a.y), degree: Number(degree[ia]) || 0 },
+                b: { x: Number(b.x), y: Number(b.y), degree: Number(degree[ib]) || 0 },
+                distance: Number(d),
+            });
+        }
+    }
+
+    const parsed = buildHatchLoopsFromBoundaryIds(shapes || [], ids, scale);
+    const loopOk = !!parsed?.ok;
+    const loopError = loopOk ? "" : String(parsed?.error || "Boundary is not closed");
+
+    return {
+        ok: openNodes.length === 0 && loopOk,
+        ids,
+        idsKey: hatchBoundaryIdsKey(ids),
+        openNodes,
+        nearMissPairs,
+        endpointNearToleranceWorld,
+        loopOk,
+        loopError,
+    };
 }

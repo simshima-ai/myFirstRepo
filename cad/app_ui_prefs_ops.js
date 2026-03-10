@@ -79,6 +79,13 @@ export function createUiPrefsOps(config) {
     draw();
   }
 
+  function setImportDxfAsPolyline(on) {
+    if (!state.ui) state.ui = {};
+    state.ui.importDxfAsPolyline = !!on;
+    scheduleSaveAppSettings();
+    draw();
+  }
+
   function setToolShortcut(tool, key) {
     const t = String(tool || "").toLowerCase();
     if (!toolOrder.includes(t)) return;
@@ -106,6 +113,7 @@ export function createUiPrefsOps(config) {
     setAutoBackupIntervalSec,
     setTouchMode,
     setTouchMultiSelect,
+    setImportDxfAsPolyline,
     setToolShortcut,
     resetToolShortcuts
   };

@@ -201,7 +201,7 @@ export function getShapeBounds(s, shapes, state) {
         const x = Number(s.x1 ?? s.x) || 0;
         const y = Number(s.y1 ?? s.y) || 0;
         // Use heuristic for text/position bounds
-        const size = (s.type === 'position') ? (s.size || 20) : (s.textSizePt || 12);
+        const size = (s.type === 'position') ? (s.size || 3) : (s.textSizePt || 12);
         return { minX: x - size, minY: y - size, maxX: x + size, maxY: y + size };
     }
     return null;

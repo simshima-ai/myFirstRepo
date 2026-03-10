@@ -100,7 +100,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
   const hasObjectSelectionForMove = state.tool === "select" && selectedShapesForMove.length > 0;
   const canCopyLineCircle = state.tool === "select"
     && selectedShapesForMove.length > 0
-    && selectedShapesForMove.every(s => s.type === "line" || s.type === "circle" || s.type === "arc");
+    && selectedShapesForMove.every(s => s.type === "line" || s.type === "polyline" || s.type === "circle" || s.type === "arc");
   if (dom.moveSelectedShapesBtn) {
     dom.moveSelectedShapesBtn.disabled = !hasObjectSelectionForMove;
   }
@@ -126,10 +126,31 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     syncInputValue(dom.vertexMoveDyInput, v);
   }
   if (dom.moveVertexBtn) {
-    dom.moveVertexBtn.disabled = !(state.vertexEdit?.selectedVertices?.length > 0);
+    const insertMode = String(state.vertexEdit?.mode || "move").toLowerCase() === "insert";
+    dom.moveVertexBtn.disabled = insertMode || !(state.vertexEdit?.selectedVertices?.length > 0);
+  }
+  if (dom.deleteVertexBtn) {
+    const selected = Array.isArray(state.vertexEdit?.selectedVertices) ? state.vertexEdit.selectedVertices : [];
+    const shapeById = new Map((state.shapes || []).map((s) => [Number(s.id), s]));
+    let canDelete = false;
+    for (const v of selected) {
+      const sid = Number(v?.shapeId);
+      const key = String(v?.key || "");
+      const s = shapeById.get(sid);
+      if (!s || String(s.type || "") !== "polyline" || !Array.isArray(s.points) || s.points.length <= 2) continue;
+      if (/^v\d+$/.test(key)) {
+        canDelete = true;
+        break;
+      }
+    }
+    dom.deleteVertexBtn.disabled = !canDelete;
   }
   if (dom.vertexLinkCoincidentToggle) {
     dom.vertexLinkCoincidentToggle.checked = state.vertexEdit?.linkCoincident !== false;
+  }
+  if (dom.vertexModeSelect) {
+    const vm = String(state.vertexEdit?.mode || "move").toLowerCase();
+    dom.vertexModeSelect.value = (vm === "insert") ? "insert" : "move";
   }
   if (dom.lineLengthInput) {
     const v = Number(state.lineSettings?.length || 0);
@@ -246,7 +267,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
       }
       return null;
     })();
-    const v = Number(selectedPosition?.size ?? state.positionSettings?.size ?? 20);
+    const v = Number(selectedPosition?.size ?? state.positionSettings?.size ?? 3);
     syncInputValue(dom.positionSizeInput, v);
   }
   if (dom.selectionLineWidthInput) {
@@ -254,7 +275,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     const selected = [];
     for (const s of (state.shapes || [])) {
       if (!ids.has(Number(s.id))) continue;
-      if (s.type !== "line" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
+      if (s.type !== "line" && s.type !== "polyline" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
       selected.push(s);
     }
     const first = selected[0] || null;
@@ -267,7 +288,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     let first = null;
     for (const s of (state.shapes || [])) {
       if (!ids.has(Number(s.id))) continue;
-      if (s.type !== "line" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
+      if (s.type !== "line" && s.type !== "polyline" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
       first = s;
       break;
     }
@@ -315,7 +336,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
       first = s;
       break;
     }
-    const v = Math.max(1, Number(first?.size ?? state.positionSettings?.size ?? 20));
+    const v = Math.max(1, Number(first?.size ?? state.positionSettings?.size ?? 3));
     syncInputValue(dom.selectionPositionSizeInput, v);
     dom.selectionPositionSizeInput.disabled = !first;
   }

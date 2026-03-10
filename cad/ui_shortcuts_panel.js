@@ -39,6 +39,9 @@ export function refreshToolShortcutSettings(state, dom, helpers) {
       none: "(なし)",
     };
   const shortcuts = sanitizeToolShortcuts(state?.ui?.toolShortcuts);
+  if (!labels.vertex_mode_toggle) {
+    labels.vertex_mode_toggle = (lang === "en") ? "Vertex Mode Toggle" : "頂点モード切替";
+  }
   host.innerHTML = "";
   for (const tool of toolOrder) {
     const row = document.createElement("label");
@@ -60,6 +63,10 @@ export function refreshToolShortcutSettings(state, dom, helpers) {
     optDel.value = "DEL";
     optDel.textContent = "DEL";
     select.appendChild(optDel);
+    const optBackslash = document.createElement("option");
+    optBackslash.value = "\\";
+    optBackslash.textContent = "\\";
+    select.appendChild(optBackslash);
     for (let code = 65; code <= 90; code++) {
       const k = String.fromCharCode(code);
       const opt = document.createElement("option");

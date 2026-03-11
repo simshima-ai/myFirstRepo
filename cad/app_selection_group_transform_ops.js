@@ -10,6 +10,13 @@ export function createSelectionGroupTransformOps(config) {
     normalizeRad
   } = config || {};
 
+  function scalePointAround(x, y, ox, oy, factor) {
+    return {
+      x: ox + (Number(x) - ox) * factor,
+      y: oy + (Number(y) - oy) * factor,
+    };
+  }
+
   function beginGroupOriginDrag(state, group, worldRaw) {
     const pickedGroupId = Number(group.id);
     const selectedGroupIds = Array.isArray(state.selection?.groupIds)
@@ -71,6 +78,28 @@ export function createSelectionGroupTransformOps(config) {
     state.input.groupRotate.groupSnapshots = collectGroupTreeGroupSnapshots(state, group.id);
     state.input.groupRotate.modelSnapshotBeforeRotate = snapshotModel(state);
     state.input.groupRotate.moved = false;
+  }
+
+  function beginGroupScaleDrag(state, group, worldRaw) {
+    const idSet = new Set(collectGroupTreeShapeIds(state, group.id).map(Number));
+    const snaps = [];
+    for (const s of state.shapes) {
+      if (!idSet.has(Number(s.id))) continue;
+      snaps.push({ id: s.id, shape: JSON.parse(JSON.stringify(s)) });
+    }
+    const origin = { x: Number(group.originX) || 0, y: Number(group.originY) || 0 };
+    const startDistance = Math.max(1e-9, Math.hypot(Number(worldRaw.x) - origin.x, Number(worldRaw.y) - origin.y));
+    const scaleOptions = (group.scaleOptions && typeof group.scaleOptions === "object")
+      ? group.scaleOptions
+      : { allowScale: false, keepAspect: false, scaleFactor: 1 };
+    state.input.groupScale.active = true;
+    state.input.groupScale.groupId = Number(group.id);
+    state.input.groupScale.startDistance = startDistance;
+    state.input.groupScale.startScaleFactor = Math.max(1e-9, Number(scaleOptions.scaleFactor) || 1);
+    state.input.groupScale.groupOrigin = origin;
+    state.input.groupScale.shapeSnapshots = snaps;
+    state.input.groupScale.modelSnapshotBeforeScale = snapshotModel(state);
+    state.input.groupScale.moved = false;
   }
 
   function applyGroupOriginDrag(state, worldRaw) {
@@ -257,6 +286,116 @@ export function createSelectionGroupTransformOps(config) {
     }
   }
 
+  function applyGroupScaleDrag(state, worldRaw) {
+    const gs = state.input.groupScale;
+    if (!gs.active || !gs.groupOrigin) return;
+    const g = getGroup(state, gs.groupId);
+    if (!g) return;
+    const scOpt = (g.scaleOptions && typeof g.scaleOptions === "object")
+      ? g.scaleOptions
+      : { allowScale: false, keepAspect: false, scaleFactor: 1 };
+    if (!scOpt.allowScale) return;
+    const ox = gs.groupOrigin.x;
+    const oy = gs.groupOrigin.y;
+    const curDist = Math.max(1e-9, Math.hypot(Number(worldRaw.x) - ox, Number(worldRaw.y) - oy));
+    const dragFactor = Math.max(0.02, Math.min(100, curDist / Math.max(1e-9, Number(gs.startDistance) || 1)));
+    const nextScale = Math.max(1e-9, Number(gs.startScaleFactor || 1) * dragFactor);
+    if (Math.abs(nextScale - Number(scOpt.scaleFactor || 1)) > 1e-9) gs.moved = true;
+    g.scaleOptions = {
+      allowScale: true,
+      keepAspect: scOpt.keepAspect !== false,
+      scaleFactor: nextScale,
+    };
+
+    const byId = new Map(state.shapes.map((s) => [Number(s.id), s]));
+    for (const it of gs.shapeSnapshots || []) {
+      const t = byId.get(Number(it.id));
+      if (!t) continue;
+      const b = it.shape;
+      if (t.type === "line" || t.type === "rect") {
+        const p1 = scalePointAround(b.x1, b.y1, ox, oy, dragFactor);
+        const p2 = scalePointAround(b.x2, b.y2, ox, oy, dragFactor);
+        t.x1 = p1.x; t.y1 = p1.y; t.x2 = p2.x; t.y2 = p2.y;
+      } else if (t.type === "polyline") {
+        if (Array.isArray(b.points)) {
+          t.points = b.points.map((pt) => scalePointAround(Number(pt?.x), Number(pt?.y), ox, oy, dragFactor));
+        }
+      } else if (t.type === "circle") {
+        const c = scalePointAround(b.cx, b.cy, ox, oy, dragFactor);
+        t.cx = c.x; t.cy = c.y; t.r = Math.abs(Number(b.r) || 0) * dragFactor;
+      } else if (t.type === "arc") {
+        const c = scalePointAround(b.cx, b.cy, ox, oy, dragFactor);
+        t.cx = c.x; t.cy = c.y;
+        t.r = Math.abs(Number(b.r) || 0) * dragFactor;
+        t.a1 = b.a1; t.a2 = b.a2; t.ccw = b.ccw;
+      } else if (t.type === "position") {
+        const p = scalePointAround(b.x, b.y, ox, oy, dragFactor);
+        t.x = p.x; t.y = p.y; t.size = Math.max(0.1, Number(b.size) * dragFactor);
+      } else if (t.type === "dim") {
+        const p1 = scalePointAround(b.x1, b.y1, ox, oy, dragFactor);
+        const p2 = scalePointAround(b.x2, b.y2, ox, oy, dragFactor);
+        const pp = scalePointAround(b.px, b.py, ox, oy, dragFactor);
+        t.x1 = p1.x; t.y1 = p1.y;
+        t.x2 = p2.x; t.y2 = p2.y;
+        t.px = pp.x; t.py = pp.y;
+        if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+          const tp = scalePointAround(Number(b.tx), Number(b.ty), ox, oy, dragFactor);
+          t.tx = tp.x; t.ty = tp.y;
+        }
+        if (Number.isFinite(Number(b.tdx)) && Number.isFinite(Number(b.tdy))) {
+          t.tdx = Number(b.tdx) * dragFactor;
+          t.tdy = Number(b.tdy) * dragFactor;
+        }
+        t.groupScaleComp = Math.max(1e-9, (Number(b.groupScaleComp) || 1) * dragFactor);
+      } else if (t.type === "dimchain") {
+        if (Array.isArray(b.points) && Array.isArray(t.points)) {
+          t.points = b.points.map(pt => scalePointAround(Number(pt.x), Number(pt.y), ox, oy, dragFactor));
+        }
+        if (Number.isFinite(Number(b.px)) && Number.isFinite(Number(b.py))) {
+          const pp = scalePointAround(Number(b.px), Number(b.py), ox, oy, dragFactor);
+          t.px = pp.x; t.py = pp.y;
+        }
+        if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+          const tp = scalePointAround(Number(b.tx), Number(b.ty), ox, oy, dragFactor);
+          t.tx = tp.x; t.ty = tp.y;
+        }
+        t.groupScaleComp = Math.max(1e-9, (Number(b.groupScaleComp) || 1) * dragFactor);
+      } else if (t.type === "circleDim") {
+        if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+          const tp = scalePointAround(Number(b.tx), Number(b.ty), ox, oy, dragFactor);
+          t.tx = tp.x; t.ty = tp.y;
+        }
+        if (Number.isFinite(Number(b.tdx)) && Number.isFinite(Number(b.tdy))) {
+          t.tdx = Number(b.tdx) * dragFactor;
+          t.tdy = Number(b.tdy) * dragFactor;
+        }
+        t.groupScaleComp = Math.max(1e-9, (Number(b.groupScaleComp) || 1) * dragFactor);
+      } else if (t.type === "dimangle") {
+        if (Number.isFinite(Number(b.cx)) && Number.isFinite(Number(b.cy))) {
+          const cp = scalePointAround(Number(b.cx), Number(b.cy), ox, oy, dragFactor);
+          t.cx = cp.x; t.cy = cp.y;
+        }
+        if (Number.isFinite(Number(b.r))) t.r = Math.abs(Number(b.r)) * dragFactor;
+        if (Number.isFinite(Number(b.tx)) && Number.isFinite(Number(b.ty))) {
+          const tp = scalePointAround(Number(b.tx), Number(b.ty), ox, oy, dragFactor);
+          t.tx = tp.x; t.ty = tp.y;
+        }
+      } else if (t.type === "text") {
+        const p = scalePointAround(b.x1, b.y1, ox, oy, dragFactor);
+        t.x1 = p.x; t.y1 = p.y;
+      } else if (t.type === "image") {
+        const p = scalePointAround(Number(b.x), Number(b.y), ox, oy, dragFactor);
+        t.x = p.x; t.y = p.y;
+        t.width = Math.max(1e-6, Number(b.width) * dragFactor);
+        t.height = Math.max(1e-6, Number(b.height) * dragFactor);
+      } else if (t.type === "bspline") {
+        if (Array.isArray(b.controlPoints)) {
+          t.controlPoints = b.controlPoints.map((cp) => scalePointAround(Number(cp?.x), Number(cp?.y), ox, oy, dragFactor));
+        }
+      }
+    }
+  }
+
   function endGroupOriginDrag(state) {
     const moved = !!state.input.groupDrag.moved;
     const snap = state.input.groupDrag.modelSnapshotBeforeMove;
@@ -286,6 +425,20 @@ export function createSelectionGroupTransformOps(config) {
     state.input.groupRotate.groupSnapshots = null;
     state.input.groupRotate.modelSnapshotBeforeRotate = null;
     state.input.groupRotate.moved = false;
+    return { moved, snapshot: snap };
+  }
+
+  function endGroupScaleDrag(state) {
+    const moved = !!state.input.groupScale.moved;
+    const snap = state.input.groupScale.modelSnapshotBeforeScale;
+    state.input.groupScale.active = false;
+    state.input.groupScale.groupId = null;
+    state.input.groupScale.startDistance = 0;
+    state.input.groupScale.startScaleFactor = 1;
+    state.input.groupScale.groupOrigin = null;
+    state.input.groupScale.shapeSnapshots = null;
+    state.input.groupScale.modelSnapshotBeforeScale = null;
+    state.input.groupScale.moved = false;
     return { moved, snapshot: snap };
   }
 
@@ -330,10 +483,13 @@ export function createSelectionGroupTransformOps(config) {
   return {
     beginGroupOriginDrag,
     beginGroupRotateDrag,
+    beginGroupScaleDrag,
     applyGroupOriginDrag,
     applyGroupRotateDrag,
+    applyGroupScaleDrag,
     endGroupOriginDrag,
     endGroupRotateDrag,
+    endGroupScaleDrag,
     beginGroupOriginPickDrag,
     applyGroupOriginPickDrag,
     endGroupOriginPickDrag

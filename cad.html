@@ -357,6 +357,81 @@
       align-items: center;
     }
 
+    .debug-console {
+      position: absolute;
+      left: 50%;
+      transform: translateX(-50%);
+      bottom: 90px;
+      z-index: 120;
+      width: min(720px, calc(100vw - 20px));
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 6px 18px rgba(15, 23, 42, 0.12);
+      pointer-events: auto;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      max-height: 28vh;
+    }
+
+    .debug-console-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-bottom: 1px solid #dbe3ea;
+      background: rgba(248, 250, 252, 0.96);
+    }
+
+    .debug-console-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: #334155;
+      letter-spacing: .02em;
+    }
+
+    .debug-console-actions {
+      display: flex;
+      gap: 6px;
+    }
+
+    .debug-console-actions button {
+      min-height: 24px;
+      font-size: 11px;
+      padding: 2px 8px;
+    }
+
+    .debug-console-body {
+      overflow: auto;
+      padding: 6px 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+      font-size: 11px;
+      line-height: 1.35;
+      color: #1f2937;
+      white-space: pre-wrap;
+      word-break: break-word;
+    }
+
+    .debug-console-row {
+      border-radius: 4px;
+      padding: 1px 3px;
+    }
+
+    .debug-console-row.warn {
+      background: #fff7ed;
+      color: #9a3412;
+    }
+
+    .debug-console-row.error {
+      background: #fef2f2;
+      color: #991b1b;
+    }
+
     .grid-scale-indicator {
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.9);
@@ -377,6 +452,46 @@
       line-height: 1.35;
       white-space: pre-line;
       max-width: 320px;
+    }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(2, 6, 23, 0.36);
+      z-index: 2000;
+      display: none;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 24px 10px;
+      overflow: auto;
+    }
+
+    .modal-card {
+      width: min(720px, calc(100vw - 20px));
+      border: 1px solid #cbd5e1;
+      border-radius: 12px;
+      background: #ffffff;
+      box-shadow: 0 16px 40px rgba(2, 6, 23, 0.28);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .modal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px 10px;
+      align-items: center;
+    }
+
+    .modal-grid label {
+      justify-content: flex-start;
+      gap: 6px;
+    }
+
+    .modal-grid .wide {
+      grid-column: 1 / -1;
     }
 
     .grid-scale-bar-wrap {
@@ -1665,6 +1780,15 @@
                 </label>
                 <button id="deleteGroupBtn" type="button">このグループを削除</button>
               </div>
+              <label style="display:flex; align-items:center; justify-content:space-between;">
+                <span>グループにスケールを許可</span>
+                <input id="groupScaleEnableToggle" type="checkbox">
+              </label>
+              <div style="display:grid; grid-template-columns:auto 1fr auto; gap:6px; align-items:center;">
+                <span>スケール値</span>
+                <input id="groupScaleFactorInput" type="number" min="0.000001" step="0.01" value="1">
+                <button id="groupScaleApplyBtn" type="button">適用</button>
+              </div>
               <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:6px;">
                 <label style="justify-content:flex-start; gap:8px;">
                   <input id="groupAimEnableToggle" type="checkbox">
@@ -1767,6 +1891,19 @@
             </div>
             <div style="display:flex; align-items:center; gap:8px; justify-content:flex-start;">
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
+                <span id="importSourceUnitLabel">入力単位</span>
+                <select id="importSourceUnitSelect" style="width:100px;">
+                  <option value="auto">Auto</option>
+                  <option value="unitless">Unitless</option>
+                  <option value="mm">mm</option>
+                  <option value="cm">cm</option>
+                  <option value="m">m</option>
+                  <option value="inch">inch</option>
+                  <option value="px">px</option>
+                  <option value="pt">pt</option>
+                </select>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
                 Flip X
                 <input id="importAdjustFlipXToggle" type="checkbox" style="margin-left:0;">
               </label>
@@ -1775,8 +1912,8 @@
                 <input id="importAdjustFlipYToggle" type="checkbox" style="margin-left:0;">
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
-                <span id="importDxfAsPolylineLabel">DXFをポリライン化</span>
-                <input id="importDxfAsPolylineToggle" type="checkbox" style="margin-left:0;">
+                <span id="importAsPolylineLabel">ポリライン化</span>
+                <input id="importAsPolylineToggle" type="checkbox" style="margin-left:0;">
               </label>
               <button id="importAdjustApplyBtn" type="button">Apply</button>
               <button id="importAdjustCancelBtn" type="button">Cancel</button>
@@ -2044,6 +2181,10 @@
               <label style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
                 <input id="dlineNoTrimToggle" type="checkbox">
                 <span>トリムしない</span>
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
+                <input id="dlineAsPolylineToggle" type="checkbox" checked>
+                <span>Polylineで生成</span>
               </label>
               <span>線幅(mm)</span>
               <select id="dlineToolLineWidthInput" style="width:auto; min-width:58px;">
@@ -2388,9 +2529,84 @@
         </div>
         <div id="gridAutoDebugText" class="grid-auto-debug" style="display:none;">auto-grid debug</div>
       </div>
+      <div id="debugConsolePanel" class="debug-console">
+        <div class="debug-console-head">
+          <div class="debug-console-title">Debug Console</div>
+          <div class="debug-console-actions">
+            <button id="debugConsoleCopyBtn" type="button">Copy</button>
+            <button id="debugConsoleClearBtn" type="button">Clear</button>
+          </div>
+        </div>
+        <div id="debugConsoleBody" class="debug-console-body"></div>
+      </div>
     </main>
   </div>
   <input id="jsonFileInput" type="file" accept=".json,application/json,.dxf,.svg,.png,.jpg,.jpeg,.webp,.gif,.bmp,image/*" hidden>
+  <div id="pngExportModal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pngExportTitle">
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div id="pngExportTitle" style="font-size:14px; font-weight:700; color:#334155;">PNG Export</div>
+        <button id="pngExportCloseBtn" type="button">Close</button>
+      </div>
+      <div class="modal-grid">
+        <label>Filename <input id="pngFilenameInput" type="text" value=""></label>
+        <label>Range
+          <select id="pngRangeModeSelect">
+            <option value="page" selected>Page</option>
+            <option value="view">View</option>
+            <option value="selection">Selection</option>
+            <option value="custom">Custom</option>
+          </select>
+        </label>
+        <label id="pngCustomXWrap">Center X <input id="pngCustomXInput" type="number" value="0" step="0.1"></label>
+        <label id="pngCustomYWrap">Center Y <input id="pngCustomYInput" type="number" value="0" step="0.1"></label>
+        <label id="pngCustomWWrap">Width <input id="pngCustomWInput" type="number" value="100" min="0.0001" step="0.1"></label>
+        <label id="pngCustomHWrap">Height <input id="pngCustomHInput" type="number" value="100" min="0.0001" step="0.1"></label>
+
+        <label>Size Mode
+          <select id="pngSizeModeSelect">
+            <option value="pixels" selected>Pixels</option>
+            <option value="dpi">DPI</option>
+          </select>
+        </label>
+        <label>DPI <input id="pngDpiInput" type="number" min="1" step="1" value="300"></label>
+        <label>Width(px) <input id="pngWidthInput" type="number" min="1" step="1" value="2048"></label>
+        <label>Height(px) <input id="pngHeightInput" type="number" min="1" step="1" value="1536"></label>
+        <label>Scale Multiplier <input id="pngScaleMulInput" type="number" min="0.01" step="0.01" value="1"></label>
+        <label>Margin(px) <input id="pngMarginInput" type="number" min="0" step="1" value="0"></label>
+
+        <label>Background
+          <select id="pngBackgroundModeSelect">
+            <option value="white" selected>White</option>
+            <option value="transparent">Transparent</option>
+            <option value="color">Color</option>
+          </select>
+        </label>
+        <label>BG Color <input id="pngBackgroundColorInput" type="color" value="#ffffff"></label>
+        <label>Color Mode
+          <select id="pngColorModeSelect">
+            <option value="normal" selected>Normal</option>
+            <option value="layer">Layer Colorize</option>
+            <option value="group">Group Colorize</option>
+          </select>
+        </label>
+        <div></div>
+
+        <label><input id="pngIncludeGridToggle" type="checkbox"> Include Grid</label>
+        <label><input id="pngIncludeAxesToggle" type="checkbox"> Include Axes</label>
+        <label><input id="pngIncludePageFrameToggle" type="checkbox"> Include Page Frame</label>
+        <label><input id="pngIncludeSelectionToggle" type="checkbox"> Include Selection Highlight</label>
+        <label><input id="pngAntialiasToggle" type="checkbox" checked> Antialias</label>
+        <label><input id="pngSrgbToggle" type="checkbox" checked> sRGB</label>
+        <label>Line Width Scale <input id="pngLineScaleInput" type="number" min="0.1" step="0.1" value="1"></label>
+        <label>Min Line Width(px) <input id="pngMinLinePxInput" type="number" min="0" step="0.1" value="0"></label>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:8px;">
+        <button id="pngExportCancelBtn" type="button">Cancel</button>
+        <button id="pngExportApplyBtn" type="button">Export PNG</button>
+      </div>
+    </div>
+  </div>
   <div id="colorPalettePopup"
     style="position:fixed; display:none; z-index:1200; background:#ffffff; border:1px solid #cbd5e1; border-radius:10px; padding:10px; box-shadow:0 10px 28px rgba(2,6,23,0.2);"></div>
   <script>

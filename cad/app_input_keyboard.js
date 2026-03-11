@@ -4,6 +4,7 @@ export function bindKeyboardInput(state, helpers, deps) {
         setStatus,
         setTool,
         clearSelection,
+        toggleDebugConsole,
         getLineCreateMode,
         finalizeBsplineDraft,
         commitFilletFromHover,
@@ -32,6 +33,11 @@ export function bindKeyboardInput(state, helpers, deps) {
     };
 
     const onKeyDown = (e) => {
+        if (e?.key === "F9") {
+            if (typeof toggleDebugConsole === "function") toggleDebugConsole();
+            e.preventDefault();
+            return;
+        }
         state.input.modifierKeys.shift = e.shiftKey;
         state.input.modifierKeys.ctrl = e.ctrlKey;
         state.input.modifierKeys.alt = e.altKey;

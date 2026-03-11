@@ -5,15 +5,15 @@ import {
     panByScreenDelta, zoomAt, getMouseScreen, getMouseWorld
 } from "./app_input_coords.js";
 import {
-    hitActiveGroupRotateHandle, hitActiveGroupOriginHandle, hitTestVertexHandle,
-    beginGroupRotateDrag, beginGroupOriginDrag, beginSelectionBox,
+    hitActiveGroupRotateHandle, hitActiveGroupOriginHandle, hitActiveGroupScaleHandle, hitTestVertexHandle,
+    beginGroupRotateDrag, beginGroupOriginDrag, beginGroupScaleDrag, beginSelectionBox,
     hitTestShapes, hitTestDimHandle, beginDimHandleDrag, beginVertexDrag,
     beginSelectionDrag, beginImageScaleDrag, hitTestImageScaleHandle, toggleGroupSelectionById,
     findConnectedLinesChain,
     getVertexInsertCandidate, insertVertexAtCandidate,
-    applyGroupRotateDrag, applyGroupOriginDrag, applyDimHandleDrag, applyVertexDrag,
+    applyGroupRotateDrag, applyGroupOriginDrag, applyGroupScaleDrag, applyDimHandleDrag, applyVertexDrag,
     applySelectionDrag, updateSelectionBox,
-    endGroupRotateDrag, endGroupOriginDrag, endDimHandleDrag, endVertexDrag,
+    endGroupRotateDrag, endGroupOriginDrag, endGroupScaleDrag, endDimHandleDrag, endVertexDrag,
     endSelectionDrag, endSelectionBox,
     beginVertexSelectionBox, endVertexSelectionBox,
     beginGroupOriginPickDrag, applyGroupOriginPickDrag, endGroupOriginPickDrag,
@@ -237,6 +237,8 @@ export function setupInputListenersImpl(state, dom, helpers) {
                 findConnectedLinesChain,
                 hitActiveGroupRotateHandle,
                 beginGroupRotateDrag,
+                hitActiveGroupScaleHandle,
+                beginGroupScaleDrag,
                 hitActiveGroupOriginHandle,
                 beginGroupOriginDrag,
                 hitTestDimHandle,
@@ -670,6 +672,11 @@ export function setupInputListenersImpl(state, dom, helpers) {
             drawFast();
             return;
         }
+        if (state.input.groupScale.active) {
+            applyGroupScaleDrag(state, worldRaw);
+            drawFast();
+            return;
+        }
         if (state.input.groupDrag.active) {
             applyGroupOriginDrag(state, worldRaw);
             drawFast();
@@ -733,6 +740,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
             state.vertexEdit.insertCandidate = null;
         }
         state.input.hover.groupRotate = hitActiveGroupRotateHandle(state, screen);
+        state.input.hover.groupScale = hitActiveGroupScaleHandle(state, screen);
         state.input.hover.groupOrigin = hitActiveGroupOriginHandle(state, screen);
         state.input.hover.dimHandle = hasVisibleLayer ? hitTestDimHandle(state, worldRaw) : null;
 
@@ -888,6 +896,10 @@ export function setupInputListenersImpl(state, dom, helpers) {
             const { moved, snapshot } = endGroupRotateDrag(state);
             if (moved) pushHistorySnapshot(state, snapshot);
         }
+        if (state.input.groupScale.active) {
+            const { moved, snapshot } = endGroupScaleDrag(state);
+            if (moved) pushHistorySnapshot(state, snapshot);
+        }
         if (state.input.groupDrag.active) {
             const { moved, snapshot } = endGroupOriginDrag(state);
             if (moved) pushHistorySnapshot(state, snapshot);
@@ -1025,25 +1037,8 @@ export function setupInputListenersImpl(state, dom, helpers) {
             state.input.dimLineDrag.active = false;
             state.input.dimLineDrag.moved = false;
         }
-        if (state.tool === "circle" && getCircleCreateMode() === "drag" && state.input.dragStartWorld) {
-            const worldRaw = getMouseWorld(state, dom, e, false);
-            const snap = resolvePolylineDraftEndpointSnap(worldRaw, getObjectSnapPoint(state, worldRaw));
-            const endWorld = snap ? { x: snap.x, y: snap.y } : getMouseWorld(state, dom, e, true);
-            const p1 = state.input.dragStartWorld;
-            state.input.dragStartWorld = null;
-            if (Math.hypot(endWorld.x - p1.x, endWorld.y - p1.y) > 1e-9) {
-                pushHistory();
-                const shape = createCircle(p1, endWorld);
-                shape.showCenterMark = !!state.circleSettings?.showCenterMark;
-                shape.id = nextShapeId();
-                shape.layerId = state.activeLayerId;
-                applyToolStrokeToShape(shape, "circle");
-                addShape(shape);
-                clearSelection();
-                state.activeGroupId = null;
-                if (setStatus) setStatus("CIRCLE created (drag)");
-            }
-        }
+        // Circle drag-finalize was removed; circle(mode=drag) now uses 2-click finalize
+        // in handlePointerDownDrawMode, same as rectangle.
 
         if (draw) draw();
     });
@@ -1066,6 +1061,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
         setStatus,
         setTool,
         clearSelection,
+        toggleDebugConsole: helpers.toggleDebugConsole,
         getLineCreateMode,
         finalizeBsplineDraft,
         commitFilletFromHover,

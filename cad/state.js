@@ -175,9 +175,10 @@ export function createState() {
       boundaryIds: [],
     },
     dlineSettings: {
-      offset: 10,
+      offset: 5,
       mode: 'both', // 'single' | 'both'
       noTrim: false,
+      asPolyline: false,
       lineWidthMm: 0.25,
       lineType: "solid",
     },
@@ -306,6 +307,7 @@ export function createState() {
         vertex: null,
         groupRotate: null,
         groupOrigin: null,
+        groupScale: null,
         dimHandle: null,
         trimCandidate: null,
         filletCandidate: null,
@@ -335,6 +337,16 @@ export function createState() {
         modelSnapshotBeforeRotate: null,
         moved: false,
         snapDeg: 5,
+      },
+      groupScale: {
+        active: false,
+        groupId: null,
+        startDistance: 0,
+        startScaleFactor: 1,
+        groupOrigin: null,
+        shapeSnapshots: null,
+        modelSnapshotBeforeScale: null,
+        moved: false,
       },
       groupOriginPick: {
         active: false,
@@ -425,7 +437,8 @@ export function createState() {
       menuScalePct: 100,
       touchMode: false,
       touchMultiSelect: false,
-      importDxfAsPolyline: false,
+      importSourceUnit: "auto",
+      importAsPolyline: false,
       showFps: false,
       showObjectCount: false,
       autoBackupEnabled: true,
@@ -472,6 +485,7 @@ export function restoreModel(state, snap) {
       originY: Number.isFinite(Number(g.originY)) ? Number(g.originY) : 0,
       rotationDeg: Number.isFinite(Number(g.rotationDeg)) ? Number(g.rotationDeg) : 0,
       aimConstraint: normalizeGroupAimConstraint(g.aimConstraint),
+      scaleOptions: normalizeGroupScaleOptions(g.scaleOptions),
     }))))
     : [];
   state.nextGroupId = Number(snap.nextGroupId) || (Math.max(0, ...state.groups.map(g => Number(g.id) || 0)) + 1);
@@ -656,6 +670,14 @@ export function setTool(state, tool) {
   }
 }
 
+function normalizeGroupScaleOptions(raw) {
+  const allowScale = !!raw?.allowScale;
+  const keepAspect = allowScale ? (raw?.keepAspect !== false) : false;
+  const scaleFactorRaw = Number(raw?.scaleFactor);
+  const scaleFactor = Number.isFinite(scaleFactorRaw) && scaleFactorRaw > 1e-9 ? scaleFactorRaw : 1;
+  return { allowScale, keepAspect, scaleFactor };
+}
+
 export function clearSelection(state) {
   state.selection.ids = [];
   state.selection.groupIds = [];
@@ -751,6 +773,7 @@ export function addShape(state, shape) {
       originY: soy,
       rotationDeg: 0,
       aimConstraint: normalizeGroupAimConstraint(null),
+      scaleOptions: normalizeGroupScaleOptions(null),
     };
     state.groups.unshift(group);
     shape.groupId = id;
@@ -806,6 +829,7 @@ export function addShapesAsGroup(state, shapes) {
     originY: soy,
     rotationDeg: 0,
     aimConstraint: normalizeGroupAimConstraint(null),
+    scaleOptions: normalizeGroupScaleOptions(null),
   };
 
   state.groups.unshift(group);
@@ -1016,6 +1040,7 @@ export function createGroupFromSelection(state, name) {
       originY: Math.round(cy / gridStep) * gridStep,
       rotationDeg: 0,
       aimConstraint: normalizeGroupAimConstraint(null),
+      scaleOptions: normalizeGroupScaleOptions(null),
     };
     state.groups.unshift(group);
     state.activeGroupId = id;
@@ -1107,6 +1132,7 @@ export function createGroupFromSelection(state, name) {
     originY: snapOriginY,
     rotationDeg: 0,
     aimConstraint: normalizeGroupAimConstraint(null),
+    scaleOptions: normalizeGroupScaleOptions(null),
   };
   state.groups.unshift(group);
   // Keep shape.groupId consistent with groups[].shapeIds so group-pick hit tests work.
@@ -1126,6 +1152,7 @@ export function addGroup(state, group) {
   if (group && (group.id == null)) group.id = state.nextGroupId++;
   if (group) group.visible = group.visible !== false;
   if (group) group.aimConstraint = normalizeGroupAimConstraint(group.aimConstraint);
+  if (group) group.scaleOptions = normalizeGroupScaleOptions(group.scaleOptions);
   state.groups.push(group);
   return group;
 }

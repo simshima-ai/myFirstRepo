@@ -60,6 +60,28 @@ export function bindInitTailEvents(params) {
       actions.clearActiveGroupAimTarget?.();
     });
   }
+  if (dom.groupScaleEnableToggle) {
+    dom.groupScaleEnableToggle.addEventListener("change", () => {
+      actions.setActiveGroupScaleOptions?.({
+        allowScale: !!dom.groupScaleEnableToggle.checked,
+      });
+    });
+  }
+  if (dom.groupScaleApplyBtn) {
+    dom.groupScaleApplyBtn.addEventListener("click", () => {
+      const v = Math.max(1e-6, Number(dom.groupScaleFactorInput?.value) || 1);
+      const rounded = Math.round(v * 1000) / 1000;
+      if (dom.groupScaleFactorInput) dom.groupScaleFactorInput.value = String(rounded);
+      actions.setActiveGroupScaleFactor?.(rounded);
+    });
+  }
+  if (dom.groupScaleFactorInput) {
+    dom.groupScaleFactorInput.addEventListener("change", () => {
+      const v = Math.max(1e-6, Number(dom.groupScaleFactorInput?.value) || 1);
+      const rounded = Math.round(v * 1000) / 1000;
+      dom.groupScaleFactorInput.value = String(rounded);
+    });
+  }
   if (dom.moveSelectedShapesBtn) {
     dom.moveSelectedShapesBtn.addEventListener("click", () => {
       const dx = Number(dom.selectMoveDxInput?.value || 0);
@@ -235,6 +257,34 @@ export function bindInitTailEvents(params) {
     dom.touchModeToggle.addEventListener("change", () => {
       actions.setTouchMode?.(!!dom.touchModeToggle.checked);
     });
+  }
+  if (dom.pngExportCloseBtn) {
+    dom.pngExportCloseBtn.addEventListener("click", () => actions.closePngExportDialog?.());
+  }
+  if (dom.pngExportCancelBtn) {
+    dom.pngExportCancelBtn.addEventListener("click", () => actions.closePngExportDialog?.());
+  }
+  if (dom.pngExportApplyBtn) {
+    dom.pngExportApplyBtn.addEventListener("click", () => actions.runPngExportFromDialog?.());
+  }
+  if (dom.pngExportModal) {
+    dom.pngExportModal.addEventListener("click", (e) => {
+      if (e.target === dom.pngExportModal) actions.closePngExportDialog?.();
+    });
+  }
+  if (dom.pngRangeModeSelect) {
+    dom.pngRangeModeSelect.addEventListener("change", () => actions.syncPngExportVisibilityByRange?.());
+  }
+  if (dom.pngSizeModeSelect) {
+    dom.pngSizeModeSelect.addEventListener("change", () => actions.syncPngExportVisibilityBySizeMode?.());
+  }
+  if (dom.pngBackgroundModeSelect && dom.pngBackgroundColorInput) {
+    const syncBgColorEnabled = () => {
+      const on = String(dom.pngBackgroundModeSelect.value || "white") === "color";
+      dom.pngBackgroundColorInput.disabled = !on;
+    };
+    dom.pngBackgroundModeSelect.addEventListener("change", syncBgColorEnabled);
+    syncBgColorEnabled();
   }
   if (dom.touchConfirmBtn) {
     let lastTouchConfirmAt = 0;

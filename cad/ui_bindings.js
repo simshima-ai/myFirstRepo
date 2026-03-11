@@ -266,7 +266,7 @@ export function bindPageAndPatternEvents(state, dom, actions, helpers) {
   if (dom.dlineOffsetInput) {
     dom.dlineOffsetInput.addEventListener("input", () => {
       if (actions.cancelDoubleLineTrimPending) actions.cancelDoubleLineTrimPending();
-      state.dlineSettings.offset = Number(dom.dlineOffsetInput.value) || 10;
+      state.dlineSettings.offset = Number(dom.dlineOffsetInput.value) || 5;
       refreshUiDeferred();
     });
   }
@@ -281,6 +281,13 @@ export function bindPageAndPatternEvents(state, dom, actions, helpers) {
     dom.dlineNoTrimToggle.addEventListener("change", () => {
       if (actions.cancelDoubleLineTrimPending) actions.cancelDoubleLineTrimPending();
       state.dlineSettings.noTrim = !!dom.dlineNoTrimToggle.checked;
+      refreshUiDeferred();
+    });
+  }
+  if (dom.dlineAsPolylineToggle) {
+    dom.dlineAsPolylineToggle.addEventListener("change", () => {
+      if (actions.cancelDoubleLineTrimPending) actions.cancelDoubleLineTrimPending();
+      state.dlineSettings.asPolyline = !!dom.dlineAsPolylineToggle.checked;
       refreshUiDeferred();
     });
   }

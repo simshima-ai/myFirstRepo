@@ -109,6 +109,7 @@ export function drawPageFrame(ctx, canvas, state) {
 }
 
 export function drawAxes(ctx, canvas, state) {
+  if (state?.ui?.hideAxes) return;
   ctx.save();
   ctx.strokeStyle = "#cfd6df";
   ctx.lineWidth = 1;

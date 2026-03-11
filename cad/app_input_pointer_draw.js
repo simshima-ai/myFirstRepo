@@ -106,10 +106,8 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
             }
             return true;
         }
-        state.input.dragStartWorld = { x: world.x, y: world.y };
-        if (setStatus) setStatus("CIRCLE: drag and release");
-        if (draw) draw();
-        return true;
+        // circleMode === "drag" now uses the same 2-click flow as rectangle.
+        // Fall through to the common "first point / second point" creation block below.
     }
     if (state.tool === "line" && getLineCreateMode() === "freehand") {
         beginOrExtendBsplineDraft(world);
@@ -188,6 +186,19 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
                 shape.id = nextShapeId();
                 shape.layerId = state.activeLayerId;
                 applyToolStrokeToShape(shape, state.tool);
+                addShape(shape);
+                clearSelection();
+                state.activeGroupId = null;
+            }
+        } else if (state.tool === "circle") {
+            const p1 = state.input.dragStartWorld;
+            const p2 = world;
+            if (Math.hypot(Number(p2.x) - Number(p1.x), Number(p2.y) - Number(p1.y)) > 1e-9) {
+                const shape = createCircle(p1, p2);
+                shape.showCenterMark = !!state.circleSettings?.showCenterMark;
+                shape.id = nextShapeId();
+                shape.layerId = state.activeLayerId;
+                applyToolStrokeToShape(shape, "circle");
                 addShape(shape);
                 clearSelection();
                 state.activeGroupId = null;

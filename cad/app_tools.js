@@ -35,7 +35,7 @@ export {
     unparentActiveGroup, moveActiveGroup, updateSelectedTextSettings, moveSelectedVertices, lineToPolyline
 } from "./app_tools_structure.js";
 
-export { exportPdf, exportSvg, exportDxf } from "./app_tools_export.js";
+export { exportPdf, exportSvg, exportDxf, exportPng } from "./app_tools_export.js";
 
 export { setPatternCopyMode, setPatternCopyCenterFromSelection, clearPatternCopyCenter, setPatternCopyAxisFromSelection, clearPatternCopyAxis, executePatternCopy } from "./app_tools_patterncopy.js";
 

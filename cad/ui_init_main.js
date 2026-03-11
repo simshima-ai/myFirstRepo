@@ -78,6 +78,7 @@ export function initUiMain(state, dom, actions, deps = {}) {
     dom,
     getUiLanguage,
     getViewportSizeForUi,
+    selectSameColorByCurrent: (hex) => actions.selectShapesByColor?.(hex),
   });
   let groupPanelResizeDrag = null;
   const onGroupPanelResizeMove = (e) => {
@@ -729,9 +730,14 @@ export function initUiMain(state, dom, actions, deps = {}) {
     if (dom.importAdjustCancelBtn) {
       dom.importAdjustCancelBtn.addEventListener("click", () => actions.cancelImportAdjust?.());
     }
-    if (dom.importDxfAsPolylineToggle) {
-      dom.importDxfAsPolylineToggle.addEventListener("change", () => {
-        actions.setImportDxfAsPolyline?.(!!dom.importDxfAsPolylineToggle.checked);
+    if (dom.importAsPolylineToggle) {
+      dom.importAsPolylineToggle.addEventListener("change", () => {
+        actions.setImportAsPolyline?.(!!dom.importAsPolylineToggle.checked);
+      });
+    }
+    if (dom.importSourceUnitSelect) {
+      dom.importSourceUnitSelect.addEventListener("change", () => {
+        actions.setImportSourceUnit?.(String(dom.importSourceUnitSelect.value || "auto"));
       });
     }
   }

@@ -43,6 +43,25 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
       dom.groupRotationValue.textContent = `${rounded.toFixed(2)}°`;
     }
   }
+  if (dom.groupScaleEnableToggle) {
+    const scOpt = (activeGroup && activeGroup.scaleOptions && typeof activeGroup.scaleOptions === "object")
+      ? activeGroup.scaleOptions
+      : { allowScale: false, keepAspect: false };
+    const allowScale = !!scOpt.allowScale;
+    if (dom.groupScaleEnableToggle) {
+      dom.groupScaleEnableToggle.disabled = (state.activeGroupId == null);
+      dom.groupScaleEnableToggle.checked = allowScale;
+    }
+    if (dom.groupScaleFactorInput) {
+      const sf = Math.max(1e-9, Number(scOpt.scaleFactor) || 1);
+      const sfRounded = Math.round(sf * 1000) / 1000;
+      if (document.activeElement !== dom.groupScaleFactorInput) syncInputValue(dom.groupScaleFactorInput, sfRounded);
+      dom.groupScaleFactorInput.disabled = (state.activeGroupId == null) || !allowScale;
+    }
+    if (dom.groupScaleApplyBtn) {
+      dom.groupScaleApplyBtn.disabled = (state.activeGroupId == null) || !allowScale;
+    }
+  }
   const aim = activeGroup?.aimConstraint || {};
   const aimEnabled = !!aim.enabled;
   const aimTargetType = String(aim.targetType || "");
@@ -241,7 +260,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     dom.applyFilletBtn.disabled = !((state.selection?.ids || []).length >= 2);
   }
   if (dom.dlineOffsetInput) {
-    const v = Number(state.dlineSettings?.offset || 10);
+    const v = Number(state.dlineSettings?.offset || 5);
     syncInputValue(dom.dlineOffsetInput, v);
   }
   if (dom.dlineModeSelect) {
@@ -250,6 +269,9 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
   }
   if (dom.dlineNoTrimToggle) {
     dom.dlineNoTrimToggle.checked = !!state.dlineSettings?.noTrim;
+  }
+  if (dom.dlineAsPolylineToggle) {
+    dom.dlineAsPolylineToggle.checked = !!state.dlineSettings?.asPolyline;
   }
   if (dom.applyDLineBtn) {
     const touchMode = !!state.ui?.touchMode;

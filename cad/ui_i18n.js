@@ -148,7 +148,8 @@ export function applyLanguageUi(state, dom) {
       traceOffsetX: "オフセットX",
       traceOffsetY: "オフセットY",
       traceInvert: "反転",
-      importDxfAsPolyline: "DXFをポリライン化",
+      importSourceUnit: "入力単位",
+      importAsPolyline: "ポリライン化",
       traceRegenerate: "再生成",
       close: "閉じる",
       export: "出力",
@@ -185,6 +186,8 @@ export function applyLanguageUi(state, dom) {
       rename: "リネーム",
       colorize: "カラー分け表示",
       currentLayerOnly: "現在レイヤー所属のみ表示",
+      groupAllowScale: "グループにスケールを許可",
+      groupScaleFactor: "スケール値",
       editOnlyActive: "選択レイヤーのみ編集",
       moveObjectsToLayer: "オブジェクトを移動",
       deleteLayer: "レイヤー削除",
@@ -243,6 +246,7 @@ export function applyLanguageUi(state, dom) {
       precision: "精度",
       hatchApply: "選択境界でハッチング作成",
       hatchValidate: "端点一致チェック",
+      selectSameColor: "同じ色を選択",
       patternCopyRun: "コピー実行",
       dlineApply: "適用",
       dlineTrimExecute: "トリム実行",
@@ -287,7 +291,7 @@ export function applyLanguageUi(state, dom) {
       bottomRight: "下右",
       showCenterMark: "中心マーカーを表示",
       circleMode: "モード",
-      circleModeDrag: "マウスドラッグ",
+      circleModeDrag: "2点クリック",
       circleModeFixed: "半径固定",
       circleModeThreePoint: "三点指示",
       circleThreePointHint: "中心座標を持つオブジェクトを3つ選択",
@@ -344,6 +348,7 @@ export function applyLanguageUi(state, dom) {
       bothSides: "両側",
       oneSide: "片側",
       noTrim: "トリムしない",
+      dlineAsPolyline: "Polylineで生成",
       dimArrowOpen: "開き",
       dimArrowClosed: "塗り三角",
       dimArrowHollow: "中抜き三角",
@@ -392,7 +397,8 @@ export function applyLanguageUi(state, dom) {
       traceOffsetX: "Offset X",
       traceOffsetY: "Offset Y",
       traceInvert: "Invert",
-      importDxfAsPolyline: "Polylineize DXF",
+      importSourceUnit: "Source Unit",
+      importAsPolyline: "Polylineize",
       traceRegenerate: "Regenerate",
       close: "Close",
       export: "Export",
@@ -429,6 +435,8 @@ export function applyLanguageUi(state, dom) {
       rename: "Rename",
       colorize: "Colorize",
       currentLayerOnly: "Show Active-Layer Items Only",
+      groupAllowScale: "Allow Group Scaling",
+      groupScaleFactor: "Scale Value",
       editOnlyActive: "Edit Active Layer Only",
       moveObjectsToLayer: "Move Objects",
       deleteLayer: "Delete Layer",
@@ -487,6 +495,7 @@ export function applyLanguageUi(state, dom) {
       precision: "Precision",
       hatchApply: "Create Hatching",
       hatchValidate: "Check Endpoint Match",
+      selectSameColor: "Select Same Color",
       patternCopyRun: "Run Copy",
       dlineApply: "Apply",
       dlineTrimExecute: "Trim Execute",
@@ -531,7 +540,7 @@ export function applyLanguageUi(state, dom) {
       bottomRight: "Bottom Right",
       showCenterMark: "Show Center Marker",
       circleMode: "Mode",
-      circleModeDrag: "Mouse Drag",
+      circleModeDrag: "2-Point Click",
       circleModeFixed: "Fixed Radius",
       circleModeThreePoint: "3-Point Tangent",
       circleThreePointHint: "Select 3 objects that have center coordinates.",
@@ -588,6 +597,7 @@ export function applyLanguageUi(state, dom) {
       bothSides: "Both Sides",
       oneSide: "Single Side",
       noTrim: "No Trim",
+      dlineAsPolyline: "Generate as Polyline",
       dimArrowOpen: "Open",
       dimArrowClosed: "Filled Triangle",
       dimArrowHollow: "Hollow Triangle",
@@ -647,6 +657,7 @@ export function applyLanguageUi(state, dom) {
       else if (id === "traceImage") btn.textContent = t.traceImage;
       else if (id === "lineToPolyline") btn.textContent = t.lineToPolyline;
       else if (id === "export") btn.textContent = t.export;
+      else if (id === "png") btn.textContent = "PNG";
       else if (id === "pdf") btn.textContent = "PDF";
       else if (id === "svg") btn.textContent = "SVG";
       else if (id === "dxf") btn.textContent = "DXF";
@@ -674,7 +685,8 @@ export function applyLanguageUi(state, dom) {
   setText("#traceMaxSegLabel", t.traceMaxSeg);
   setText("#traceOffsetXLabel", t.traceOffsetX);
   setText("#traceOffsetYLabel", t.traceOffsetY);
-  setText("#importDxfAsPolylineLabel", t.importDxfAsPolyline);
+  setText("#importSourceUnitLabel", t.importSourceUnit);
+  setText("#importAsPolylineLabel", t.importAsPolyline);
   setText("#traceLineWidthLabel", t.lineWidth);
   setText("#traceLineTypeLabel", t.lineType);
   setText("#traceInvertLabel", t.traceInvert);
@@ -765,6 +777,9 @@ export function applyLanguageUi(state, dom) {
   setButtonById("dimMergeGroupsBtn", t.groupSelectedShapes);
   setButtonById("unparentGroupBtn", t.unparent);
   setButtonById("deleteGroupBtn", t.deleteThisGroup);
+  setLabelByControl("groupScaleEnableToggle", t.groupAllowScale);
+  setLabelByControl("groupScaleFactorInput", t.groupScaleFactor);
+  setButtonById("groupScaleApplyBtn", t.apply);
   setLabelByControl("groupAimEnableToggle", t.aimConstraint);
   setButtonById("groupAimPickBtn", t.aimPickTarget);
   setButtonById("groupAimClearBtn", t.aimClear);
@@ -805,6 +820,7 @@ export function applyLanguageUi(state, dom) {
   setPrevSpanByControl("dlineOffsetInput", t.offset);
   setPrevSpanByControl("dlineModeSelect", t.mode);
   setLabelByControl("dlineNoTrimToggle", t.noTrim);
+  setLabelByControl("dlineAsPolylineToggle", t.dlineAsPolyline);
   setPrevSpanByControl("dlineToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("dlineToolLineTypeInput", t.lineType);
   setOptionText("dlineModeSelect", "both", t.bothSides);
@@ -873,6 +889,7 @@ export function applyLanguageUi(state, dom) {
   if (dom.applyDLineBtn) dom.applyDLineBtn.textContent = t.dlineApply;
   if (dom.applyHatchBtn) dom.applyHatchBtn.textContent = t.hatchApply;
   if (dom.hatchValidateBtn) dom.hatchValidateBtn.textContent = t.hatchValidate;
+  if (dom.selectSameColorBtn) dom.selectSameColorBtn.textContent = t.selectSameColor;
   if (dom.patternCopyApplyBtn) dom.patternCopyApplyBtn.textContent = t.patternCopyRun;
   if (dom.patternCopySetCenterBtn) dom.patternCopySetCenterBtn.textContent = t.setAsCenter;
   if (dom.patternCopySetAxisBtn) dom.patternCopySetAxisBtn.textContent = t.setAsAxis;

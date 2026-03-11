@@ -29,6 +29,11 @@ function getDimRenderMetrics(state, dim) {
   return { fontPx, arrowPx, extOffPx, extOverPx };
 }
 
+function getDimScaleComp(dim) {
+  const c = Number(dim?.groupScaleComp);
+  return Number.isFinite(c) && c > 1e-9 ? c : 1;
+}
+
 function drawArrow(ctx, p, dir, _scale, color, type = "open", sizePt = 10) {
   const headLen = sizePt;
   const headWid = sizePt * 0.35;
@@ -180,7 +185,8 @@ export function createRenderDimensionOps(deps) {
       if (geom.kind === "circle" || geom.kind === "arc") {
         const c = worldToScreen(state.view, { x: geom.cx, y: geom.cy });
         const p2 = worldToScreen(state.view, { x: dim.x2, y: dim.y2 });
-        const label = (geom.kind === "circle" ? "ﾃ・" : "R ") + geom.len.toFixed(dim.precision ?? 1);
+        const dimComp = getDimScaleComp(dim);
+        const label = (geom.kind === "circle" ? "ﾃ・" : "R ") + (geom.len / dimComp).toFixed(dim.precision ?? 1);
         ctx.beginPath();
         ctx.moveTo(c.x, c.y);
         ctx.lineTo(p2.x, p2.y);
@@ -229,7 +235,8 @@ export function createRenderDimensionOps(deps) {
         const d2dir = reverseArrow ? { x: -geom.tx, y: -geom.ty } : { x: geom.tx, y: geom.ty };
         drawArrow(ctx, d1s, d1dir, scale, baseStroke, arrowType, arrowSize);
         drawArrow(ctx, d2s, d2dir, scale, baseStroke, arrowType, arrowSize);
-        const textVal = geom.len.toFixed(dim.precision ?? 1);
+        const dimComp = getDimScaleComp(dim);
+        const textVal = (geom.len / dimComp).toFixed(dim.precision ?? 1);
         drawTextLabel(ctx, state, dim, geom, textVal, selected, groupActive, normalColor);
       }
     } else if (dim.type === "circleDim") {
@@ -268,7 +275,8 @@ export function createRenderDimensionOps(deps) {
         drawArrow(ctx, c2s, d2, scale, baseStroke, arrowType, arrowSize);
       }
 
-      const value = dim.kind === "diameter" ? g.r * 2 : g.r;
+      const dimComp = getDimScaleComp(dim);
+      const value = (dim.kind === "diameter" ? g.r * 2 : g.r) / dimComp;
       const label = (dim.kind === "diameter" ? "D " : "R ") + value.toFixed(dim.precision ?? 1);
       const tGeom = { ...g, tx: g.ux, ty: g.uy };
       const tDim = { ...dim, tx: g.tx, ty: g.ty };
@@ -305,7 +313,8 @@ export function createRenderDimensionOps(deps) {
         ctx.stroke();
         drawArrow(ctx, d1s, { x: -g.tx, y: -g.ty }, scale, baseStroke, arrowType, arrowSize);
         drawArrow(ctx, d2s, { x: g.tx, y: g.ty }, scale, baseStroke, arrowType, arrowSize);
-        const textVal = g.len.toFixed(dim.precision ?? 1);
+        const dimComp = getDimScaleComp(dim);
+        const textVal = (g.len / dimComp).toFixed(dim.precision ?? 1);
         drawTextLabel(ctx, state, dim, g, textVal, selected, groupActive, normalColor);
       });
     } else if (dim.type === "dimangle") {

@@ -233,12 +233,13 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
   }
   const sid = Number(shape.id);
   const selected = selectedSet ? selectedSet.has(sid) : state.selection.ids.includes(sid);
+  const selectedVisual = selected && !state.ui?.suppressSelectionHighlight;
   const isHatchBoundary = state.tool === "hatch" && state.hatchDraft?.boundaryIds?.includes(Number(shape.id));
   const isPatternCopyReference = state.tool === "patterncopy" && (
     Number(shape.id) === state.input.patternCopyFlow.centerPositionId ||
     Number(shape.id) === state.input.patternCopyFlow.axisLineId
   );
-  const groupActive = !selected && (activeGroupShapeSet ? activeGroupShapeSet.has(sid) : isInActiveGroup(state, shape.id));
+  const groupActive = !selectedVisual && (activeGroupShapeSet ? activeGroupShapeSet.has(sid) : isInActiveGroup(state, shape.id));
   const layerColorize = !!state.ui?.layerView?.colorize;
   const groupColorize = !!state.ui?.groupView?.colorize;
   const resolvedGroupId = currentShapeGroupMap?.get?.(Number(shape.id));
@@ -253,9 +254,9 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
   const isHovered = (state.tool === "vertex" || state.tool === "select" || state.tool === "fillet")
     && state.input.hover?.shape && Number(state.input.hover.shape.id) === Number(shape.id);
 
-  ctx.strokeStyle = (selected || isHatchBoundary) ? "#f59e0b" : (isPatternCopyReference ? "#22c55e" : (groupActive ? "#2563eb" : (isHovered ? "#94a3b8" : baseStroke)));
+  ctx.strokeStyle = (selectedVisual || isHatchBoundary) ? "#f59e0b" : (isPatternCopyReference ? "#22c55e" : (groupActive ? "#2563eb" : (isHovered ? "#94a3b8" : baseStroke)));
   const shapeStrokePx = lineWidthMmToScreenPx(state, getShapeLineWidthMm(state, shape));
-  ctx.lineWidth = (selected || isHatchBoundary || isPatternCopyReference)
+  ctx.lineWidth = (selectedVisual || isHatchBoundary || isPatternCopyReference)
     ? Math.max(2, shapeStrokePx)
     : (isHovered ? Math.max(2, shapeStrokePx) : shapeStrokePx);
   if (shape.type !== "hatch" && shape.type !== "text" && shape.type !== "image") {
@@ -266,7 +267,7 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
 
   if (shape.type === "hatch") {
     drawHatchFill(ctx, state, shape);
-    if (selected) {
+    if (selectedVisual) {
       // ハッチE��択時にバウンチE��ングボックスを描画
       const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, shape.boundaryIds || [], state.view.scale);
       if (parsed.ok && parsed.bounds) {
@@ -323,7 +324,7 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
     ctx.translate(p1.x, p1.y);
     const rDeg = Number(shape.textRotate) || 0;
     ctx.rotate(rDeg * Math.PI / 180);
-    ctx.fillStyle = selected ? "#f59e0b" : (groupActive ? "#2563eb" : (shape.textColor || baseStroke));
+    ctx.fillStyle = selectedVisual ? "#f59e0b" : (groupActive ? "#2563eb" : (shape.textColor || baseStroke));
     const isBold = !!shape.textBold;
     const isItalic = !!shape.textItalic;
     const sizePt = Number(shape.textSizePt) || 12;
@@ -570,6 +571,10 @@ function drawActiveGroupRotateHandle(ctx, state) {
   return groupOverlayOps.drawActiveGroupRotateHandle(ctx, state);
 }
 
+function drawActiveGroupScaleHandle(ctx, state) {
+  return groupOverlayOps.drawActiveGroupScaleHandle(ctx, state);
+}
+
 function drawDimEditHandles(ctx, state) {
   return handlesOps.drawDimEditHandles(ctx, state);
 }
@@ -706,6 +711,7 @@ export function render(ctx, canvas, state) {
   drawActiveGroupHint(ctx, state);
   drawActiveGroupOriginHandle(ctx, state);
   drawActiveGroupRotateHandle(ctx, state);
+  drawActiveGroupScaleHandle(ctx, state);
   drawVertexHandles(ctx, state);
   drawDimEditHandles(ctx, state);
   drawImageScaleHandles(ctx, state);

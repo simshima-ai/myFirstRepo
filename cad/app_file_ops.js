@@ -64,6 +64,74 @@ export function createFileOpsRuntime(config) {
     return /\.(png|jpe?g|webp|gif|bmp)$/i.test(name);
   }
 
+  function unitMm(unitRaw) {
+    const u = String(unitRaw || "").toLowerCase();
+    if (u === "mm") return 1;
+    if (u === "cm") return 10;
+    if (u === "m") return 1000;
+    if (u === "inch" || u === "in") return 25.4;
+    if (u === "px") return 25.4 / 96; // CSS px
+    if (u === "pt") return 25.4 / 72;
+    return NaN;
+  }
+
+  function detectDxfInsunits(text) {
+    const pairs = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
+    for (let i = 0; i + 3 < pairs.length; i++) {
+      const c0 = String(pairs[i] || "").trim();
+      const v0 = String(pairs[i + 1] || "").trim();
+      const c1 = String(pairs[i + 2] || "").trim();
+      const v1 = String(pairs[i + 3] || "").trim();
+      if (c0 === "9" && v0.toUpperCase() === "$INSUNITS" && c1 === "70") {
+        const n = Number(v1);
+        if (n === 4) return "mm";
+        if (n === 5) return "cm";
+        if (n === 6) return "m";
+        if (n === 1) return "inch";
+        return "unitless";
+      }
+    }
+    return null;
+  }
+
+  function detectSvgUnit(text) {
+    const m = String(text || "").match(/<svg\b[^>]*\b(?:width|height)\s*=\s*["']\s*[-+]?(?:\d+\.?\d*|\.\d+)\s*([a-z%]+)?\s*["']/i);
+    const u = String(m?.[1] || "").toLowerCase();
+    if (u === "mm" || u === "cm" || u === "m" || u === "in" || u === "inch" || u === "px" || u === "pt") {
+      return (u === "in") ? "inch" : u;
+    }
+    if (!u) return "px";
+    return null;
+  }
+
+  function resolveImportSourceUnit(kind, text) {
+    const manual = String(state.ui?.importSourceUnit || "auto").toLowerCase();
+    if (manual && manual !== "auto") return manual;
+    if (kind === "dxf") return detectDxfInsunits(text) || "unitless";
+    if (kind === "svg") return detectSvgUnit(text) || "px";
+    return "unitless";
+  }
+
+  function scaleImportedShapes(shapes, factor) {
+    const f = Number(factor);
+    if (!Number.isFinite(f) || Math.abs(f - 1) <= 1e-12) return shapes;
+    const out = [];
+    for (const raw of (Array.isArray(shapes) ? shapes : [])) {
+      const s = JSON.parse(JSON.stringify(raw || {}));
+      const t = String(s.type || "").toLowerCase();
+      if (t === "line" || t === "rect") {
+        s.x1 = Number(s.x1) * f; s.y1 = Number(s.y1) * f;
+        s.x2 = Number(s.x2) * f; s.y2 = Number(s.y2) * f;
+      } else if (t === "polyline" && Array.isArray(s.points)) {
+        s.points = s.points.map((p) => ({ x: Number(p?.x) * f, y: Number(p?.y) * f }));
+      } else if (t === "circle" || t === "arc") {
+        s.cx = Number(s.cx) * f; s.cy = Number(s.cy) * f; s.r = Math.abs(Number(s.r) * f);
+      }
+      out.push(s);
+    }
+    return out;
+  }
+
   function polylineizeImportedLineShapes(shapes, eps = 1e-3) {
     const src = Array.isArray(shapes) ? shapes : [];
     const lines = [];
@@ -712,9 +780,71 @@ export function createFileOpsRuntime(config) {
     return true;
   }
 
-  function importVectorShapes(shapes, sourceName, mode = "import") {
+  function importVectorShapes(shapes, sourceName, mode = "import", importMeta = null) {
     const src = Array.isArray(shapes) ? shapes : [];
     if (!src.length) return false;
+    const isSvgSource = String(sourceName || "").toLowerCase().endsWith(".svg") || String(sourceName || "").toLowerCase().includes("svg");
+    const normalizeImported = (shape) => {
+      if (!shape || typeof shape !== "object") return shape;
+      return JSON.parse(JSON.stringify(shape));
+    };
+    const computeBounds = (items) => {
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      const addPt = (x, y) => {
+        const nx = Number(x), ny = Number(y);
+        if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;
+        minX = Math.min(minX, nx);
+        minY = Math.min(minY, ny);
+        maxX = Math.max(maxX, nx);
+        maxY = Math.max(maxY, ny);
+      };
+      for (const s of (items || [])) {
+        const t = String(s?.type || "").toLowerCase();
+        if (t === "line" || t === "rect") {
+          addPt(s.x1, s.y1); addPt(s.x2, s.y2);
+        } else if (t === "polyline") {
+          for (const p of (Array.isArray(s.points) ? s.points : [])) addPt(p?.x, p?.y);
+        } else if (t === "circle" || t === "arc") {
+          const cx = Number(s.cx), cy = Number(s.cy), r = Math.abs(Number(s.r) || 0);
+          addPt(cx - r, cy - r); addPt(cx + r, cy + r);
+        }
+      }
+      if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null;
+      return { minX, minY, maxX, maxY };
+    };
+    const viewCenterWorld = () => {
+      const vw = Math.max(1, Number(state.view?.viewportWidth || 1));
+      const vh = Math.max(1, Number(state.view?.viewportHeight || 1));
+      const sc = Math.max(1e-9, Number(state.view?.scale || 1));
+      const ox = Number(state.view?.offsetX || 0);
+      const oy = Number(state.view?.offsetY || 0);
+      return { x: (vw * 0.5 - ox) / sc, y: (vh * 0.5 - oy) / sc };
+    };
+    const translateShape = (s, dx, dy) => {
+      const t = String(s?.type || "").toLowerCase();
+      if (t === "line" || t === "rect") {
+        s.x1 = Number(s.x1) + dx; s.y1 = Number(s.y1) + dy;
+        s.x2 = Number(s.x2) + dx; s.y2 = Number(s.y2) + dy;
+      } else if (t === "polyline") {
+        if (Array.isArray(s.points)) {
+          s.points = s.points.map((p) => ({ x: Number(p?.x) + dx, y: Number(p?.y) + dy }));
+        }
+      } else if (t === "circle" || t === "arc") {
+        s.cx = Number(s.cx) + dx; s.cy = Number(s.cy) + dy;
+      }
+    };
+    let importSource = src.map(normalizeImported);
+    if (isSvgSource) {
+      const b = computeBounds(importSource);
+      if (b) {
+        const c = viewCenterWorld();
+        const cx = (b.minX + b.maxX) * 0.5;
+        const cy = (b.minY + b.maxY) * 0.5;
+        const dx = c.x - cx;
+        const dy = c.y - cy;
+        for (const s of importSource) translateShape(s, dx, dy);
+      }
+    }
     pushHistory(state);
     if (mode === "replace") {
       state.shapes = [];
@@ -753,7 +883,7 @@ export function createFileOpsRuntime(config) {
     const gid = Number(state.nextGroupId) || 1;
     state.nextGroupId = gid + 1;
     const imported = [];
-    for (const raw of src) {
+    for (const raw of importSource) {
       const t = String(raw?.type || "").toLowerCase();
       if (!["line", "polyline", "rect", "circle", "arc"].includes(t)) continue;
       const s = { ...raw };
@@ -785,7 +915,7 @@ export function createFileOpsRuntime(config) {
     setSelection(state, imported.map((s) => Number(s.id)));
     state.activeGroupId = gid;
     setStatus(`Imported ${imported.length} objects from ${sourceName}`);
-    beginImportAdjustSession(gid, imported.map((s) => Number(s.id)));
+    beginImportAdjustSession(gid, imported.map((s) => Number(s.id)), importMeta || null);
     draw();
     return true;
   }
@@ -847,7 +977,7 @@ export function createFileOpsRuntime(config) {
     return { minX, minY, maxX, maxY };
   }
 
-  function beginImportAdjustSession(groupId, shapeIds) {
+  function beginImportAdjustSession(groupId, shapeIds, meta = null) {
     const ids = (shapeIds || []).map(Number).filter(Number.isFinite);
     if (!ids.length) return;
     const ia = getImportAdjustState();
@@ -856,7 +986,46 @@ export function createFileOpsRuntime(config) {
     ia.shapeIds = ids.slice();
     ia.originalShapes = snapshotShapesByIds(ids);
     ia.params = { scale: 1, dx: 0, dy: 0, flipX: false, flipY: false };
+    ia.sourceKind = String(meta?.sourceKind || "");
+    ia.detectedSourceUnit = String(meta?.detectedSourceUnit || "");
+    ia.baseUnitScale = Number.isFinite(Number(meta?.baseUnitScale)) ? Number(meta.baseUnitScale) : 1;
+    if (!(Number.isFinite(ia.baseUnitScale) && ia.baseUnitScale > 0)) ia.baseUnitScale = 1;
+    // Keep preview unit-scaled from the start; manual Scale works as additional multiplier.
+    ia.params.scale = ia.baseUnitScale;
+    applyImportAdjustPreview();
     if (state.tool === "settings") state.tool = "select";
+  }
+
+  function getEffectiveSourceUnitForImport(sourceKind, detectedSourceUnit) {
+    const pref = String(state.ui?.importSourceUnit || "auto").toLowerCase();
+    if (pref && pref !== "auto") return pref;
+    const detected = String(detectedSourceUnit || "").toLowerCase();
+    if (detected) return detected;
+    return sourceKind === "svg" ? "px" : "unitless";
+  }
+
+  function resolveUnitScaleForImport(sourceKind, detectedSourceUnit) {
+    const srcUnit = getEffectiveSourceUnitForImport(sourceKind, detectedSourceUnit);
+    const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
+    const srcMm = unitMm(srcUnit);
+    const dstMm = unitMm(dstUnit);
+    if (!(Number.isFinite(srcMm) && Number.isFinite(dstMm) && dstMm > 0)) return 1;
+    return srcMm / dstMm;
+  }
+
+  function onImportSourceUnitChanged() {
+    const ia = getImportAdjustState();
+    if (!ia.active) return false;
+    const prevBase = Number(ia.baseUnitScale);
+    const nextBase = resolveUnitScaleForImport(String(ia.sourceKind || ""), String(ia.detectedSourceUnit || ""));
+    if (!(Number.isFinite(prevBase) && prevBase > 0 && Number.isFinite(nextBase) && nextBase > 0)) return false;
+    if (!ia.params || typeof ia.params !== "object") ia.params = { scale: 1, dx: 0, dy: 0, flipX: false, flipY: false };
+    const manualScale = Number(ia.params.scale);
+    ia.params.scale = (Number.isFinite(manualScale) ? manualScale : 1) * (nextBase / prevBase);
+    ia.baseUnitScale = nextBase;
+    const ok = applyImportAdjustPreview();
+    if (ok) draw();
+    return ok;
   }
 
   function transformPointImportAdjust(x, y, origin, params) {
@@ -961,6 +1130,38 @@ export function createFileOpsRuntime(config) {
   function applyImportAdjust() {
     const ia = getImportAdjustState();
     if (!ia.active) return false;
+    // Finalize optional polylineization at Apply timing (not at import timing).
+    if (!!state.ui?.importAsPolyline && (ia.sourceKind === "dxf" || ia.sourceKind === "svg")) {
+      const idSet = new Set((ia.shapeIds || []).map(Number).filter(Number.isFinite));
+      const importedNow = (state.shapes || []).filter((s) => idSet.has(Number(s?.id))).map((s) => JSON.parse(JSON.stringify(s)));
+      if (importedNow.length) {
+        const converted = polylineizeImportedLineShapes(importedNow, 1e-3);
+        const conv = Array.isArray(converted?.shapes) ? converted.shapes : importedNow;
+        const gid = Number(ia.groupId);
+        const oldIds = (ia.shapeIds || []).map(Number).filter(Number.isFinite);
+        const oldIdSet = new Set(oldIds);
+        state.shapes = (state.shapes || []).filter((s) => !oldIdSet.has(Number(s?.id)));
+        const baseLayerId = Number(importedNow[0]?.layerId ?? state.activeLayerId);
+        const createdIds = [];
+        for (const raw of conv) {
+          const t = String(raw?.type || "").toLowerCase();
+          if (!["line", "polyline", "rect", "circle", "arc"].includes(t)) continue;
+          const s = { ...raw };
+          s.id = nextShapeId(state);
+          s.type = t;
+          s.groupId = gid;
+          s.layerId = Number.isFinite(baseLayerId) ? baseLayerId : state.activeLayerId;
+          if (!Number.isFinite(Number(s.lineWidthMm))) s.lineWidthMm = Math.max(0.01, Number(state.lineWidthMm ?? 0.25) || 0.25);
+          if (typeof s.lineType !== "string") s.lineType = "solid";
+          state.shapes.push(s);
+          createdIds.push(Number(s.id));
+        }
+        const g = (state.groups || []).find((x) => Number(x?.id) === gid);
+        if (g) g.shapeIds = createdIds.slice();
+        ia.shapeIds = createdIds.slice();
+        setSelection(state, createdIds.slice());
+      }
+    }
     ia.active = false;
     ia.originalShapes = [];
     setStatus("Import transform applied");
@@ -1012,35 +1213,52 @@ export function createFileOpsRuntime(config) {
     const mode = String(modeRaw || "import");
     if (isDxfFile(file)) {
       const text = await file.text();
+      const srcUnit = resolveImportSourceUnit("dxf", text);
+      const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
+      const srcMm = unitMm(srcUnit);
+      const dstMm = unitMm(dstUnit);
+      const unitScale = (Number.isFinite(srcMm) && Number.isFinite(dstMm) && dstMm > 0) ? (srcMm / dstMm) : 1;
       const parsed = parseDxfToCadShapes(text, {
-        polylineize: !!state.ui?.importDxfAsPolyline
+        polylineize: false
       });
-      let shapes = parsed.shapes;
-      let polylineizeNote = "";
-      if (!!state.ui?.importDxfAsPolyline) {
-        const forced = polylineizeImportedLineShapes(shapes, 1e-3);
-        shapes = forced.shapes;
-        if (forced.mergedChains > 0) polylineizeNote = `DXF polylineize: merged ${forced.mergedChains} chains`;
-      }
+      const shapes = parsed.shapes;
       const polyCount = shapes.filter((s) => String(s?.type || "").toLowerCase() === "polyline").length;
       if (!shapes.length) throw new Error(parsed.warnings?.[0] || "DXF import failed");
-      importVectorShapes(shapes, String(file.name || "DXF"), mode);
-      if (!!state.ui?.importDxfAsPolyline) {
-        const msg = polylineizeNote
-          ? `${polylineizeNote}, polylines=${polyCount}`
-          : `DXF polylineize: polylines=${polyCount}`;
-        setStatus(`Imported with notes: ${msg}`);
-      } else if (parsed.warnings?.length) {
+      importVectorShapes(shapes, String(file.name || "DXF"), mode, {
+        sourceKind: "dxf",
+        detectedSourceUnit: srcUnit,
+        baseUnitScale: unitScale,
+      });
+      const unitNote = (srcUnit && srcUnit !== "unitless")
+        ? `unit=${srcUnit}->${dstUnit} (x${unitScale.toFixed(6)})`
+        : `unit=${srcUnit || "unitless"} (x1)`;
+      if (parsed.warnings?.length) {
         setStatus(`Imported with notes: ${parsed.warnings[0]}`);
+      } else {
+        setStatus(`Imported (preview): polylines=${polyCount}, ${unitNote}`);
       }
       return true;
     }
     if (isSvgFile(file)) {
       const text = await file.text();
+      const srcUnit = resolveImportSourceUnit("svg", text);
+      const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
+      const srcMm = unitMm(srcUnit);
+      const dstMm = unitMm(dstUnit);
+      const unitScale = (Number.isFinite(srcMm) && Number.isFinite(dstMm) && dstMm > 0) ? (srcMm / dstMm) : 1;
       const parsed = parseSvgToCadShapes(text);
       if (parsed.shapes.length) {
-        importVectorShapes(parsed.shapes, String(file.name || "SVG"), mode);
-        if (parsed.warnings?.length) setStatus(`Imported with notes: ${parsed.warnings[0]}`);
+        const shapes = parsed.shapes;
+        importVectorShapes(shapes, String(file.name || "SVG"), mode, {
+          sourceKind: "svg",
+          detectedSourceUnit: srcUnit,
+          baseUnitScale: unitScale,
+        });
+        const unitNote = (srcUnit && srcUnit !== "unitless")
+          ? `unit=${srcUnit}->${dstUnit} (x${unitScale.toFixed(6)})`
+          : `unit=${srcUnit || "unitless"} (x1)`;
+        if (parsed.warnings?.length) setStatus(`Imported with notes: ${parsed.warnings[0]} / ${unitNote}`);
+        else setStatus(`Imported with notes: ${unitNote}`);
         return true;
       }
       if (isImageLikeFile(file) && (mode === "import" || mode === "append")) {
@@ -1149,6 +1367,7 @@ export function createFileOpsRuntime(config) {
     importImageFile,
     bindJsonFileInputChange,
     bindDropImport,
+    onImportSourceUnitChanged,
     setImportAdjustParam,
     applyImportAdjust,
     cancelImportAdjust

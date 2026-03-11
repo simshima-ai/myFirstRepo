@@ -234,6 +234,25 @@ export function moveSelectedVerticesByDelta(state, dx, dy, helpers) {
     return selectionVertexOps.moveSelectedVerticesByDelta(state, dx, dy, helpers);
 }
 
+export function hitActiveGroupScaleHandle(state, screen) {
+    if (state.activeGroupId == null) return null;
+    const g = getGroup(state, state.activeGroupId);
+    if (!g) return null;
+    const scOpt = (g.scaleOptions && typeof g.scaleOptions === "object")
+        ? g.scaleOptions
+        : { allowScale: false };
+    if (!scOpt.allowScale) return null;
+    const c = {
+        x: (Number(g.originX) || 0) * state.view.scale + state.view.offsetX,
+        y: (Number(g.originY) || 0) * state.view.scale + state.view.offsetY,
+    };
+    const originR = 14;
+    const handleDist = originR * 6.6;
+    const ang = ((Number(g.rotationDeg) || 0) + 45) * Math.PI / 180;
+    const h = { x: c.x + Math.cos(ang) * handleDist, y: c.y + Math.sin(ang) * handleDist };
+    return (Math.hypot(screen.x - h.x, screen.y - h.y) <= 20) ? g : null;
+}
+
 export function deleteSelectedPolylineVertices(state, helpers) {
     return selectionVertexOps.deleteSelectedPolylineVertices(state, helpers);
 }
@@ -254,8 +273,16 @@ export function beginGroupRotateDrag(state, group, worldRaw) {
     return groupTransformOps.beginGroupRotateDrag(state, group, worldRaw);
 }
 
+export function beginGroupScaleDrag(state, group, worldRaw) {
+    return groupTransformOps.beginGroupScaleDrag(state, group, worldRaw);
+}
+
 export function applyGroupOriginDrag(state, worldRaw) {
     return groupTransformOps.applyGroupOriginDrag(state, worldRaw);
+}
+
+export function applyGroupScaleDrag(state, worldRaw) {
+    return groupTransformOps.applyGroupScaleDrag(state, worldRaw);
 }
 
 function resolveFollowPointFromAttrib(state, attrib) {
@@ -393,6 +420,10 @@ export function endGroupOriginDrag(state) {
 
 export function endGroupRotateDrag(state) {
     return groupTransformOps.endGroupRotateDrag(state);
+}
+
+export function endGroupScaleDrag(state) {
+    return groupTransformOps.endGroupScaleDrag(state);
 }
 
 export function beginGroupOriginPickDrag(state, group, worldRaw) {

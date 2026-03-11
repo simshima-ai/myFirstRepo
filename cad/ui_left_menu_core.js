@@ -31,6 +31,7 @@ export function createHtmlLikeLeftMenuRegistry() {
       label: "Export",
       group: "file",
       options: [
+        { id: "png", label: "PNG", implemented: true },
         { id: "pdf", label: "PDF", implemented: true },
         { id: "svg", label: "SVG", implemented: true },
         { id: "dxf", label: "DXF", implemented: true },

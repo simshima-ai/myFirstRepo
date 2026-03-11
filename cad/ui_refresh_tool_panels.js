@@ -266,7 +266,10 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
   if (dom.importAdjustDyInput) setIfNotEditing(dom.importAdjustDyInput, Number(importAdjustParams.dy ?? 0));
   if (dom.importAdjustFlipXToggle) dom.importAdjustFlipXToggle.checked = !!importAdjustParams.flipX;
   if (dom.importAdjustFlipYToggle) dom.importAdjustFlipYToggle.checked = !!importAdjustParams.flipY;
-  if (dom.importDxfAsPolylineToggle) dom.importDxfAsPolylineToggle.checked = !!state.ui?.importDxfAsPolyline;
+  if (dom.importSourceUnitSelect && document.activeElement !== dom.importSourceUnitSelect) {
+    dom.importSourceUnitSelect.value = String(state.ui?.importSourceUnit || "auto");
+  }
+  if (dom.importAsPolylineToggle) dom.importAsPolylineToggle.checked = !!state.ui?.importAsPolyline;
   if (dom.importAdjustScaleInput) dom.importAdjustScaleInput.disabled = !importAdjustActive;
   if (dom.importAdjustDxInput) dom.importAdjustDxInput.disabled = !importAdjustActive;
   if (dom.importAdjustDyInput) dom.importAdjustDyInput.disabled = !importAdjustActive;

@@ -30,7 +30,8 @@ export function createPersistenceRuntime(config) {
         menuScalePct: Number(state.ui?.menuScalePct ?? 100),
         touchMode: !!state.ui?.touchMode,
         touchMultiSelect: !!state.ui?.touchMultiSelect,
-        importDxfAsPolyline: !!state.ui?.importDxfAsPolyline,
+        importSourceUnit: String(state.ui?.importSourceUnit || "auto"),
+        importAsPolyline: !!state.ui?.importAsPolyline,
         groupCurrentLayerOnly: !!state.ui?.groupView?.currentLayerOnly,
         leftMenuVisibility: (state.ui?.leftMenuVisibility && typeof state.ui.leftMenuVisibility === "object")
           ? { ...state.ui.leftMenuVisibility }
@@ -104,7 +105,9 @@ export function createPersistenceRuntime(config) {
         state.ui.menuScalePct = Math.max(50, Math.min(200, Math.round(Number(data.ui.menuScalePct ?? state.ui.menuScalePct ?? 100) / 5) * 5));
         state.ui.touchMode = !!(data.ui.touchMode ?? state.ui.touchMode);
         state.ui.touchMultiSelect = !!(data.ui.touchMultiSelect ?? state.ui.touchMultiSelect);
-        state.ui.importDxfAsPolyline = !!(data.ui.importDxfAsPolyline ?? state.ui.importDxfAsPolyline);
+        state.ui.importSourceUnit = String(data.ui.importSourceUnit || state.ui.importSourceUnit || "auto");
+        const legacyPoly = !!(data.ui.importDxfAsPolyline || data.ui.importSvgAsPolyline);
+        state.ui.importAsPolyline = !!(data.ui.importAsPolyline ?? state.ui.importAsPolyline ?? legacyPoly);
         state.ui.leftMenuVisibility = (data.ui.leftMenuVisibility && typeof data.ui.leftMenuVisibility === "object")
           ? { ...data.ui.leftMenuVisibility }
           : (state.ui.leftMenuVisibility || {});

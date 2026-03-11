@@ -79,9 +79,18 @@ export function createUiPrefsOps(config) {
     draw();
   }
 
-  function setImportDxfAsPolyline(on) {
+  function setImportAsPolyline(on) {
     if (!state.ui) state.ui = {};
-    state.ui.importDxfAsPolyline = !!on;
+    state.ui.importAsPolyline = !!on;
+    scheduleSaveAppSettings();
+    draw();
+  }
+
+  function setImportSourceUnit(unit) {
+    if (!state.ui) state.ui = {};
+    const v = String(unit || "auto").toLowerCase();
+    const ok = new Set(["auto", "unitless", "mm", "cm", "m", "inch", "px", "pt"]);
+    state.ui.importSourceUnit = ok.has(v) ? v : "auto";
     scheduleSaveAppSettings();
     draw();
   }
@@ -113,7 +122,8 @@ export function createUiPrefsOps(config) {
     setAutoBackupIntervalSec,
     setTouchMode,
     setTouchMultiSelect,
-    setImportDxfAsPolyline,
+    setImportSourceUnit,
+    setImportAsPolyline,
     setToolShortcut,
     resetToolShortcuts
   };

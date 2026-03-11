@@ -1,5 +1,5 @@
 ﻿import {
-  createState, addShape, nextShapeId, setSelection, clearSelection, setTool,
+  createState, addShape, nextShapeId, nextGroupId, setSelection, clearSelection, setTool,
   pushHistory, pushHistorySnapshot, snapshotModel, restoreModel, undo as stateUndo, redo as stateRedo, removeShapeById,
   addLayer, setActiveLayer, setLayerVisible, setLayerLocked, isLayerVisible, isLayerLocked,
   createGroupFromSelection, getGroup, setActiveGroup, moveGroupOrigin, addGroup, addShapesAsGroup,
@@ -31,7 +31,7 @@ import {
   setLineWidthMm, setToolLineType, setSelectedLineWidthMm, setSelectedLineType,
   setSelectedColor, setToolColor,
   setFilletNoTrim,
-  buildDoubleLinePreview, executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg, exportDxf,
+  buildDoubleLinePreview, executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg, exportDxf, exportPng,
   beginOrAdvanceDim, updateDimHover, finalizeDimDraft,
   beginOrExtendPolyline, updatePolylineHover, finalizePolylineDraft,
   executeHatch, validateHatchBoundary, trimateFillet, applyDimSettingsToSelection, mergeSelectedShapesToGroup,
@@ -102,10 +102,92 @@ const APP_SETTINGS_KEY = "s-cad:settings:v1";
 
 const dom = createDomRefs();
 const ctx = dom.canvas.getContext("2d");
+const debugConsoleState = {
+  maxRows: 300,
+  rows: [],
+};
+
+function formatConsoleArg(v) {
+  if (typeof v === "string") return v;
+  if (v instanceof Error) return `${v.name}: ${v.message}`;
+  try {
+    return JSON.stringify(v);
+  } catch (_) {
+    return String(v);
+  }
+}
+
+function appendDebugConsole(text, level = "info") {
+  const body = dom.debugConsoleBody;
+  if (!body) return;
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, "0");
+  const mm = String(now.getMinutes()).padStart(2, "0");
+  const ss = String(now.getSeconds()).padStart(2, "0");
+  const line = `[${hh}:${mm}:${ss}] ${String(text ?? "")}`;
+  debugConsoleState.rows.push(line);
+  if (debugConsoleState.rows.length > debugConsoleState.maxRows) debugConsoleState.rows.shift();
+
+  const row = document.createElement("div");
+  row.className = `debug-console-row ${level}`;
+  row.textContent = line;
+  body.appendChild(row);
+  while (body.childElementCount > debugConsoleState.maxRows) {
+    body.removeChild(body.firstElementChild);
+  }
+  body.scrollTop = body.scrollHeight;
+}
 
 function setStatus(text) {
   if (dom.statusText) dom.statusText.textContent = text;
+  appendDebugConsole(`status: ${text}`, "info");
 }
+
+function initDebugConsole() {
+  if (dom.debugConsoleClearBtn) {
+    dom.debugConsoleClearBtn.addEventListener("click", () => {
+      debugConsoleState.rows = [];
+      if (dom.debugConsoleBody) dom.debugConsoleBody.textContent = "";
+    });
+  }
+  if (dom.debugConsoleCopyBtn) {
+    dom.debugConsoleCopyBtn.addEventListener("click", async () => {
+      const text = debugConsoleState.rows.join("\n");
+      if (!text) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        setStatus("Debug Console copied");
+      } catch (_) {
+        setStatus("Copy failed");
+      }
+    });
+  }
+  const methods = ["log", "info", "warn", "error"];
+  for (const m of methods) {
+    const original = console[m]?.bind(console);
+    if (typeof original !== "function") continue;
+    console[m] = (...args) => {
+      try {
+        const text = args.map((a) => formatConsoleArg(a)).join(" ");
+        appendDebugConsole(text, m === "log" ? "info" : m);
+      } catch (_) {
+      }
+      original(...args);
+    };
+  }
+  appendDebugConsole("Debug Console ready", "info");
+}
+
+function toggleDebugConsolePanel() {
+  const panel = dom.debugConsolePanel;
+  if (!panel) return false;
+  const hidden = panel.style.display === "none";
+  panel.style.display = hidden ? "flex" : "none";
+  setStatus(hidden ? "Debug Console: ON" : "Debug Console: OFF");
+  return true;
+}
+
+initDebugConsole();
 
 const persistence = createPersistenceRuntime({
   state,
@@ -164,6 +246,143 @@ function getPrimarySelectedShape() {
   return null;
 }
 
+function getDefaultPngExportSettings() {
+  return {
+    filename: "",
+    rangeMode: "page",
+    customX: 0,
+    customY: 0,
+    customWidth: 100,
+    customHeight: 100,
+    sizeMode: "pixels",
+    dpi: 300,
+    pxWidth: 2048,
+    pxHeight: 1536,
+    scaleMul: 1,
+    marginPx: 0,
+    backgroundMode: "white",
+    backgroundColor: "#ffffff",
+    colorMode: "normal",
+    includeGrid: false,
+    includeAxes: false,
+    includePageFrame: false,
+    includeSelection: false,
+    antialias: true,
+    srgb: true,
+    lineScale: 1,
+    minLinePx: 0,
+  };
+}
+
+function getPngExportSettings() {
+  if (!state.ui) state.ui = {};
+  if (!state.ui.pngExportSettings || typeof state.ui.pngExportSettings !== "object") {
+    state.ui.pngExportSettings = getDefaultPngExportSettings();
+  }
+  return { ...getDefaultPngExportSettings(), ...state.ui.pngExportSettings };
+}
+
+function setPngExportModalVisible(visible) {
+  if (!dom.pngExportModal) return;
+  dom.pngExportModal.style.display = visible ? "flex" : "none";
+  dom.pngExportModal.setAttribute("aria-hidden", visible ? "false" : "true");
+}
+
+function syncPngExportVisibilityByRange() {
+  const isCustom = String(dom.pngRangeModeSelect?.value || "page") === "custom";
+  const ids = ["pngCustomXWrap", "pngCustomYWrap", "pngCustomWWrap", "pngCustomHWrap"];
+  for (const id of ids) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = isCustom ? "" : "none";
+  }
+}
+
+function syncPngExportVisibilityBySizeMode() {
+  const isDpi = String(dom.pngSizeModeSelect?.value || "pixels") === "dpi";
+  if (dom.pngDpiInput) dom.pngDpiInput.disabled = !isDpi;
+}
+
+function openPngExportDialog() {
+  const o = getPngExportSettings();
+  if (dom.pngFilenameInput) dom.pngFilenameInput.value = String(o.filename || "");
+  if (dom.pngRangeModeSelect) dom.pngRangeModeSelect.value = String(o.rangeMode || "page");
+  if (dom.pngCustomXInput) dom.pngCustomXInput.value = String(Number(o.customX || 0));
+  if (dom.pngCustomYInput) dom.pngCustomYInput.value = String(Number(o.customY || 0));
+  if (dom.pngCustomWInput) dom.pngCustomWInput.value = String(Math.max(0.0001, Number(o.customWidth || 100)));
+  if (dom.pngCustomHInput) dom.pngCustomHInput.value = String(Math.max(0.0001, Number(o.customHeight || 100)));
+  if (dom.pngSizeModeSelect) dom.pngSizeModeSelect.value = String(o.sizeMode || "pixels");
+  if (dom.pngDpiInput) dom.pngDpiInput.value = String(Math.max(1, Number(o.dpi || 300)));
+  if (dom.pngWidthInput) dom.pngWidthInput.value = String(Math.max(1, Number(o.pxWidth || 2048)));
+  if (dom.pngHeightInput) dom.pngHeightInput.value = String(Math.max(1, Number(o.pxHeight || 1536)));
+  if (dom.pngScaleMulInput) dom.pngScaleMulInput.value = String(Math.max(0.01, Number(o.scaleMul || 1)));
+  if (dom.pngMarginInput) dom.pngMarginInput.value = String(Math.max(0, Math.round(Number(o.marginPx || 0))));
+  if (dom.pngBackgroundModeSelect) dom.pngBackgroundModeSelect.value = String(o.backgroundMode || "white");
+  if (dom.pngBackgroundColorInput) dom.pngBackgroundColorInput.value = String(o.backgroundColor || "#ffffff");
+  if (dom.pngColorModeSelect) dom.pngColorModeSelect.value = String(o.colorMode || "normal");
+  if (dom.pngIncludeGridToggle) dom.pngIncludeGridToggle.checked = !!o.includeGrid;
+  if (dom.pngIncludeAxesToggle) dom.pngIncludeAxesToggle.checked = !!o.includeAxes;
+  if (dom.pngIncludePageFrameToggle) dom.pngIncludePageFrameToggle.checked = !!o.includePageFrame;
+  if (dom.pngIncludeSelectionToggle) dom.pngIncludeSelectionToggle.checked = !!o.includeSelection;
+  if (dom.pngAntialiasToggle) dom.pngAntialiasToggle.checked = !!o.antialias;
+  if (dom.pngSrgbToggle) dom.pngSrgbToggle.checked = !!o.srgb;
+  if (dom.pngLineScaleInput) dom.pngLineScaleInput.value = String(Math.max(0.1, Number(o.lineScale || 1)));
+  if (dom.pngMinLinePxInput) dom.pngMinLinePxInput.value = String(Math.max(0, Number(o.minLinePx || 0)));
+  syncPngExportVisibilityByRange();
+  syncPngExportVisibilityBySizeMode();
+  setPngExportModalVisible(true);
+}
+
+function closePngExportDialog() {
+  setPngExportModalVisible(false);
+}
+
+function runPngExportFromDialog() {
+  const next = {
+    filename: String(dom.pngFilenameInput?.value || "").trim(),
+    rangeMode: String(dom.pngRangeModeSelect?.value || "page"),
+    customX: Number(dom.pngCustomXInput?.value || 0),
+    customY: Number(dom.pngCustomYInput?.value || 0),
+    customWidth: Math.max(0.0001, Number(dom.pngCustomWInput?.value || 100)),
+    customHeight: Math.max(0.0001, Number(dom.pngCustomHInput?.value || 100)),
+    sizeMode: String(dom.pngSizeModeSelect?.value || "pixels"),
+    dpi: Math.max(1, Number(dom.pngDpiInput?.value || 300)),
+    pxWidth: Math.max(1, Math.round(Number(dom.pngWidthInput?.value || 2048))),
+    pxHeight: Math.max(1, Math.round(Number(dom.pngHeightInput?.value || 1536))),
+    scaleMul: Math.max(0.01, Number(dom.pngScaleMulInput?.value || 1)),
+    marginPx: Math.max(0, Math.round(Number(dom.pngMarginInput?.value || 0))),
+    backgroundMode: String(dom.pngBackgroundModeSelect?.value || "white"),
+    backgroundColor: String(dom.pngBackgroundColorInput?.value || "#ffffff"),
+    colorMode: String(dom.pngColorModeSelect?.value || "normal"),
+    includeGrid: !!dom.pngIncludeGridToggle?.checked,
+    includeAxes: !!dom.pngIncludeAxesToggle?.checked,
+    includePageFrame: !!dom.pngIncludePageFrameToggle?.checked,
+    includeSelection: !!dom.pngIncludeSelectionToggle?.checked,
+    antialias: !!dom.pngAntialiasToggle?.checked,
+    srgb: !!dom.pngSrgbToggle?.checked,
+    lineScale: Math.max(0.1, Number(dom.pngLineScaleInput?.value || 1)),
+    minLinePx: Math.max(0, Number(dom.pngMinLinePxInput?.value || 0)),
+  };
+  state.ui.pngExportSettings = next;
+  scheduleSaveAppSettings();
+  exportPng(state, helpers, next);
+  closePngExportDialog();
+}
+
+function getShapeDisplayColorHex(shape) {
+  if (!shape || typeof shape !== "object") return null;
+  const norm = (v) => {
+    const s = String(v || "").trim().toLowerCase();
+    return /^#[0-9a-f]{6}$/.test(s) ? s : null;
+  };
+  const t = String(shape.type || "");
+  if (t === "text") return norm(shape.textColor) || norm(shape.color);
+  if (t === "hatch") return norm(shape.lineColor) || norm(shape.color);
+  if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circleDim") {
+    return norm(shape.color) || norm(shape.lineColor);
+  }
+  return norm(shape.color) || norm(shape.lineColor) || norm(shape.textColor);
+}
+
 function buildRectAsLines(p1, p2) {
   return [
     { type: "line", x1: p1.x, y1: p1.y, x2: p2.x, y2: p1.y },
@@ -205,6 +424,7 @@ const groupAimOps = createGroupAimOps({
 const groupStructureOps = createGroupStructureOps({
   state,
   getGroup,
+  collectGroupTreeShapeIds,
   pushHistory,
   draw
 });
@@ -246,7 +466,9 @@ const doubleLineOps = createDoubleLineOps({
     setStatus,
     pushHistory: () => pushHistory(state),
     nextShapeId: () => nextShapeId(state),
+    nextGroupId: () => nextGroupId(state),
     addShape: (s) => addShape(state, s),
+    addGroup: (g) => addGroup(state, g),
     removeShapeById: (id) => removeShapeById(state, id),
     clearSelection: () => clearSelection(state),
     setSelection: (ids) => setSelection(state, ids),
@@ -307,7 +529,9 @@ const layerGroupOps = createLayerGroupOps({
 
 const helpers = {
   draw,
+  render,
   setStatus,
+  toggleDebugConsole: () => toggleDebugConsolePanel(),
   pushHistory: () => pushHistory(state),
   pushHistorySnapshot: (snap) => pushHistorySnapshot(state, snap),
   snapshotModel: () => snapshotModel(state),
@@ -365,6 +589,11 @@ const helpers = {
   pdf: () => exportPdf(state, helpers),
   svg: () => exportSvg(state, helpers),
   dxf: () => exportDxf(state, helpers),
+  png: () => openPngExportDialog(),
+  closePngExportDialog: () => closePngExportDialog(),
+  runPngExportFromDialog: () => runPngExportFromDialog(),
+  syncPngExportVisibilityByRange: () => syncPngExportVisibilityByRange(),
+  syncPngExportVisibilityBySizeMode: () => syncPngExportVisibilityBySizeMode(),
 
   createLine: (p1, p2) => createLine(p1, p2),
   createRect: (p1, p2) => createRect(p1, p2),
@@ -416,6 +645,8 @@ const helpers = {
   pickOrConfirmActiveGroupAimTarget: () => groupAimOps.pickOrConfirmActiveGroupAimTarget(),
   clearActiveGroupAimTarget: () => groupAimOps.clearActiveGroupAimTarget(),
   setActiveGroupParent: (pid) => groupStructureOps.setActiveGroupParent(pid),
+  setActiveGroupScaleOptions: (options) => groupStructureOps.setActiveGroupScaleOptions(options),
+  setActiveGroupScaleFactor: (value) => groupStructureOps.setActiveGroupScaleFactor(value),
   moveShapeToGroup: (sid, gid) => groupStructureOps.moveShapeToGroup(sid, gid),
   moveShapesToGroup: (shapeIds, gid) => groupStructureOps.moveShapesToGroup(shapeIds, gid),
   createGroupFromSelection: (name) => { pushHistory(state); const g = createGroupFromSelection(state, name); draw(); return g; },
@@ -542,6 +773,52 @@ const helpers = {
   setSelectedLineWidthMm: (v) => setSelectedLineWidthMm(state, helpers, v),
   setSelectedLineType: (v) => setSelectedLineType(state, helpers, v),
   setSelectedColor: (v) => setSelectedColor(state, helpers, v),
+  selectShapesByColor: (hex) => {
+    const c0 = String(hex || "").trim().toLowerCase();
+    const target = /^#[0-9a-f]{6}$/.test(c0) ? c0 : "";
+    if (!target) {
+      setStatus("No color selected");
+      draw();
+      return;
+    }
+    const matchedIds = [];
+    for (const s of (state.shapes || [])) {
+      const c = getShapeDisplayColorHex(s);
+      if (c && c === target) matchedIds.push(Number(s.id));
+    }
+    setSelection(state, matchedIds);
+    state.activeGroupId = null;
+    setStatus(`Selected ${matchedIds.length} same-color object(s)`);
+    draw();
+  },
+  selectSameColorAsSelection: () => {
+    const selIds = new Set((state.selection?.ids || []).map(Number).filter(Number.isFinite));
+    if (!selIds.size) {
+      setStatus("Select objects first");
+      draw();
+      return;
+    }
+    const selectedShapes = (state.shapes || []).filter((s) => selIds.has(Number(s.id)));
+    const colors = new Set();
+    for (const s of selectedShapes) {
+      const c = getShapeDisplayColorHex(s);
+      if (c) colors.add(c);
+    }
+    if (!colors.size) {
+      setStatus("No color found in selected objects");
+      draw();
+      return;
+    }
+    const matchedIds = [];
+    for (const s of (state.shapes || [])) {
+      const c = getShapeDisplayColorHex(s);
+      if (c && colors.has(c)) matchedIds.push(Number(s.id));
+    }
+    setSelection(state, matchedIds);
+    state.activeGroupId = null;
+    setStatus(`Selected ${matchedIds.length} same-color object(s)`);
+    draw();
+  },
   setToolColor: (v, toolKey = null) => setToolColor(state, helpers, v, toolKey),
   setSelectPickMode: (mode) => {
     if (!state.ui) state.ui = {};
@@ -605,7 +882,11 @@ const helpers = {
   setAutoBackupIntervalSec: (sec) => uiPrefsOps.setAutoBackupIntervalSec(sec),
   setTouchMode: (on) => uiPrefsOps.setTouchMode(on),
   setTouchMultiSelect: (on) => uiPrefsOps.setTouchMultiSelect(on),
-  setImportDxfAsPolyline: (on) => uiPrefsOps.setImportDxfAsPolyline(on),
+  setImportSourceUnit: (u) => {
+    uiPrefsOps.setImportSourceUnit(u);
+    fileOps.onImportSourceUnitChanged?.();
+  },
+  setImportAsPolyline: (on) => uiPrefsOps.setImportAsPolyline(on),
   confirmTouchRectStep: () => {
     if (!(String(state.tool || "") === "rect" && !!state.ui?.touchMode)) return false;
     if (!state.input.touchRectDraft || typeof state.input.touchRectDraft !== "object") {
@@ -808,6 +1089,7 @@ fileOps.bindDropImport();
 
 // Handle exports for manual access if needed
 window.cadApp = { state, dom, helpers, exportJsonObject, importJsonObject };
+
 
 
 

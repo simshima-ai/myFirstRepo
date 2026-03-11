@@ -13,6 +13,8 @@ export function handlePointerDownSelectMode(state, dom, helpers, deps, ctx) {
         findConnectedLinesChain,
         hitActiveGroupRotateHandle,
         beginGroupRotateDrag,
+        hitActiveGroupScaleHandle,
+        beginGroupScaleDrag,
         hitActiveGroupOriginHandle,
         beginGroupOriginDrag,
         hitTestDimHandle,
@@ -70,6 +72,21 @@ export function handlePointerDownSelectMode(state, dom, helpers, deps, ctx) {
             state.selection.groupIds = [hitGroupId];
         }
         beginGroupOriginDrag(state, groupHandleHit, worldRaw);
+        if (draw) draw();
+        return true;
+    }
+    const scaleHandleHit = hitActiveGroupScaleHandle(state, screen);
+    if (scaleHandleHit && !isAppendSelect(e)) {
+        const hitGroupId = Number(scaleHandleHit.id);
+        const selectedGroupIds = Array.isArray(state.selection?.groupIds)
+            ? state.selection.groupIds.map(Number).filter(Number.isFinite)
+            : [];
+        const keepMultiGroupSelection = selectedGroupIds.length > 1 && selectedGroupIds.includes(hitGroupId);
+        if (!keepMultiGroupSelection) {
+            setSelection((scaleHandleHit.shapeIds || []).slice());
+            state.selection.groupIds = [hitGroupId];
+        }
+        beginGroupScaleDrag(state, scaleHandleHit, worldRaw);
         if (draw) draw();
         return true;
     }

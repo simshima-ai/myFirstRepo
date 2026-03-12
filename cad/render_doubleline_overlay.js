@@ -1,4 +1,4 @@
-export function createRenderDoubleLineOverlayOps(deps) {
+﻿export function createRenderDoubleLineOverlayOps(deps) {
   const { worldToScreen } = deps;
 
   function drawDoubleLinePreview(ctx, state) {
@@ -45,13 +45,27 @@ export function createRenderDoubleLineOverlayOps(deps) {
       ctx.setLineDash([]);
       ctx.lineWidth = 1.1;
       for (const m of dbg) {
-        if (!m || String(m.type || "") !== "circle") continue;
+        if (!m) continue;
+        const mt = String(m.type || "");
         ctx.strokeStyle = String(m.color || "#16a34a");
-        const c = worldToScreen(state.view, { x: Number(m.cx), y: Number(m.cy) });
-        const rr = Math.max(1.5, Number(m.r) * state.view.scale);
-        ctx.beginPath();
-        ctx.arc(c.x, c.y, rr, 0, Math.PI * 2);
-        ctx.stroke();
+        if (mt === "circle") {
+          const c = worldToScreen(state.view, { x: Number(m.cx), y: Number(m.cy) });
+          const rr = Math.max(1.5, Number(m.r) * state.view.scale);
+          ctx.beginPath();
+          ctx.arc(c.x, c.y, rr, 0, Math.PI * 2);
+          ctx.stroke();
+          continue;
+        }
+        if (mt === "cross") {
+          const c = worldToScreen(state.view, { x: Number(m.x), y: Number(m.y) });
+          const half = Math.max(2, Number(m.halfPx) || 2);
+          ctx.beginPath();
+          ctx.moveTo(c.x - half, c.y - half);
+          ctx.lineTo(c.x + half, c.y + half);
+          ctx.moveTo(c.x - half, c.y + half);
+          ctx.lineTo(c.x + half, c.y - half);
+          ctx.stroke();
+        }
       }
       ctx.restore();
     }
@@ -60,7 +74,6 @@ export function createRenderDoubleLineOverlayOps(deps) {
 
   function drawDoubleLineTrimCandidates(ctx, state) {
     if (state.tool !== "doubleline" || !state.dlineTrimPending) return;
-    return;
     const candidates = Array.isArray(state.dlineTrimCandidates) ? state.dlineTrimCandidates : [];
     if (!candidates.length) return;
     ctx.save();
@@ -80,7 +93,6 @@ export function createRenderDoubleLineOverlayOps(deps) {
   }
 
   function drawDoubleLineTrimIntersections(ctx, state) {
-    return;
     const points = Array.isArray(state.dlineTrimIntersections) ? state.dlineTrimIntersections : [];
     if (!points.length) return;
     ctx.save();
@@ -160,3 +172,5 @@ export function createRenderDoubleLineOverlayOps(deps) {
     drawDoubleLineConnectDebug,
   };
 }
+
+

@@ -1,5 +1,6 @@
-﻿import { segmentIntersectionParamPoint } from "./solvers.js";
+import { segmentIntersectionParamPoint } from "./solvers.js";
 import { sampleBSplinePoints } from "./bspline_utils.js";
+import { expandDoubleLineBasesFromSelection } from "./dline_geom.js";
 
 
 export function createDoubleLineOps(config) {
@@ -8,52 +9,99 @@ export function createDoubleLineOps(config) {
     helpers,
     executeDoubleLineGeom,
     buildDoubleLinePreviewGeom,
+    buildDoubleLineTrimMarkersGeom,
     trimClickedLineAtNearestIntersection,
     clearDoubleLineTrimPendingState,
     setStatus,
     draw
   } = config || {};
 
-  function expandSelectedBaseLinesForTrim(baseShapes) {
-    const out = [];
-    for (const s of (baseShapes || [])) {
-      if (!s) continue;
-      const t = String(s.type || "");
-      if (t === "line") {
-        const x1 = Number(s.x1), y1 = Number(s.y1), x2 = Number(s.x2), y2 = Number(s.y2);
-        if ([x1, y1, x2, y2].every(Number.isFinite) && Math.hypot(x2 - x1, y2 - y1) > 1e-9) {
-          out.push({ x1, y1, x2, y2 });
-        }
+  function getExpandedSelectedBases() {
+    const expanded = expandDoubleLineBasesFromSelection(state);
+    return Array.isArray(expanded?.bases) ? expanded.bases.filter((s) => !!s) : [];
+  }
+  function withResolvedDoubleLineSources(run, options = null) {
+    const restoreOriginalSelection = options?.restoreOriginalSelection !== false;
+    const originalSelectionIds = Array.isArray(state.selection?.ids) ? state.selection.ids.map(Number).filter(Number.isFinite) : [];
+    const selectedShapes = originalSelectionIds
+      .map((id) => (state.shapes || []).find((s) => Number(s?.id) === Number(id)))
+      .filter((s) => !!s);
+    const tempShapes = [];
+    const effectiveSelectionIds = [];
+    const pushTempLine = (sourceShape, a, b, segIndex) => {
+      const x1 = Number(a?.x), y1 = Number(a?.y), x2 = Number(b?.x), y2 = Number(b?.y);
+      if (![x1, y1, x2, y2].every(Number.isFinite)) return;
+      if (Math.hypot(x2 - x1, y2 - y1) <= 1e-9) return;
+      const ownerId = Number(sourceShape?.id);
+      const segNo = Math.max(0, Number(segIndex) || 0);
+      const id = Number.isFinite(ownerId)
+        ? Number(-2000000000 - ownerId * 1000 - segNo)
+        : Number(helpers.nextShapeId?.());
+      if (!Number.isFinite(id)) return;
+      const temp = {
+        id,
+        type: "line",
+        x1, y1, x2, y2,
+        layerId: Number(sourceShape?.layerId ?? state.activeLayerId),
+        lineWidthMm: Math.max(0.01, Number(sourceShape?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25),
+        lineType: String(sourceShape?.lineType || "solid"),
+        color: String(sourceShape?.color || "#0f172a"),
+        tempDoubleLineSource: true,
+        tempDoubleLineOwnerId: ownerId,
+        tempDoubleLineSegIndex: segNo,
+        tempDoubleLineSourceType: String(sourceShape?.type || ""),
+      };
+      tempShapes.push(temp);
+      effectiveSelectionIds.push(id);
+    };
+    for (const s of selectedShapes) {
+      const t = String(s?.type || "");
+      if (t === "line" || t === "circle" || t === "arc") {
+        effectiveSelectionIds.push(Number(s.id));
         continue;
       }
-      if (t !== "polyline") continue;
-      const pts = Array.isArray(s.points) ? s.points : [];
-      if (pts.length < 2) continue;
-      const addSeg = (a, b) => {
-        const x1 = Number(a?.x), y1 = Number(a?.y), x2 = Number(b?.x), y2 = Number(b?.y);
-        if (![x1, y1, x2, y2].every(Number.isFinite)) return;
-        if (Math.hypot(x2 - x1, y2 - y1) <= 1e-9) return;
-        out.push({ x1, y1, x2, y2 });
-      };
-      for (let i = 0; i < pts.length - 1; i++) addSeg(pts[i], pts[i + 1]);
-      if (s.closed) addSeg(pts[pts.length - 1], pts[0]);
-      continue;
+      if (t === "polyline") {
+        const pts = Array.isArray(s.points) ? s.points : [];
+        for (let i = 0; i < pts.length - 1; i++) pushTempLine(s, pts[i], pts[i + 1], i);
+        if (s.closed && pts.length >= 2) pushTempLine(s, pts[pts.length - 1], pts[0], pts.length - 1);
+        continue;
+      }
+      if (t === "bspline") {
+        effectiveSelectionIds.push(Number(s.id));
+        continue;
+      }
     }
-    for (const s of (baseShapes || [])) {
-      if (!s) continue;
-      const t = String(s.type || "");
-      if (t !== "bspline") continue;
-      const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
-      if (!Array.isArray(sampled) || sampled.length < 2) continue;
-      const addSeg = (a, b) => {
-        const x1 = Number(a?.x), y1 = Number(a?.y), x2 = Number(b?.x), y2 = Number(b?.y);
-        if (![x1, y1, x2, y2].every(Number.isFinite)) return;
-        if (Math.hypot(x2 - x1, y2 - y1) <= 1e-9) return;
-        out.push({ x1, y1, x2, y2 });
-      };
-      for (let i = 0; i < sampled.length - 1; i++) addSeg(sampled[i], sampled[i + 1]);
+    if (!tempShapes.length) return run(Array.from(new Set(effectiveSelectionIds)));
+    const originalShapes = Array.isArray(state.shapes) ? state.shapes.slice() : [];
+    const originalSelection = Array.isArray(state.selection?.ids) ? state.selection.ids.slice() : [];
+    state.shapes = originalShapes.concat(tempShapes);
+    state.selection.ids = Array.from(new Set(effectiveSelectionIds));
+    try {
+      return run(state.selection.ids.slice(), tempShapes.slice());
+    } finally {
+      const tempIdSet = new Set(tempShapes.map((s) => Number(s.id)).filter(Number.isFinite));
+      state.shapes = (state.shapes || []).filter((s) => !tempIdSet.has(Number(s?.id)));
+      if (restoreOriginalSelection) state.selection.ids = originalSelection.slice();
+      else state.selection.ids = (state.selection.ids || []).map(Number).filter((id) => Number.isFinite(id) && !tempIdSet.has(id));
     }
-    return out;
+  }
+
+  function buildDoubleLinePreviewForSelection(mousePt = null) {
+    return withResolvedDoubleLineSources(() => buildDoubleLinePreviewGeom(state, mousePt), { restoreOriginalSelection: true });
+  }
+
+  function buildDoubleLineTrimMarkersForSelection(preview) {
+    return withResolvedDoubleLineSources(() => {
+      const selectedBases = (state.selection?.ids || [])
+        .map((id) => (state.shapes || []).find((s) => Number(s?.id) === Number(id)))
+        .filter((s) => !!s);
+      return buildDoubleLineTrimMarkersGeom(
+        preview || [],
+        selectedBases,
+        Number(state.dlineSettings?.offset) || 0,
+        String(state.dlineSettings?.mode || "both")
+      );
+    }, { restoreOriginalSelection: true });
   }
 
   function pointKey(x, y, tol = 1e-3) {
@@ -241,8 +289,10 @@ export function createDoubleLineOps(config) {
       helpers.addShape?.(polyline);
       const pid = Number(polyline.id);
       if (!Number.isFinite(pid)) continue;
-      // Ensure group membership is explicit even if addShape internals change.
+      const addedShape = (state.shapes || []).find((s) => Number(s?.id) === pid) || null;
+      // Ensure both the local object and the stored shape belong to the same group.
       polyline.groupId = gid;
+      if (addedShape) addedShape.groupId = gid;
       createdPolylineIds.push(pid);
       for (const item of chain) {
         const e = edges[item.edgeIdx];
@@ -252,9 +302,9 @@ export function createDoubleLineOps(config) {
     }
     if (!createdPolylineIds.length) return [];
 
-    for (const id of consumedLineIds) helpers.removeShapeById?.(id);
     const keepIds = (g.shapeIds || []).map(Number).filter((id) => Number.isFinite(id) && !consumedLineIds.has(id));
     g.shapeIds = keepIds.concat(createdPolylineIds);
+    for (const id of consumedLineIds) helpers.removeShapeById?.(id);
     // Final safety: align created polylines to the same group.
     const byId = new Map((state.shapes || []).map((s) => [Number(s?.id), s]));
     for (const pid of createdPolylineIds) {
@@ -332,7 +382,7 @@ export function createDoubleLineOps(config) {
 
   function buildShiftedTrimTargetsForCreatedLines(preview, newShapeIds, selectedBases, offsetDist) {
     const out = [];
-    const baseLines = expandSelectedBaseLinesForTrim(selectedBases);
+    const baseLines = (selectedBases || []).filter((s) => String(s?.type || "") === "line").map((s) => ({ x1: Number(s.x1), y1: Number(s.y1), x2: Number(s.x2), y2: Number(s.y2) })).filter((s) => [s.x1, s.y1, s.x2, s.y2].every(Number.isFinite));
     if (!Array.isArray(preview) || !preview.length || !Array.isArray(newShapeIds) || !newShapeIds.length || !baseLines.length) return out;
     const mode = String(state.dlineSettings?.mode || "both");
     const epsT = 1e-6;
@@ -386,42 +436,6 @@ export function createDoubleLineOps(config) {
     return out;
   }
 
-  function removeArcEndpointCapLikeLines(lines, baseShapes, offsetDist) {
-    const src = Array.isArray(lines) ? lines : [];
-    const bases = Array.isArray(baseShapes) ? baseShapes : [];
-    if (!src.length || !bases.length) return src;
-    const arcEndpoints = [];
-    for (const s of bases) {
-      if (!s || String(s.type || "") !== "arc") continue;
-      const cx = Number(s.cx), cy = Number(s.cy), r = Number(s.r);
-      const a1 = Number(s.a1), a2 = Number(s.a2);
-      if (![cx, cy, r, a1, a2].every(Number.isFinite) || r <= 1e-9) continue;
-      arcEndpoints.push({ x: cx + Math.cos(a1) * r, y: cy + Math.sin(a1) * r });
-      arcEndpoints.push({ x: cx + Math.cos(a2) * r, y: cy + Math.sin(a2) * r });
-    }
-    if (!arcEndpoints.length) return src;
-    const off = Math.max(0.01, Number(offsetDist) || 0);
-    const lenMax = Math.max(off * 3.2, 2.0);
-    const nearTol = Math.max(off * 0.55, 0.8);
-    const out = [];
-    for (const l of src) {
-      if (!l || String(l.type || "") !== "line") { out.push(l); continue; }
-      const x1 = Number(l.x1), y1 = Number(l.y1), x2 = Number(l.x2), y2 = Number(l.y2);
-      if (![x1, y1, x2, y2].every(Number.isFinite)) { out.push(l); continue; }
-      const len = Math.hypot(x2 - x1, y2 - y1);
-      const mx = (x1 + x2) * 0.5, my = (y1 + y2) * 0.5;
-      let nearArcEnd = false;
-      for (const p of arcEndpoints) {
-        if (Math.hypot(Number(p.x) - mx, Number(p.y) - my) <= nearTol) {
-          nearArcEnd = true;
-          break;
-        }
-      }
-      if (nearArcEnd && len <= lenMax) continue;
-      out.push(l);
-    }
-    return out;
-  }
 
   function getStatusText(lang, key, data) {
     if (lang === "en") {
@@ -430,14 +444,15 @@ export function createDoubleLineOps(config) {
       if (key === "step") return `Double line trim step ${Number(data?.done)}/${Number(data?.total)}. Press Enter to continue.`;
       return "";
     }
-    if (key === "created") return "二重線を作成しました";
-    if (key === "needSelect") return "二重線: 先に対象を選択してください";
-    if (key === "step") return `二重線トリム ${Number(data?.done)}/${Number(data?.total)}。Enterで次へ。`;
+    if (key === "created") return "Double line created";
+    if (key === "needSelect") return "Double line: select line(s) first";
+    if (key === "step") return `Double line trim step ${Number(data?.done)}/${Number(data?.total)}. Press Enter to continue.`;
     return "";
   }
 
   function collectIntersectionsFromPreview(preview, baseShapes = [], eps = 1e-6) {
     const out = [];
+    const debugCandidatesRaw = [];
     const lines = (preview || []).filter((o) => o && String(o.type || "") === "line");
     const e = Math.max(1e-9, Number(eps) || 1e-6);
     const lineEnds = (o) => {
@@ -879,6 +894,7 @@ export function createDoubleLineOps(config) {
               const ux = len > 1e-9 ? (dx / len) : 0;
               const uy = len > 1e-9 ? (dy / len) : 0;
               const comboBias = (Number(c.sa) * 2 + Number(c.sb)) * 0.15;
+              debugCandidatesRaw.push({ x: Number(c.x) + ux * comboBias, y: Number(c.y) + uy * comboBias, markerHalfPx: 3, markerColor: "#f97316", nn: isNN, ff: isFF });
               pushPt(Number(c.x) + ux * comboBias, Number(c.y) + uy * comboBias, [junction.dirA, junction.dirB], {
                 debugCandidate: true,
                 markerHalfPx: 2,
@@ -945,6 +961,7 @@ export function createDoubleLineOps(config) {
               const ux = len > 1e-9 ? (dx / len) : 0;
               const uy = len > 1e-9 ? (dy / len) : 0;
               const nudge = (ci - 1.5) * 0.15;
+              debugCandidatesRaw.push({ x: Number(c.x) + ux * nudge, y: Number(c.y) + uy * nudge, markerHalfPx: 3, markerColor: "#2563eb", tFourCandidate: true });
               pushPt(Number(c.x) + ux * nudge, Number(c.y) + uy * nudge, [junction.dirA, junction.dirB], {
                 debugCandidate: true,
                 tFourCandidate: true,
@@ -1025,11 +1042,33 @@ export function createDoubleLineOps(config) {
       }
     }
 
-    // Endpoint candidates for single line / open polyline support.
-    // Build degree map per source from split base segments, then add markers at degree-1 nodes.
+    // Endpoint targets for open sources.
     const endpointTol = Math.max(1e-6, e * 10);
     const endpointKey = (x, y) => `${Math.round(Number(x) / endpointTol)}:${Math.round(Number(y) / endpointTol)}`;
     const endpointVirtualSidBase = -900000000;
+    const endpointRefs = [];
+    const endpointOwners = new Map();
+    const endpointTouchTol = Math.max(0.05, e * 20);
+    const touchesOtherSourceInterior = (sid, pt) => {
+      const px = Number(pt?.x), py = Number(pt?.y);
+      if (![px, py].every(Number.isFinite)) return false;
+      for (const otherSid of sourceIds) {
+        const osid = Number(otherSid);
+        if (!Number.isFinite(osid) || osid === Number(sid)) continue;
+        const segs = rawSegsBySource.get(osid) || [];
+        for (const s of segs) {
+          const a = { x: Number(s.x1), y: Number(s.y1) };
+          const b = { x: Number(s.x2), y: Number(s.y2) };
+          if (![a.x, a.y, b.x, b.y].every(Number.isFinite)) continue;
+          if (pointToSegDist(px, py, a.x, a.y, b.x, b.y) > endpointTouchTol) continue;
+          const t = segmentParam({ x: px, y: py }, a, b);
+          if (!Number.isFinite(t)) continue;
+          if (t > 0.08 && t < 0.92) return true;
+        }
+      }
+      return false;
+    };
+    const off = Math.max(0, Number(state?.dlineSettings?.offset) || 0);
     for (const sid of sourceIds) {
       const segs = baseSegsBySource.get(Number(sid)) || [];
       if (!segs.length) continue;
@@ -1052,34 +1091,36 @@ export function createDoubleLineOps(config) {
         if (!b.tangent && tBA) b.tangent = tBA;
       }
       const endpoints = Array.from(nodeMap.values()).filter((n) => Number(n.deg) === 1 && n.tangent);
-      let epIdx = 0;
       for (const ep of endpoints) {
-        epIdx += 1;
         const tangent = norm(ep.tangent?.x, ep.tangent?.y);
         if (!tangent) continue;
-        const virtualSid = Number(endpointVirtualSidBase - (Number(sid) * 1000 + epIdx));
-        for (const side of [1, -1]) {
-          const pool = bySourceSide.get(`${Number(sid)}:${Number(side)}`) || [];
-          let bestPt = null;
-          let bestDist = Infinity;
-          for (const l of pool) {
-            const ee = lineEnds(l);
-            const p1 = { x: Number(ee.x1), y: Number(ee.y1) };
-            const p2 = { x: Number(ee.x2), y: Number(ee.y2) };
-            const d1 = Math.hypot(Number(p1.x) - Number(ep.x), Number(p1.y) - Number(ep.y));
-            const d2 = Math.hypot(Number(p2.x) - Number(ep.x), Number(p2.y) - Number(ep.y));
-            if (d1 < bestDist) { bestDist = d1; bestPt = p1; }
-            if (d2 < bestDist) { bestDist = d2; bestPt = p2; }
-          }
-          if (!bestPt) continue;
-          const normal = norm(-Number(tangent.y) * Number(side), Number(tangent.x) * Number(side));
-          pushPt(bestPt.x, bestPt.y, [tangent, normal], {
+        if (touchesOtherSourceInterior(Number(sid), ep)) continue;
+        const key = endpointKey(ep.x, ep.y);
+        endpointRefs.push({ sid: Number(sid), key, x: Number(ep.x), y: Number(ep.y), tangent });
+        if (!endpointOwners.has(key)) endpointOwners.set(key, new Set());
+        endpointOwners.get(key).add(Number(sid));
+      }
+    }
+    if (off > 1e-9) {
+      for (let ei = 0; ei < endpointRefs.length; ei++) {
+        const ep = endpointRefs[ei];
+        const owners = endpointOwners.get(ep.key);
+        if (owners && owners.size > 1) continue;
+        const baseNormal = norm(-Number(ep.tangent.y), Number(ep.tangent.x));
+        if (!baseNormal) continue;
+        const virtualSid = Number(endpointVirtualSidBase - (Number(ep.sid) * 1000 + (ei + 1)));
+        const availableSides = [1, -1].filter((side) => (bySourceSide.get(`${Number(ep.sid)}:${Number(side)}`) || []).length > 0);
+        if (!availableSides.length) availableSides.push(1);
+        for (const side of availableSides) {
+          const nx = Number(baseNormal.x) * Number(side);
+          const ny = Number(baseNormal.y) * Number(side);
+          pushPt(Number(ep.x) + nx * off, Number(ep.y) + ny * off, [ep.tangent, { x: nx, y: ny }], {
             tCandidate: true,
             endpointCap: true,
-            parentSourceIds: [Number(sid), Number(virtualSid)],
+            parentSourceIds: [Number(ep.sid), virtualSid],
             parentLanes: [
-              { sid: Number(sid), dir: tangent },
-              { sid: Number(virtualSid), dir: normal || { x: 0, y: 1 } },
+              { sid: Number(ep.sid), dir: ep.tangent },
+              { sid: Number(virtualSid), dir: { x: nx, y: ny } },
             ],
           });
         }
@@ -1104,14 +1145,72 @@ export function createDoubleLineOps(config) {
         }
       }
     }
+    out.debugCandidatesRaw = debugCandidatesRaw;
     return out;
+  }
+
+  function createDebugCandidateCrossGroup(points) {
+    if (!Array.isArray(points) || !points.length) return { ok: false, markerIds: [], groupId: null, count: 0 };
+    if (typeof helpers?.nextGroupId !== "function" || typeof helpers?.nextShapeId !== "function" || typeof helpers?.addGroup !== "function" || typeof helpers?.addShape !== "function") {
+      return { ok: false, markerIds: [], groupId: null, count: 0 };
+    }
+    const candidates = (Array.isArray(points?.debugCandidatesRaw) && points.debugCandidatesRaw.length) ? points.debugCandidatesRaw : points.filter((p) => !!p?.debugCandidate);
+    if (!candidates.length) return { ok: false, markerIds: [], groupId: null, count: 0 };
+    const gid = Number(helpers.nextGroupId());
+    if (!Number.isFinite(gid)) return { ok: false, markerIds: [], groupId: null, count: 0 };
+    const defaultHalf = Math.max(0.8, (Number(state?.dlineSettings?.offset) || 5) * 0.22);
+    const lineWidthMm = 0.12;
+    const markerIds = [];
+    let sx = 0, sy = 0, n = 0;
+    const addLine = (x1, y1, x2, y2, color) => {
+      const id = Number(helpers.nextShapeId());
+      if (!Number.isFinite(id)) return;
+      helpers.addShape({
+        id,
+        type: "line",
+        x1: Number(x1),
+        y1: Number(y1),
+        x2: Number(x2),
+        y2: Number(y2),
+        color: String(color || "#64748b"),
+        lineType: "solid",
+        lineWidthMm,
+        layerId: state.activeLayerId,
+        groupId: gid,
+      });
+      markerIds.push(id);
+    };
+    for (const p of candidates) {
+      const x = Number(p?.x), y = Number(p?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const color = String(p?.markerColor || "#64748b");
+      const half = Math.max(0.6, Number(p?.markerHalfPx) || defaultHalf);
+      addLine(x - half, y - half, x + half, y + half, color);
+      addLine(x - half, y + half, x + half, y - half, color);
+      sx += x; sy += y; n += 1;
+    }
+    if (!markerIds.length) return { ok: false, markerIds: [], groupId: null, count: 0 };
+    helpers.addGroup({
+      id: gid,
+      name: `DLineDebugCandidates${gid}`,
+      shapeIds: markerIds.slice(),
+      originX: n > 0 ? sx / n : 0,
+      originY: n > 0 ? sy / n : 0,
+      rotationDeg: 0,
+      parentId: state.activeGroupId,
+      layerId: state.activeLayerId,
+    });
+    return { ok: true, markerIds, groupId: gid, count: n };
   }
 
   function createIntersectionMarkerGroup(points, baseShapes = [], options = null) {
     if (!Array.isArray(points) || !points.length) return { ok: false, markerIds: [], groupId: null };
     const returnConnectedPreview = !!options?.returnConnectedPreview;
+    const markersOnly = !!options?.markersOnly;
+    const debugConnectLogs = !!state?.ui?.debugDoubleLineConnect;
+    const shouldCreateMarkerShapes = !returnConnectedPreview || markersOnly;
     let gid = null;
-    if (!returnConnectedPreview) {
+    if (!returnConnectedPreview || markersOnly) {
       if (typeof helpers?.nextGroupId !== "function" || typeof helpers?.addGroup !== "function") {
         return { ok: false, markerIds: [], groupId: null };
       }
@@ -1142,6 +1241,8 @@ export function createDoubleLineOps(config) {
       const sid = Number(s.id);
       if (!Number.isFinite(sid)) continue;
       const t = String(s.type || "");
+      const sourceType = String(s?.tempDoubleLineSourceType || "");
+      if (t === "line" && sourceType === "bspline") curvedSourceIds.add(sid);
       if (t === "bspline") curvedSourceIds.add(sid);
       if (t === "line") {
         addBaseSeg(sid, Number(s.x1), Number(s.y1), Number(s.x2), Number(s.y2));
@@ -1223,7 +1324,7 @@ export function createDoubleLineOps(config) {
       if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
       // Debug marker visuals disabled (NN/FF/T/endpoint rings).
       const pParents = Array.isArray(p?.parentSourceIds) ? p.parentSourceIds.map((v) => Number(v)).filter(Number.isFinite) : [];
-      const isEndpointCandidate = !hasAnyTChosen && !!(p?.tCandidate && p?.endpointCap && isNearYellowEndpointNode(x, y));
+      const isEndpointCandidate = !!p?.endpointCap;
       // Connection sources:
       // - NN/FF (L-like)
       // - tChosen (T-like selected 2 points; green ring)
@@ -1255,6 +1356,45 @@ export function createDoubleLineOps(config) {
       n++;
     }
     if (!validPts.length) return { ok: false, markerIds: [], ringIds: [], groupId: null };
+    const markerRingR = Math.max(0.8, (Number(state?.dlineSettings?.offset) || 5) * 0.12);
+    const markerRingLineW = 0.12;
+    const pushCandidateRing = (p, color) => {
+      if (!p) return;
+      const ring = {
+        id: helpers.nextShapeId?.(),
+        type: "circle",
+        cx: Number(p.x),
+        cy: Number(p.y),
+        r: markerRingR,
+        color: String(color || "#94a3b8"),
+        lineType: "solid",
+        lineWidthMm: markerRingLineW,
+        layerId: state.activeLayerId,
+        groupId: gid,
+      };
+      if (!Number.isFinite(Number(ring.id))) return;
+      helpers.addShape?.(ring);
+      ringIds.push(Number(ring.id));
+    };
+    if (shouldCreateMarkerShapes) {
+      for (const p of validPts) {
+        if (p?.nn) pushCandidateRing(p, "#2563eb");
+        else if (p?.ff) pushCandidateRing(p, "#ef4444");
+      }
+    }
+    if (markersOnly) {
+      helpers.addGroup?.({
+        id: gid,
+        name: `DLineCandidateRings${gid}` ,
+        shapeIds: ringIds.slice(),
+        originX: n > 0 ? sx / n : 0,
+        originY: n > 0 ? sy / n : 0,
+        rotationDeg: 0,
+        parentId: state.activeGroupId,
+        layerId: state.activeLayerId
+      });
+      return { ok: ringIds.length > 0, markerIds, ringIds, groupId: gid };
+    }
     const crossesOwnParentLines = (a, b, parentIds) => {
       const a1 = { x: Number(a.x), y: Number(a.y) };
       const a2 = { x: Number(b.x), y: Number(b.y) };
@@ -1491,7 +1631,7 @@ export function createDoubleLineOps(config) {
         addEdge(i, Number(uniqChosen[0]));
       } else {
         failCount += 1;
-        try {
+        if (debugConnectLogs) try {
           console.warn("[dline-connect] marker-fail", {
             markerIndex: i,
             marker: { x: Number(p.x), y: Number(p.y) },
@@ -1602,8 +1742,7 @@ export function createDoubleLineOps(config) {
       addEdge(pair[0][0], pair[0][1]); // rail 1
       addEdge(pair[1][0], pair[1][1]); // rail 2
     }
-    try {
-      const tChosenCount = validPts.filter((v) => !!v?.tChosen).length;
+    const tChosenCount = validPts.filter((v) => !!v?.tChosen).length;
       const edgePairs = [];
       for (const ek of edgeKeySet) {
         const [us, vs] = String(ek).split(":");
@@ -1617,6 +1756,7 @@ export function createDoubleLineOps(config) {
           vx: Number(pv.x), vy: Number(pv.y),
         });
       }
+    if (debugConnectLogs) try {
       console.log("[dline-connect] summary", {
         markerCount: validPts.length,
         tChosenCount,
@@ -1643,7 +1783,6 @@ export function createDoubleLineOps(config) {
     } catch (_) {}
 
     const connectedPreview = [];
-    const endpointCapPreview = [];
     for (const ek of edgeKeySet) {
       const [us, vs] = String(ek).split(":");
       const u = Number(us), v = Number(vs);
@@ -1657,7 +1796,6 @@ export function createDoubleLineOps(config) {
         y2: Number(q.y),
       };
       connectedPreview.push(seg);
-      if (!!p?.endpointCap && !!q?.endpointCap) endpointCapPreview.push(seg);
       if (returnConnectedPreview) continue;
       const line = {
         id: helpers.nextShapeId?.(),
@@ -1713,7 +1851,6 @@ export function createDoubleLineOps(config) {
       return {
         ok: connectedPreview.length > 0,
         connectedPreview,
-        endpointCapPreview,
         markerCount: validPts.length,
         edgeCount: edgeKeySet.size,
         failCount,
@@ -1834,38 +1971,10 @@ export function createDoubleLineOps(config) {
     }
   }
 
-  function addPostExecuteEndpointCircles(groupId) {
-    const gid = Number(groupId);
-    if (!Number.isFinite(gid)) return [];
-    if (typeof helpers?.nextShapeId !== "function" || typeof helpers?.addShape !== "function") return [];
-    const group = (state.groups || []).find((g) => Number(g?.id) === gid);
-    if (!group || !Array.isArray(group.shapeIds)) return [];
-    const p = state?.dlineLastConnectSourcePoint;
-    const px = Number(p?.x);
-    const py = Number(p?.y);
-    if (!Number.isFinite(px) || !Number.isFinite(py)) return [];
-    const rr = Math.max(0.5, (Number(state?.dlineSettings?.offset) || 5) * 0.08);
-    const m = {
-      id: helpers.nextShapeId(),
-      type: "circle",
-      cx: px,
-      cy: py,
-      r: rr,
-      color: "#f59e0b",
-      lineType: "solid",
-      lineWidthMm: 0.12,
-      layerId: state.activeLayerId,
-      groupId: gid
-    };
-    if (!Number.isFinite(Number(m.id))) return [];
-    helpers.addShape(m);
-    group.shapeIds = group.shapeIds.concat([Number(m.id)]);
-    return [Number(m.id)];
-  }
 
   function executeDoubleLineAction() {
     const lang = String(state.ui?.language || "ja").toLowerCase();
-    try {
+    if (!!state?.ui?.debugDoubleLineConnect) try {
       console.info("[dline-connect] execute", {
         tool: String(state?.tool || ""),
         debugEnabled: !!state?.ui?.debugDoubleLineConnect,
@@ -1891,7 +2000,7 @@ export function createDoubleLineOps(config) {
 
     // Optional debug mode: show marker connections instead of normal generation.
     const useDebugConnect = !!state?.ui?.debugDoubleLineConnect;
-    try { console.info("[dline-connect] mode", useDebugConnect ? "debug-connect" : "normal-execute"); } catch (_) {}
+    if (useDebugConnect) try { console.info("[dline-connect] mode", "debug-connect"); } catch (_) {}
     if (useDebugConnect) {
       const previewForMarkers = Array.isArray(state.dlinePreview) ? state.dlinePreview : [];
       if (!previewForMarkers.length) {
@@ -1900,11 +2009,9 @@ export function createDoubleLineOps(config) {
         draw();
         return false;
       }
-      const selectedBases = (state.selection?.ids || [])
-        .map((id) => (state.shapes || []).find((s) => Number(s?.id) === Number(id)))
-        .filter((s) => !!s);
+      const selectedBases = getExpandedSelectedBases();
       const intersections = collectIntersectionsFromPreview(previewForMarkers, selectedBases, 1e-6);
-      const mk = createIntersectionMarkerGroup(intersections, selectedBases);
+      const mk = createDebugCandidateCrossGroup(intersections);
       const changedByMarker = (Array.isArray(state.shapes) ? state.shapes.length : 0) !== shapeCountBefore
         || (Array.isArray(state.groups) ? state.groups.length : 0) !== groupCountBefore;
       if (mk.ok || changedByMarker) {
@@ -1912,27 +2019,26 @@ export function createDoubleLineOps(config) {
         state.dlineSingleSidePickPoint = null;
         clearDoubleLineTrimPendingState(state);
         if (typeof helpers?.setSelection === "function") {
-          helpers.setSelection([...(mk.markerIds || []), ...(mk.ringIds || [])]);
+          helpers.setSelection([...(mk.markerIds || [])]);
         }
         if (setStatus) setStatus(lang === "en"
-          ? `DLine debug: ${intersections.length} intersections marked`
-          : `二重線デバッグ: 交点 ${intersections.length} 箇所をマーカー表示`);
+          ? `DLine debug: ${Number(mk?.count || 0)} candidate crosses created`
+          : `DLine debug: ${Number(mk?.count || 0)} candidate crosses created`);
         draw();
         return true;
       }
       state.dlineConnectDebug = null;
-      if (setStatus) setStatus(lang === "en" ? "DLine debug: no intersections" : "二重線デバッグ: 交点が見つかりません");
+      if (setStatus) setStatus("DLine debug: no candidate crosses");
       draw();
       return false;
     }
     state.dlineConnectDebug = null;
 
     if (!!state.dlineSettings?.noTrim) {
-      const res = executeDoubleLineGeom(state, null, { returnMeta: true });
+      const res = withResolvedDoubleLineSources(() => executeDoubleLineGeom(state, null, { returnMeta: true }), { restoreOriginalSelection: false });
       const ok = !!res?.ok;
       if (ok && state.dlineSettings?.asPolyline !== false) mergeCreatedLinesToPolylines(res.groupId);
       if (ok) ensurePolylinesInGroup(res.groupId);
-      if (ok) addPostExecuteEndpointCircles(res.groupId);
       const changed = (Array.isArray(state.shapes) ? state.shapes.length : 0) !== shapeCountBefore
         || (Array.isArray(state.groups) ? state.groups.length : 0) !== groupCountBefore;
       if (ok || changed) helpers.pushHistorySnapshot(snap);
@@ -1952,95 +2058,44 @@ export function createDoubleLineOps(config) {
     const previewTrimmed = state.dlinePreview.map((o) => ({ ...o }));
     let previewForExecute = previewTrimmed;
     try {
-      const selectedBases = (state.selection?.ids || [])
-        .map((id) => (state.shapes || []).find((s) => Number(s?.id) === Number(id)))
-        .filter((s) => !!s);
-      const selectedBsplineCount = selectedBases.filter((s) => String(s?.type || "") === "bspline").length;
-      const selectedLineCount = selectedBases.filter((s) => String(s?.type || "") === "line").length;
-      const sourceCount = new Set(
-        selectedBases
-          .map((s) => Number(s?.id))
-          .filter(Number.isFinite)
-      ).size;
-      const intersections = collectIntersectionsFromPreview(previewTrimmed, selectedBases, 1e-6);
-      const conn = createIntersectionMarkerGroup(intersections, selectedBases, { returnConnectedPreview: true });
-      // Connected-preview replacement is effective for multi-source networks.
-      // For a single source (e.g. standalone B-spline), this replacement can
-      // collapse curve offsets to endpoint ladder lines, so keep original preview.
-      if (sourceCount >= 2 && conn?.ok && Array.isArray(conn.connectedPreview) && conn.connectedPreview.length > 0) {
-        const nonLine = previewTrimmed.filter((o) => String(o?.type || "") !== "line");
-        const filteredConnected = removeArcEndpointCapLikeLines(
-          conn.connectedPreview,
-          selectedBases,
-          Number(state?.dlineSettings?.offset || 0)
-        );
-        previewForExecute = filteredConnected.concat(nonLine);
-        try {
-          console.info("[dline-connect] apply-connected-preview", {
-            sourceCount,
-            lineCount: conn.connectedPreview.length,
-            filteredLineCount: filteredConnected.length,
-            nonLineCount: nonLine.length,
-            markerCount: Number(conn.markerCount || 0),
-            edgeCount: Number(conn.edgeCount || 0),
-            failCount: Number(conn.failCount || 0),
-          });
-        } catch (_) {}
-      } else {
-        const isBothMode = String(state?.dlineSettings?.mode || "both") === "both";
-        const shouldAddSingleSourceCaps = (sourceCount === 1 && isBothMode && (selectedBsplineCount === 1 || selectedLineCount === 1));
-        if (shouldAddSingleSourceCaps && Array.isArray(conn?.endpointCapPreview) && conn.endpointCapPreview.length > 0) {
-          const key = (l) => {
-            const x1 = Number(l?.x1), y1 = Number(l?.y1), x2 = Number(l?.x2), y2 = Number(l?.y2);
-            if (![x1, y1, x2, y2].every(Number.isFinite)) return "";
-            const a = `${x1.toFixed(6)},${y1.toFixed(6)}`;
-            const b = `${x2.toFixed(6)},${y2.toFixed(6)}`;
-            return (a <= b) ? `${a}|${b}` : `${b}|${a}`;
-          };
-          const existing = new Set(previewTrimmed.filter((o) => String(o?.type || "") === "line").map((l) => key(l)).filter(Boolean));
-          const rawCaps = conn.endpointCapPreview.filter((l) => {
-            const k = key(l);
-            return !!k && !existing.has(k);
-          });
-          let caps = rawCaps.slice();
-          if (caps.length > 2) {
-            // Standalone single-source endpoint ladder can yield 4 lines:
-            // 2 short caps (wanted) + 2 long rails (unwanted here).
-            // Keep only the shortest two.
-            caps.sort((a, b) => {
-              const al = Math.hypot(Number(a.x2) - Number(a.x1), Number(a.y2) - Number(a.y1));
-              const bl = Math.hypot(Number(b.x2) - Number(b.x1), Number(b.y2) - Number(b.y1));
-              return Number(al) - Number(bl);
-            });
-            caps = caps.slice(0, 2);
-          }
-          if (caps.length > 0) previewForExecute = previewTrimmed.concat(caps);
-          try {
-            console.info("[dline-connect] add-single-source-endcaps", {
+      withResolvedDoubleLineSources(() => {
+        const selectedBases = getExpandedSelectedBases();
+        const sourceCount = new Set(
+          selectedBases
+            .map((s) => Number(s?.id))
+            .filter(Number.isFinite)
+        ).size;
+        const intersections = collectIntersectionsFromPreview(previewTrimmed, selectedBases, 1e-6);
+        const conn = createIntersectionMarkerGroup(intersections, selectedBases, { returnConnectedPreview: true });
+        if (conn?.ok && Array.isArray(conn.connectedPreview) && conn.connectedPreview.length > 0) {
+          const nonLine = previewTrimmed.filter((o) => String(o?.type || "") !== "line");
+          previewForExecute = conn.connectedPreview.concat(nonLine);
+          if (useDebugConnect) try {
+            console.info("[dline-connect] apply-connected-preview", {
               sourceCount,
-              selectedBsplineCount,
-              selectedLineCount,
-              capCount: caps.length,
-              rawCapCount: rawCaps.length,
+              lineCount: conn.connectedPreview.length,
+              nonLineCount: nonLine.length,
+              markerCount: Number(conn.markerCount || 0),
+              edgeCount: Number(conn.edgeCount || 0),
+              failCount: Number(conn.failCount || 0),
+            });
+          } catch (_) {}
+        } else {
+          if (useDebugConnect) try {
+            console.info("[dline-connect] keep-original-preview", {
+              sourceCount,
+              markerCount: Number(conn?.markerCount || 0),
+              edgeCount: Number(conn?.edgeCount || 0),
             });
           } catch (_) {}
         }
-        try {
-          console.info("[dline-connect] keep-original-preview", {
-            sourceCount,
-            selectedBsplineCount,
-            markerCount: Number(conn?.markerCount || 0),
-            edgeCount: Number(conn?.edgeCount || 0),
-          });
-        } catch (_) {}
-      }
+      }, { restoreOriginalSelection: true });
     } catch (_) {}
-    const res = executeDoubleLineGeom(state, previewForExecute, { returnMeta: true });
+    const res = withResolvedDoubleLineSources(() => executeDoubleLineGeom(state, previewForExecute, { returnMeta: true }), { restoreOriginalSelection: false });
     const ok = !!res?.ok;
     if (ok) {
       if (state.dlineSettings?.asPolyline !== false) mergeCreatedLinesToPolylines(res.groupId);
       ensurePolylinesInGroup(res.groupId);
-      addPostExecuteEndpointCircles(res.groupId);
       clearDoubleLineTrimPendingState(state);
     }
 
@@ -2058,6 +2113,39 @@ export function createDoubleLineOps(config) {
     return ok || changed;
   }
 
+  function refreshDoubleLineCandidateMarkers() {
+    const preview = Array.isArray(state.dlinePreview) ? state.dlinePreview : [];
+    if (!preview.length) {
+      state.dlineDebugMarkers = [];
+      return;
+    }
+    const selectedBases = getExpandedSelectedBases();
+    const intersections = collectIntersectionsFromPreview(preview, selectedBases, 1e-6);
+    const debugCandidates = (Array.isArray(intersections?.debugCandidatesRaw) && intersections.debugCandidatesRaw.length) ? intersections.debugCandidatesRaw : intersections.filter((p) => !!p?.debugCandidate);
+    const ringR = Math.max(0.8, (Number(state?.dlineSettings?.offset) || 5) * 0.12);
+    const circles = intersections
+      .filter((p) => !!p && (p.nn || p.ff))
+      .map((p) => ({
+        type: "circle",
+        cx: Number(p.x),
+        cy: Number(p.y),
+        r: ringR,
+        color: String(p.nn ? "#2563eb" : "#ef4444"),
+      }))
+      .filter((m) => Number.isFinite(m.cx) && Number.isFinite(m.cy));
+    const crosses = debugCandidates
+      .filter((p) => !!p)
+      .map((p) => ({
+        type: "cross",
+        x: Number(p.x),
+        y: Number(p.y),
+        halfPx: Number(p.markerHalfPx) || 2,
+        color: String(p.markerColor || (p.nn ? "#2563eb" : p.ff ? "#ef4444" : "#64748b")),
+      }))
+      .filter((m) => Number.isFinite(m.x) && Number.isFinite(m.y));
+    state.dlineDebugMarkers = circles.concat(crosses);
+  }
+
   function cancelDoubleLineTrimPendingAction() {
     if (!state.dlineTrimPending) return;
     clearDoubleLineTrimPendingState(state);
@@ -2066,9 +2154,14 @@ export function createDoubleLineOps(config) {
 
   return {
     executeDoubleLineAction,
+    buildDoubleLinePreviewForSelection,
+    buildDoubleLineTrimMarkersForSelection,
+    refreshDoubleLineCandidateMarkers,
     cancelDoubleLineTrimPendingAction
   };
 }
+
+
 
 
 

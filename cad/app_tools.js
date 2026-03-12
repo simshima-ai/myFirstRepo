@@ -1,4 +1,4 @@
-﻿export { buildDoubleLinePreview, executeDoubleLine, buildDoubleLineTrimDeleteCandidates, buildDoubleLineTargetLineIntersections } from "./dline_geom.js";
+export { buildDoubleLinePreview, executeDoubleLine, buildDoubleLineLineTrimMarkers, buildDoubleLineTrimDeleteCandidates, buildDoubleLineTargetLineIntersections } from "./dline_geom.js";
 
 export {
     splitLineForFillet, tryCreateLineLineFillet, getFilletSelectionPair, computeLineCircleAutoTrimPlan,

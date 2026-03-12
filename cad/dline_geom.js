@@ -720,7 +720,7 @@ function computeDoubleLineSideSigns(lines, mousePt) {
     return out;
 }
 
-function expandDoubleLineBasesFromSelection(state) {
+export function expandDoubleLineBasesFromSelection(state) {
     const selected = (state.selection?.ids || [])
         .map((id) => state.shapes.find((s) => Number(s.id) === Number(id)))
         .filter((s) => !!s);

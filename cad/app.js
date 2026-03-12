@@ -1,4 +1,4 @@
-﻿import {
+import {
   createState, addShape, nextShapeId, nextGroupId, setSelection, clearSelection, setTool,
   pushHistory, pushHistorySnapshot, snapshotModel, restoreModel, undo as stateUndo, redo as stateRedo, removeShapeById,
   addLayer, setActiveLayer, setLayerVisible, setLayerLocked, isLayerVisible, isLayerLocked,
@@ -31,7 +31,7 @@ import {
   setLineWidthMm, setToolLineType, setSelectedLineWidthMm, setSelectedLineType,
   setSelectedColor, setToolColor,
   setFilletNoTrim,
-  buildDoubleLinePreview, executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg, exportDxf, exportPng,
+  buildDoubleLinePreview, buildDoubleLineLineTrimMarkers, executeDoubleLine, buildDoubleLineTargetLineIntersections, exportJsonObject, importJsonObject, importJsonObjectAppend, exportPdf, exportSvg, exportDxf, exportPng,
   beginOrAdvanceDim, updateDimHover, finalizeDimDraft,
   beginOrExtendPolyline, updatePolylineHover, finalizePolylineDraft,
   executeHatch, validateHatchBoundary, trimateFillet, applyDimSettingsToSelection, mergeSelectedShapesToGroup,
@@ -85,6 +85,8 @@ import { createToolSwitchOps } from "./app_tool_switch_ops.js";
 import { createHistoryViewOps } from "./app_history_view_ops.js";
 import { createLayerGroupOps } from "./app_layer_group_ops.js";
 import { createDomRefs } from "./app_dom.js";
+import { DEFAULT_PANEL_VISIBILITY, ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
+import { DISPLAY_MODES, applyDisplayModePreset, normalizeDisplayMode } from "./ui_display_mode_presets.js";
 
 const state = createState();
 let resetViewFlashTimer = null;
@@ -248,9 +250,10 @@ function toggleDebugConsolePanel() {
   const panel = dom.debugConsolePanel;
   if (!panel) return false;
   if (!state.ui) state.ui = {};
+  ensurePanelVisibilityState(state);
   const nextEnabled = !state.ui.debugDoubleLineConnect;
   state.ui.debugDoubleLineConnect = nextEnabled;
-  panel.style.display = nextEnabled ? "flex" : "none";
+  panel.style.display = (nextEnabled && isPanelVisible(state, "debugConsole")) ? "flex" : "none";
   setStatus(nextEnabled ? "Debug Console: ON" : "Debug Console: OFF");
   try {
     console.info(`[dline-connect] debug ${nextEnabled ? "enabled" : "disabled"}`);
@@ -548,6 +551,7 @@ const doubleLineOps = createDoubleLineOps({
   },
   executeDoubleLineGeom: executeDoubleLine,
   buildDoubleLinePreviewGeom: buildDoubleLinePreview,
+  buildDoubleLineTrimMarkersGeom: buildDoubleLineLineTrimMarkers,
   buildDoubleLineTargetLineIntersections,
   trimClickedLineAtNearestIntersection,
   clearDoubleLineTrimPendingState,
@@ -745,13 +749,13 @@ const helpers = {
   executeCircleThreePointFromTargets: () => {
     const mode = String(state.circleSettings?.mode || "").toLowerCase();
     if (mode !== "threepoint") {
-      setStatus("・ｽ~・ｽ・ｬ: ・ｽO・ｽ_・ｽw・ｽ・ｽ・ｽ・ｽ・ｽ[・ｽh・ｽﾅ使・ｽp・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ");
+      setStatus("3-point circle: switch to 3-point mode first");
       draw();
       return;
     }
     const refs = Array.isArray(state.input.circleThreePointRefs) ? state.input.circleThreePointRefs.slice(0, 3) : [];
     if (refs.length < 3) {
-      setStatus(`・ｽO・ｽ_・ｽw・ｽ・ｽ: ${refs.length}/3 ・ｽ_・ｽB・ｽ・ｽﾉタ・ｽ[・ｽQ・ｽb・ｽg・ｽ・ｽo・ｽ^・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ`);
+      setStatus(`3-point circle: ${refs.length}/3 targets selected`);
       draw();
       return;
     }
@@ -759,7 +763,7 @@ const helpers = {
     const sol = solveCircleBy3CenterRefs(refs, hint);
     if (!sol) {
       state.input.circleThreePointRefs = [];
-      setStatus("・ｽO・ｽ_・ｽw・ｽ・ｽ: ・ｽO・ｽﾚ円・ｽ・ｽv・ｽZ・ｽﾅゑｿｽ・ｽﾜゑｿｽ・ｽ・ｽﾅゑｿｽ・ｽ・ｽ");
+      setStatus("3-point circle: failed to solve from current targets");
       draw();
       return;
     }
@@ -775,13 +779,13 @@ const helpers = {
     clearSelection(state);
     state.activeGroupId = null;
     state.input.circleThreePointRefs = [];
-    setStatus("CIRCLE created (・ｽO・ｽ_・ｽw・ｽ・ｽ)");
+    setStatus("CIRCLE created (3-point)");
     draw();
   },
   registerCircleThreePointTargetFromSelection: () => {
     const mode = String(state.circleSettings?.mode || "").toLowerCase();
     if (mode !== "threepoint") {
-      setStatus("・ｽ~・ｽ・ｬ: ・ｽO・ｽ_・ｽw・ｽ・ｽ・ｽ・ｽ・ｽ[・ｽh・ｽﾅ使・ｽp・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ");
+      setStatus("3-point circle: switch to 3-point mode first");
       draw();
       return;
     }
@@ -791,7 +795,7 @@ const helpers = {
       .map(getCircleThreePointRefFromShape)
       .filter(r => !!r);
     if (!refs.length) {
-      setStatus("・ｽﾎ象ゑｿｽI・ｽ・ｽ・ｽ・ｽﾄゑｿｽ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽ (・ｽﾊ置/・ｽ~/・ｽ~・ｽ・ｽ)・ｽBShift・ｽﾅ包ｿｽ・ｽ・ｽ・ｽI・ｽ・ｽﾅゑｿｽ・ｽﾜゑｿｽ");
+      setStatus("3-point circle: select position / circle / arc objects first. Use Shift to add multiple targets.");
       draw();
       return;
     }
@@ -809,17 +813,17 @@ const helpers = {
       added.push(ref);
     }
     if (!added.length && duplicateCount > 0) {
-      setStatus("・ｽO・ｽ_・ｽw・ｽ・ｽ: ・ｽI・ｽ・ｽﾎ象はゑｿｽ・ｽﾗて登・ｽ^・ｽﾏみでゑｿｽ");
+      setStatus("3-point circle: selected targets are already registered");
       draw();
       return;
     }
     const ids = state.input.circleThreePointRefs.map(r => Number(r.shapeId)).filter(Number.isFinite).join(", ");
     if (added.length === 1) {
       const a = added[0];
-      const label = (a.type === "position") ? "・ｽﾊ置" : ((a.type === "circle") ? "・ｽ~" : "・ｽ~・ｽ・ｽ");
-      setStatus(`・ｽO・ｽ_・ｽw・ｽ・ｽ: ${label} #${Number(a.shapeId)} ・ｽ・ｽo・ｽ^ (${state.input.circleThreePointRefs.length}/3) [${ids}]`);
+      const label = (a.type === "position") ? "Position" : ((a.type === "circle") ? "Circle" : "Arc");
+      setStatus(`3-point circle: added ${label} #${Number(a.shapeId)} (${state.input.circleThreePointRefs.length}/3) [${ids}]`);
     } else {
-      setStatus(`・ｽO・ｽ_・ｽw・ｽ・ｽ: ${added.length}・ｽ・ｽ・ｽ・ｽo・ｽ^ (${state.input.circleThreePointRefs.length}/3) [${ids}]${full ? " / ・ｽ・ｽ・ｽ・ｽ・ｽ・ｽB" : ""}`);
+      setStatus(`3-point circle: added ${added.length} target(s) (${state.input.circleThreePointRefs.length}/3) [${ids}]${full ? " / target limit reached" : ""}`);
     }
     draw();
   },
@@ -893,7 +897,9 @@ const helpers = {
   setToolColor: (v, toolKey = null) => setToolColor(state, helpers, v, toolKey),
   setSelectPickMode: (mode) => {
     if (!state.ui) state.ui = {};
-    state.ui.selectPickMode = (String(mode) === "group") ? "group" : "object";
+    const groupsPanelVisible = state.ui?.panelVisibility?.groupsPanel !== false;
+    state.ui.selectPickMode = (groupsPanelVisible && String(mode) === "group") ? "group" : "object";
+    if (state.ui.selectPickMode !== "group") state.activeGroupId = null;
     draw();
   },
   setSelectionCircleCenterMark: (on) => { setSelectionCircleCenterMark(state, helpers, on); draw(); },
@@ -949,7 +955,26 @@ const helpers = {
   },
   setFpsDisplay: (on) => uiPrefsOps.setFpsDisplay(on),
   setObjectCountDisplay: (on) => uiPrefsOps.setObjectCountDisplay(on),
+  setPanelVisible: (panel, on) => uiPrefsOps.setPanelVisible(panel, on),
+  togglePanelVisible: (panel) => uiPrefsOps.togglePanelVisible(panel),
+  setPanelVisibility: (patch) => uiPrefsOps.setPanelVisibility(patch),
+  setDisplayMode: (mode) => {
+    const appliedMode = uiPrefsOps.setDisplayMode(mode);
+    setStatus(`Display mode: ${String(appliedMode).toUpperCase()}`);
+    return appliedMode;
+  },
+  setAdZoneEnabled: (zone, on) => uiPrefsOps.setAdZoneEnabled(zone, on),
   setAutoBackupEnabled: (on) => uiPrefsOps.setAutoBackupEnabled(on),
+  setAdsVisible: (on) => {
+    const visible = uiPrefsOps.setAllAdZonesEnabled(on);
+    setStatus(visible ? "Ads shown" : "Ads hidden");
+    return visible;
+  },
+  toggleAdsVisible: () => {
+    const visible = uiPrefsOps.toggleAllAdZones();
+    setStatus(visible ? "Ads shown" : "Ads hidden");
+    return visible;
+  },
   setAutoBackupIntervalSec: (sec) => uiPrefsOps.setAutoBackupIntervalSec(sec),
   setTouchMode: (on) => uiPrefsOps.setTouchMode(on),
   setTouchMultiSelect: (on) => uiPrefsOps.setTouchMultiSelect(on),
@@ -1094,6 +1119,9 @@ const helpers = {
   updateSelectedAttribute: (attrId, patch) => attributeOps.updateSelectedAttribute(attrId, patch),
   setVertexMoveInputs: (dx, dy) => { setVertexMoveInputs(state, dx, dy); draw(); },
   executeDoubleLine: () => doubleLineOps.executeDoubleLineAction(),
+  buildDoubleLinePreviewForSelection: (mousePt = null) => doubleLineOps.buildDoubleLinePreviewForSelection(mousePt),
+  buildDoubleLineTrimMarkersForSelection: (preview) => doubleLineOps.buildDoubleLineTrimMarkersForSelection(preview),
+  refreshDoubleLineCandidateMarkers: () => doubleLineOps.refreshDoubleLineCandidateMarkers(),
   cancelDoubleLineTrimPending: () => doubleLineOps.cancelDoubleLineTrimPendingAction(),
   beginMoveActiveGroupOriginOnly: () => {
     if (state.activeGroupId != null) {
@@ -1126,6 +1154,7 @@ if (!loadedAppSettings) {
   state.ui.language = detectInitialUiLanguage();
   saveAppSettingsNow();
 }
+applyDisplayModePreset(state, normalizeDisplayMode(state.ui?.displayMode || "cad"));
 initUi(state, dom, helpers);
 
 // setupInputListeners
@@ -1159,7 +1188,21 @@ fileOps.bindJsonFileInputChange();
 fileOps.bindDropImport();
 
 // Handle exports for manual access if needed
-window.cadApp = { state, dom, helpers, exportJsonObject, importJsonObject };
+window.cadApp = {
+  state,
+  dom,
+  helpers,
+  exportJsonObject,
+  importJsonObject,
+  availablePanels: Object.keys(DEFAULT_PANEL_VISIBILITY),
+  availableDisplayModes: DISPLAY_MODES.slice(),
+  toggleAds: () => helpers.toggleAdsVisible(),
+  setAdsVisible: (on) => helpers.setAdsVisible(on),
+  setPanelVisible: (panel, on) => helpers.setPanelVisible(panel, on),
+  togglePanelVisible: (panel) => helpers.togglePanelVisible(panel),
+  setPanelVisibility: (patch) => helpers.setPanelVisibility(patch),
+  setDisplayMode: (mode) => helpers.setDisplayMode(mode),
+};
 
 
 

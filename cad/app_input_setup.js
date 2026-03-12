@@ -1,4 +1,4 @@
-﻿import {
+import {
     clearSelection, setSelection, getGroup, pushHistorySnapshot
 } from "./state.js";
 import {
@@ -24,7 +24,7 @@ import {
     trimClickedLineAtNearestIntersection
 } from "./app_tools.js";
 import { getObjectSnapPoint } from "./solvers.js";
-import { buildDoubleLinePreview, buildDoubleLineLineTrimMarkers } from "./dline_geom.js";
+import { buildDoubleLinePreview, buildDoubleLineLineTrimMarkers, expandDoubleLineBasesFromSelection } from "./dline_geom.js";
 import { bindViewportResize } from "./app_input_viewport.js";
 import { isTypingTarget, findShortcutAction } from "./app_input_shortcuts.js";
 import { normalizeLineType, resolveCircleCreateMode, resolveLineCreateMode } from "./app_input_mode_utils.js";
@@ -32,7 +32,7 @@ import { createTouchInputController } from "./app_input_touch.js";
 import { bindKeyboardInput } from "./app_input_keyboard.js";
 import { createBsplineDraftController } from "./app_input_bspline.js";
 import { getRectFromAnchor, getFixedLineFromAnchor } from "./app_input_anchor_utils.js";
-import { isFilletTargetShape, commitFilletFromHover as commitFilletFromHoverImpl } from "./app_input_fillet.js";
+import { isFilletTargetShape, getFilletTargetRef, commitFilletFromHover as commitFilletFromHoverImpl } from "./app_input_fillet.js";
 import { resolvePolylineDraftEndpointSnap as resolvePolylineDraftEndpointSnapImpl } from "./app_input_snap.js";
 import { bindInputTailEvents } from "./app_input_tail_events.js";
 import { handlePointerDownSelectMode } from "./app_input_pointer_select.js";
@@ -46,7 +46,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
         clearSelection, setSelection, finalizeDimDraft, trimClickedLineAtNearestIntersection,
         createLine, createRect, createCircle, createPosition, createText, createArc,
         beginOrExtendPolyline, updatePolylineHover, finalizePolylineDraft,
-        beginOrAdvanceDim, updateDimHover, executeHatch, executeDoubleLine, setTool
+        beginOrAdvanceDim, updateDimHover, executeHatch, executeDoubleLine, buildDoubleLinePreviewForSelection, buildDoubleLineTrimMarkersForSelection, refreshDoubleLineCandidateMarkers, setTool
     } = helpers;
     const getCircleCreateMode = () => resolveCircleCreateMode(state);
     const getLineCreateMode = () => resolveLineCreateMode(state);
@@ -174,6 +174,22 @@ export function setupInputListenersImpl(state, dom, helpers) {
     const beginOrExtendBsplineDraft = (world) => bspline.beginOrExtend(world);
     const updateBsplineDraftHover = (world) => bspline.updateHover(world);
     const finalizeBsplineDraft = () => bspline.finalize();
+    const getExpandedDoubleLineBases = () => {
+        const expanded = expandDoubleLineBasesFromSelection(state);
+        return Array.isArray(expanded?.bases) ? expanded.bases.filter(Boolean) : [];
+    };
+    const syncFilletSelectionFromTargets = (targets) => {
+        const arr = Array.isArray(targets) ? targets.filter(Boolean) : [];
+        state.input.filletTargets = arr;
+        setSelection(Array.from(new Set(arr.map((t) => Number(t?.shapeId)).filter(Number.isFinite))));
+    };
+    const filletTargetKey = (target) => {
+        if (!target) return "";
+        const sid = Number(target.shapeId);
+        const type = String(target.type || "").toLowerCase();
+        if (type === "polyline") return `${sid}:seg:${Number(target.segIndex)}`;
+        return `${sid}:${type}`;
+    };
     const commitFilletFromHover = (worldRawHint = null) => commitFilletFromHoverImpl(state, helpers, {
         nextShapeId,
         pushHistory,
@@ -197,11 +213,11 @@ export function setupInputListenersImpl(state, dom, helpers) {
             : (ignoreGridSnapForDim ? worldRaw : getMouseWorld(state, dom, e, true));
         state.input.pointerDown = true;
 
-        // 蝓ｺ貅也せ遘ｻ蜍輔Δ繝ｼ繝峨′繧｢繧ｯ繝・ぅ繝悶↑蝣ｴ蜷・
+        // Keep raw world coordinates for drag flows that should ignore snapped coordinates.
         if (state.input.groupOriginPick.active && e.button === 0) {
             const activeG = getGroup(state, state.activeGroupId);
             if (activeG) {
-                // 繧ｹ繝翫ャ繝鈴←逕ｨ蠕後・蠎ｧ讓・world 繧剃ｽｿ逕ｨ縺吶ｋ
+                // Start dragging the active group origin marker immediately on pointer down.
                 beginGroupOriginPickDrag(state, activeG, world);
                 applyGroupOriginPickDrag(state, world);
                 if (draw) draw();
@@ -499,10 +515,12 @@ export function setupInputListenersImpl(state, dom, helpers) {
 
         if (state.tool === "fillet") {
             if (e.button !== 0) return;
-            if (state.selection.ids.length === 2) {
+            const curTargets = Array.isArray(state.input?.filletTargets) ? state.input.filletTargets.filter(Boolean) : [];
+            if (curTargets.length === 2) {
                 const committed = commitFilletFromHover(worldRaw);
                 if (committed) {
                     clearSelection();
+                    state.input.filletTargets = [];
                     state.activeGroupId = null;
                     state.input.filletFlow = null;
                     if (setStatus) setStatus("Fillet created");
@@ -512,31 +530,32 @@ export function setupInputListenersImpl(state, dom, helpers) {
             }
             const hit = hitTestShapes(state, worldRaw, dom);
             if (hit && isFilletTargetShape(hit)) {
-                const cur = state.selection.ids.map(Number);
-                const hid = Number(hit.id);
-                if (cur.includes(hid)) {
-                    setSelection(cur.filter(id => id !== hid));
-                } else if (cur.length === 0) {
-                    setSelection([hid]);
-                } else if (cur.length === 1) {
-                    setSelection([cur[0], hid]);
-                } else {
-                    setSelection([cur[1], hid]);
-                }
-                if (setStatus) {
-                    if (state.selection.ids.length >= 2) {
-                        const touchMode = !!state.ui?.touchMode;
-                        setStatus(touchMode
-                            ? "Fillet: candidate ready. Tap the top-left Confirm button to apply."
-                            : "Fillet: candidate ready. Click or press Enter to apply, Esc to cancel.");
+                const nextTarget = getFilletTargetRef(hit, worldRaw);
+                if (nextTarget) {
+                    const cur = Array.isArray(state.input?.filletTargets) ? state.input.filletTargets.filter(Boolean) : [];
+                    const nextKey = filletTargetKey(nextTarget);
+                    const existingIndex = cur.findIndex((t) => filletTargetKey(t) === nextKey);
+                    let next = cur.slice();
+                    if (existingIndex >= 0) next.splice(existingIndex, 1);
+                    else if (next.length === 0) next = [nextTarget];
+                    else if (next.length === 1) next = [next[0], nextTarget];
+                    else next = [next[1], nextTarget];
+                    syncFilletSelectionFromTargets(next);
+                    if (setStatus) {
+                        if (next.length >= 2) {
+                            const touchMode = !!state.ui?.touchMode;
+                            setStatus(touchMode
+                                ? "Fillet: candidate ready. Tap the top-left Confirm button to apply."
+                                : "Fillet: candidate ready. Click or press Enter to apply, Esc to cancel.");
+                        } else {
+                            setStatus("Fillet: select 2 edges/arcs.");
+                        }
                     }
-                    else setStatus("Fillet: select 2 objects.");
                 }
             }
             if (draw) draw();
             return;
         }
-
         if (state.tool === "hatch") {
             if (e.button !== 0) return;
             const hatchPickState = {
@@ -581,11 +600,12 @@ export function setupInputListenersImpl(state, dom, helpers) {
             if (isSingleMode && hasSelection && !isAppendSelect(e) && (!hit || hitIsSelected)) {
                 // In single mode, one click locks inside/outside side until execute/cancel.
                 state.dlineSingleSidePickPoint = { x: Number(worldRaw.x), y: Number(worldRaw.y) };
-                state.dlinePreview = buildDoubleLinePreview(state, state.dlineSingleSidePickPoint);
+                state.dlinePreview = buildDoubleLinePreviewForSelection(state.dlineSingleSidePickPoint);
+                refreshDoubleLineCandidateMarkers?.();
                 if (draw) draw();
                 return;
             }
-            if (hit && (hit.type === "line" || hit.type === "circle" || hit.type === "arc")) {
+            if (hit && (hit.type === "line" || hit.type === "circle" || hit.type === "arc" || hit.type === "polyline" || hit.type === "bspline")) {
                 const cur = new Set(state.selection.ids.map(Number));
                 if (cur.has(Number(hit.id))) cur.delete(Number(hit.id)); else cur.add(Number(hit.id));
                 setSelection(Array.from(cur));
@@ -597,19 +617,12 @@ export function setupInputListenersImpl(state, dom, helpers) {
                 beginSelectionBox(state, screen, isAppendSelect(e));
             }
             const sidePt = state.dlineSingleSidePickPoint || worldRaw;
-            state.dlinePreview = buildDoubleLinePreview(state, sidePt);
+            state.dlinePreview = buildDoubleLinePreviewForSelection(sidePt);
+            refreshDoubleLineCandidateMarkers?.();
             if (state.dlineSettings?.noTrim) {
                 state.dlineTrimIntersections = null;
             } else {
-                const selectedBases = (state.selection?.ids || [])
-                    .map(id => state.shapes.find(s => Number(s.id) === Number(id)))
-                    .filter(s => !!s);
-                state.dlineTrimIntersections = buildDoubleLineLineTrimMarkers(
-                    state.dlinePreview || [],
-                    selectedBases,
-                    Number(state.dlineSettings?.offset) || 0,
-                    String(state.dlineSettings?.mode || "both")
-                );
+                state.dlineTrimIntersections = buildDoubleLineTrimMarkersForSelection(state.dlinePreview || []);
             }
             if (draw) draw();
             return;
@@ -722,8 +735,8 @@ export function setupInputListenersImpl(state, dom, helpers) {
             return;
         }
         if (state.vertexEdit.drag.active) {
-            // 繝峨Λ繝・げ荳ｭ繧ゅせ繝翫ャ繝怜慍轤ｹ繧定ｨ育ｮ励＠縺ｦ繝帙ヰ繝ｼ諠・ｱ縺ｫ蜿肴丐縺輔○繧九◆繧・
-            // worldRaw 繧剃ｽｿ縺｣縺ｦ繧ｹ繝翫ャ繝励・繧､繝ｳ繝医ｒ譏守､ｺ逧・↓譖ｴ譁ｰ・・pplyVertexDrag 蜀・〒繧り｡後ｏ繧後ｋ縺後｝ointermove 蛛ｴ縺ｧ縺ｮ荳雋ｫ諤ｧ縺ｮ縺溘ａ・・
+            // Vertex dragging uses raw coordinates so snap adjustments do not accumulate during drag.
+            // worldRaw keeps the unsnapped pointer position for stable delta calculation.
             applyVertexDrag(state, worldRaw);
             drawFast();
             return;
@@ -752,7 +765,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
             ? (state.input.modifierKeys.alt ? getTrimDeleteOnlyHoverCandidate(state, worldRaw, dom) : getTrimHoverCandidate(state, worldRaw, dom, { fast: true }))
             : null;
         state.input.filletHover = (hasVisibleLayer && state.tool === "fillet") ? getFilletHoverCandidate(state, worldRaw) : null;
-        if (state.tool === "fillet" && state.selection.ids.length === 2 && !state.input.filletHover) {
+        if (state.tool === "fillet" && (Array.isArray(state.input?.filletTargets) ? state.input.filletTargets.filter(Boolean).length : 0) === 2 && !state.input.filletHover) {
             if (setStatus) setStatus("Fillet: no valid solution for current objects.");
         }
         state.input.hatchHover = (hasVisibleLayer && state.tool === "hatch") ? hitTestShapes(state, worldRaw, dom) : null;
@@ -786,19 +799,12 @@ export function setupInputListenersImpl(state, dom, helpers) {
                 return;
             }
             const sidePt = state.dlineSingleSidePickPoint || worldRaw;
-            state.dlinePreview = buildDoubleLinePreview(state, sidePt);
+            state.dlinePreview = buildDoubleLinePreviewForSelection(sidePt);
+            refreshDoubleLineCandidateMarkers?.();
             if (state.dlineSettings?.noTrim) {
                 state.dlineTrimIntersections = null;
             } else {
-                const selectedBases = (state.selection?.ids || [])
-                    .map(id => state.shapes.find(s => Number(s.id) === Number(id)))
-                    .filter(s => !!s);
-                state.dlineTrimIntersections = buildDoubleLineLineTrimMarkers(
-                    state.dlinePreview || [],
-                    selectedBases,
-                    Number(state.dlineSettings?.offset) || 0,
-                    String(state.dlineSettings?.mode || "both")
-                );
+                state.dlineTrimIntersections = buildDoubleLineTrimMarkersForSelection(state.dlinePreview || []);
             }
         }
         const touchRectDraft = state.input?.touchRectDraft;
@@ -917,7 +923,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
             if (moved) {
                 const keepSnap = !!(state.objectSnap?.keepAttributes || state.objectSnap?.tangentKeep);
                 let keepUsed = false;
-                // Save tangent attribute if "螻樊ｧ繧剃ｿ晄戟" is enabled and tangent snap was used
+                // Preserve tangent relation when keep-attributes mode is enabled and tangent snap was used.
                 if (lastTangentSnap && keepSnap) {
                     const anchorShape = state.shapes.find(s => Number(s.id) === Number(anchorShapeId));
                     if (anchorShape?.type === "line") {
@@ -1011,7 +1017,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
                     }
                 }
                 if (keepUsed) {
-                    // Keep "属性を保持" toggle state as-is after applying once.
+                    // Keep the tangent-attribute toggle state after applying it once.
                 }
                 pushHistorySnapshot(state, snapshot);
             }
@@ -1063,6 +1069,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
         clearSelection,
         toggleDebugConsole: helpers.toggleDebugConsole,
         getLineCreateMode,
+        toggleAdsVisible: helpers.toggleAdsVisible,
         finalizeBsplineDraft,
         commitFilletFromHover,
         isTypingTarget,
@@ -1070,6 +1077,8 @@ export function setupInputListenersImpl(state, dom, helpers) {
     });
     bindViewportResize(helpers, draw);
 }
+
+
 
 
 

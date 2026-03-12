@@ -1,0 +1,7 @@
+.claude/
+__pycache__/
+bak/
+debug_console.log
+local_server.py
+run_s-cad.bat
+deploy-web-only.bat

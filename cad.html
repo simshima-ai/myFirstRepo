@@ -20,7 +20,7 @@
       --app-vw: 100vw;
       --app-vh: 100vh;
       --ad-slot-h: 200px;
-      --ad-slot-gap: 0px;
+      --ad-slot-gap: 8px;
       --group-panel-right-gap: -6px;
     }
 
@@ -709,7 +709,7 @@
       display: flex;
       flex-direction: column;
       gap: 1px;
-      padding-top: calc(var(--ad-slot-h) - 40px);
+      padding-top: calc(var(--ad-slot-h) + var(--ad-slot-gap));
       pointer-events: auto;
       min-height: 0;
       max-height: calc(var(--app-vh) - 20px);

@@ -57,190 +57,251 @@ export function mergeSelectedShapesToGroup(state, helpers) {
 }
 
 export function lineToPolyline(state, helpers) {
-    const selected = getSelectedShapes(state);
-    const lineShapes = selected.filter((s) => String(s?.type || "") === "line");
-    if (lineShapes.length === 0) {
-        helpers.setStatus?.("No line selected");
+    const selectedShapeIds = new Set((state.selection?.ids || []).map(Number).filter(Number.isFinite));
+    const selectedGroupIds = new Set((state.selection?.groupIds || []).map(Number).filter(Number.isFinite));
+    const targetShapeIds = new Set(selectedShapeIds);
+    for (const gid of selectedGroupIds) {
+        const ids = collectGroupTreeShapeIds(state, gid);
+        for (const sid of ids) targetShapeIds.add(Number(sid));
+    }
+    const targetShapes = (state.shapes || []).filter((s) => targetShapeIds.has(Number(s?.id)));
+    if (!targetShapes.length) {
+        helpers.setStatus?.("No target selected");
         helpers.draw?.();
         return;
     }
 
-    const edges = [];
-    const nodeMap = new Map();
-    const addNodeEdge = (k, edgeIdx) => {
-        let set = nodeMap.get(k);
-        if (!set) {
-            set = new Set();
-            nodeMap.set(k, set);
-        }
-        set.add(edgeIdx);
-    };
-    for (const s of lineShapes) {
-        const a = pointKey(s.x1, s.y1);
-        const b = pointKey(s.x2, s.y2);
-        if (a === b) continue;
-        const idx = edges.length;
-        edges.push({ shape: s, a, b });
-        addNodeEdge(a, idx);
-        addNodeEdge(b, idx);
-    }
-    if (edges.length === 0) {
-        helpers.setStatus?.("No valid lines selected");
+    const targetPolylines = targetShapes.filter((s) => String(s?.type || "") === "polyline");
+    const targetLines = targetShapes.filter((s) => String(s?.type || "") === "line");
+    if (!targetPolylines.length && !targetLines.length) {
+        helpers.setStatus?.("No line/polyline selected");
         helpers.draw?.();
         return;
     }
 
-    const visited = new Set();
-    const components = [];
-    for (let i = 0; i < edges.length; i++) {
-        if (visited.has(i)) continue;
-        const stack = [i];
-        const comp = [];
-        while (stack.length) {
-            const ei = stack.pop();
-            if (visited.has(ei)) continue;
-            visited.add(ei);
-            comp.push(ei);
-            const e = edges[ei];
-            const aSet = nodeMap.get(e.a) || new Set();
-            const bSet = nodeMap.get(e.b) || new Set();
-            for (const ni of aSet) if (!visited.has(ni)) stack.push(ni);
-            for (const ni of bSet) if (!visited.has(ni)) stack.push(ni);
-        }
-        if (comp.length) components.push(comp);
-    }
-
-    const builtChains = [];
-    for (const comp of components) {
-        const remaining = new Set(comp);
-        const remNodeMap = new Map();
-        const addRem = (k, ei) => {
-            let set = remNodeMap.get(k);
-            if (!set) {
-                set = new Set();
-                remNodeMap.set(k, set);
-            }
-            set.add(ei);
-        };
-        for (const ei of comp) {
-            const e = edges[ei];
-            addRem(e.a, ei);
-            addRem(e.b, ei);
-        }
-        const removeEdge = (ei) => {
-            if (!remaining.has(ei)) return;
-            remaining.delete(ei);
-            const e = edges[ei];
-            remNodeMap.get(e.a)?.delete(ei);
-            remNodeMap.get(e.b)?.delete(ei);
-        };
-        const pickStartNode = () => {
-            for (const [k, set] of remNodeMap.entries()) {
-                if (!set || set.size === 0) continue;
-                if (set.size !== 2) return k;
-            }
-            const firstEdgeIdx = remaining.values().next().value;
-            if (firstEdgeIdx == null) return null;
-            return edges[firstEdgeIdx].a;
-        };
-        const pickEdge = (set) => {
-            const arr = Array.from(set || []);
-            if (!arr.length) return null;
-            arr.sort((a, b) => Number(edges[a]?.shape?.id || 0) - Number(edges[b]?.shape?.id || 0));
-            return arr[0];
-        };
-
-        while (remaining.size > 0) {
-            const startNode = pickStartNode();
-            if (!startNode) break;
-            const chain = [];
-            let currentNode = startNode;
-            let prevEdge = null;
-            while (true) {
-                const nodeEdges = remNodeMap.get(currentNode);
-                if (!nodeEdges || nodeEdges.size === 0) break;
-                const candidates = new Set(nodeEdges);
-                if (prevEdge != null) candidates.delete(prevEdge);
-                const nextEdge = pickEdge(candidates.size ? candidates : nodeEdges);
-                if (nextEdge == null) break;
-                const e = edges[nextEdge];
-                const nextNode = (e.a === currentNode) ? e.b : e.a;
-                chain.push({ edgeIdx: nextEdge, from: currentNode, to: nextNode });
-                removeEdge(nextEdge);
-                prevEdge = nextEdge;
-                currentNode = nextNode;
-                const deg = (remNodeMap.get(currentNode)?.size || 0);
-                if (deg !== 1) break;
-            }
-            if (chain.length) builtChains.push(chain);
-        }
-    }
-
-    if (!builtChains.length) {
-        helpers.setStatus?.("No polyline chain generated");
-        helpers.draw?.();
-        return;
-    }
+    const commonGroupId = (() => {
+        if (selectedGroupIds.size === 1) return Number(Array.from(selectedGroupIds)[0]);
+        const gids = new Set(
+            targetShapes
+                .map((s) => Number(s?.groupId))
+                .filter(Number.isFinite)
+        );
+        if (gids.size === 1) return Number(Array.from(gids)[0]);
+        return null;
+    })();
 
     helpers.pushHistory?.();
-    const sourceIds = new Set(edges.map((e) => Number(e.shape.id)).filter(Number.isFinite));
-    for (const id of sourceIds) {
-        helpers.removeShapeById?.(id);
-    }
-
     const createdIds = [];
-    let polylineCount = 0;
-    for (const chain of builtChains) {
-        if (!chain.length) continue;
-        const firstItem = chain[0];
-        const firstEdge = edges[firstItem.edgeIdx];
-        const firstSrc = firstEdge.shape;
-        const firstSameDir = (firstEdge.a === firstItem.from && firstEdge.b === firstItem.to);
-        const points = [
-            firstSameDir
-                ? { x: Number(firstSrc.x1), y: Number(firstSrc.y1) }
-                : { x: Number(firstSrc.x2), y: Number(firstSrc.y2) }
-        ];
-        let styleRef = firstSrc;
-        for (const item of chain) {
-            const e = edges[item.edgeIdx];
-            const src = e.shape;
-            const sameDir = (e.a === item.from && e.b === item.to);
-            const endPoint = sameDir
-                ? { x: Number(src.x2), y: Number(src.y2) }
-                : { x: Number(src.x1), y: Number(src.y1) };
-            const last = points[points.length - 1];
-            if (!last || Math.hypot(Number(last.x) - Number(endPoint.x), Number(last.y) - Number(endPoint.y)) > 1e-9) {
-                points.push(endPoint);
-            }
-            if (!styleRef && src) styleRef = src;
-        }
-        if (points.length < 2) continue;
+    let polylineToLineCount = 0;
+    let lineToPolylineCount = 0;
 
-        const p0 = points[0];
-        const pN = points[points.length - 1];
-        const closed = Math.hypot(Number(p0.x) - Number(pN.x), Number(p0.y) - Number(pN.y)) <= 1e-9;
-        const normalizedPoints = (closed && points.length > 2) ? points.slice(0, -1) : points.slice();
-        if (normalizedPoints.length < 2) continue;
-
-        const polyline = {
-            id: helpers.nextShapeId?.(),
-            type: "polyline",
-            points: normalizedPoints.map((p) => ({ x: Number(p.x), y: Number(p.y) })),
-            closed: !!closed,
-            layerId: Number(styleRef?.layerId ?? state.activeLayerId),
-            lineWidthMm: Math.max(0.01, Number(styleRef?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25),
-            lineType: String(styleRef?.lineType || "solid"),
-            color: String(styleRef?.color || "#0f172a"),
-            groupId: null,
+    // 1) polyline -> lines (always for selected/targeted polylines)
+    for (const s of targetPolylines) {
+        const pts = Array.isArray(s.points) ? s.points : [];
+        if (pts.length < 2) continue;
+        const addLineSeg = (a, b) => {
+            const x1 = Number(a?.x), y1 = Number(a?.y), x2 = Number(b?.x), y2 = Number(b?.y);
+            if (![x1, y1, x2, y2].every(Number.isFinite)) return;
+            if (Math.hypot(x2 - x1, y2 - y1) <= 1e-9) return;
+            const line = {
+                id: helpers.nextShapeId?.(),
+                type: "line",
+                x1, y1, x2, y2,
+                layerId: Number(s.layerId ?? state.activeLayerId),
+                lineWidthMm: Math.max(0.01, Number(s.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25),
+                lineType: String(s.lineType || "solid"),
+                color: String(s.color || "#0f172a"),
+                groupId: Number.isFinite(Number(commonGroupId))
+                    ? Number(commonGroupId)
+                    : (Number.isFinite(Number(s.groupId)) ? Number(s.groupId) : null),
+            };
+            helpers.addShape?.(line);
+            if (Number.isFinite(Number(line.id))) createdIds.push(Number(line.id));
         };
-        helpers.addShape?.(polyline);
-        createdIds.push(Number(polyline.id));
-        polylineCount++;
+        for (let i = 0; i < pts.length - 1; i++) addLineSeg(pts[i], pts[i + 1]);
+        if (s.closed && pts.length >= 2) addLineSeg(pts[pts.length - 1], pts[0]);
+        helpers.removeShapeById?.(Number(s.id));
+        polylineToLineCount++;
     }
 
-    setSelection(state, createdIds);
-    helpers.setStatus?.(`Line->Polyline: ${polylineCount} polyline(s)`);
+    // 2) line -> polyline (only original targeted lines)
+    const lineShapes = targetLines.filter((s) => Number.isFinite(Number(s?.id)));
+    if (lineShapes.length > 0) {
+        const edges = [];
+        const nodeMap = new Map();
+        const addNodeEdge = (k, edgeIdx) => {
+            let set = nodeMap.get(k);
+            if (!set) {
+                set = new Set();
+                nodeMap.set(k, set);
+            }
+            set.add(edgeIdx);
+        };
+        for (const s of lineShapes) {
+            const a = pointKey(s.x1, s.y1);
+            const b = pointKey(s.x2, s.y2);
+            if (a === b) continue;
+            const idx = edges.length;
+            edges.push({ shape: s, a, b });
+            addNodeEdge(a, idx);
+            addNodeEdge(b, idx);
+        }
+        if (edges.length > 0) {
+            const visited = new Set();
+            const components = [];
+            for (let i = 0; i < edges.length; i++) {
+                if (visited.has(i)) continue;
+                const stack = [i];
+                const comp = [];
+                while (stack.length) {
+                    const ei = stack.pop();
+                    if (visited.has(ei)) continue;
+                    visited.add(ei);
+                    comp.push(ei);
+                    const e = edges[ei];
+                    const aSet = nodeMap.get(e.a) || new Set();
+                    const bSet = nodeMap.get(e.b) || new Set();
+                    for (const ni of aSet) if (!visited.has(ni)) stack.push(ni);
+                    for (const ni of bSet) if (!visited.has(ni)) stack.push(ni);
+                }
+                if (comp.length) components.push(comp);
+            }
+
+            const builtChains = [];
+            for (const comp of components) {
+                const remaining = new Set(comp);
+                const remNodeMap = new Map();
+                const addRem = (k, ei) => {
+                    let set = remNodeMap.get(k);
+                    if (!set) {
+                        set = new Set();
+                        remNodeMap.set(k, set);
+                    }
+                    set.add(ei);
+                };
+                for (const ei of comp) {
+                    const e = edges[ei];
+                    addRem(e.a, ei);
+                    addRem(e.b, ei);
+                }
+                const removeEdge = (ei) => {
+                    if (!remaining.has(ei)) return;
+                    remaining.delete(ei);
+                    const e = edges[ei];
+                    remNodeMap.get(e.a)?.delete(ei);
+                    remNodeMap.get(e.b)?.delete(ei);
+                };
+                const pickStartNode = () => {
+                    for (const [k, set] of remNodeMap.entries()) {
+                        if (!set || set.size === 0) continue;
+                        if (set.size !== 2) return k;
+                    }
+                    const firstEdgeIdx = remaining.values().next().value;
+                    if (firstEdgeIdx == null) return null;
+                    return edges[firstEdgeIdx].a;
+                };
+                const pickEdge = (set) => {
+                    const arr = Array.from(set || []);
+                    if (!arr.length) return null;
+                    arr.sort((a, b) => Number(edges[a]?.shape?.id || 0) - Number(edges[b]?.shape?.id || 0));
+                    return arr[0];
+                };
+
+                while (remaining.size > 0) {
+                    const startNode = pickStartNode();
+                    if (!startNode) break;
+                    const chain = [];
+                    let currentNode = startNode;
+                    let prevEdge = null;
+                    while (true) {
+                        const nodeEdges = remNodeMap.get(currentNode);
+                        if (!nodeEdges || nodeEdges.size === 0) break;
+                        const candidates = new Set(nodeEdges);
+                        if (prevEdge != null) candidates.delete(prevEdge);
+                        const nextEdge = pickEdge(candidates.size ? candidates : nodeEdges);
+                        if (nextEdge == null) break;
+                        const e = edges[nextEdge];
+                        const nextNode = (e.a === currentNode) ? e.b : e.a;
+                        chain.push({ edgeIdx: nextEdge, from: currentNode, to: nextNode });
+                        removeEdge(nextEdge);
+                        prevEdge = nextEdge;
+                        currentNode = nextNode;
+                        const deg = (remNodeMap.get(currentNode)?.size || 0);
+                        if (deg !== 1) break;
+                    }
+                    if (chain.length) builtChains.push(chain);
+                }
+            }
+
+            if (builtChains.length > 0) {
+                const sourceIds = new Set(edges.map((e) => Number(e.shape.id)).filter(Number.isFinite));
+                for (const id of sourceIds) helpers.removeShapeById?.(id);
+                for (const chain of builtChains) {
+                    if (!chain.length) continue;
+                    const firstItem = chain[0];
+                    const firstEdge = edges[firstItem.edgeIdx];
+                    const firstSrc = firstEdge.shape;
+                    const firstSameDir = (firstEdge.a === firstItem.from && firstEdge.b === firstItem.to);
+                    const points = [
+                        firstSameDir
+                            ? { x: Number(firstSrc.x1), y: Number(firstSrc.y1) }
+                            : { x: Number(firstSrc.x2), y: Number(firstSrc.y2) }
+                    ];
+                    let styleRef = firstSrc;
+                    const chainGroupIds = new Set();
+                    if (Number.isFinite(Number(firstSrc?.groupId))) chainGroupIds.add(Number(firstSrc.groupId));
+                    for (const item of chain) {
+                        const e = edges[item.edgeIdx];
+                        const src = e.shape;
+                        const sameDir = (e.a === item.from && e.b === item.to);
+                        const endPoint = sameDir
+                            ? { x: Number(src.x2), y: Number(src.y2) }
+                            : { x: Number(src.x1), y: Number(src.y1) };
+                        const last = points[points.length - 1];
+                        if (!last || Math.hypot(Number(last.x) - Number(endPoint.x), Number(last.y) - Number(endPoint.y)) > 1e-9) {
+                            points.push(endPoint);
+                        }
+                        if (!styleRef && src) styleRef = src;
+                        if (Number.isFinite(Number(src?.groupId))) chainGroupIds.add(Number(src.groupId));
+                    }
+                    if (points.length < 2) continue;
+                    const p0 = points[0];
+                    const pN = points[points.length - 1];
+                    const closed = Math.hypot(Number(p0.x) - Number(pN.x), Number(p0.y) - Number(pN.y)) <= 1e-9;
+                    const normalizedPoints = (closed && points.length > 2) ? points.slice(0, -1) : points.slice();
+                    if (normalizedPoints.length < 2) continue;
+                    const groupId = (chainGroupIds.size === 1) ? Array.from(chainGroupIds)[0] : null;
+                    const polyline = {
+                        id: helpers.nextShapeId?.(),
+                        type: "polyline",
+                        points: normalizedPoints.map((p) => ({ x: Number(p.x), y: Number(p.y) })),
+                        closed: !!closed,
+                        layerId: Number(styleRef?.layerId ?? state.activeLayerId),
+                        lineWidthMm: Math.max(0.01, Number(styleRef?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25),
+                        lineType: String(styleRef?.lineType || "solid"),
+                        color: String(styleRef?.color || "#0f172a"),
+                        groupId: Number.isFinite(Number(commonGroupId)) ? Number(commonGroupId) : groupId,
+                    };
+                    helpers.addShape?.(polyline);
+                    if (Number.isFinite(Number(polyline.id))) createdIds.push(Number(polyline.id));
+                    lineToPolylineCount++;
+                }
+            }
+        }
+    }
+
+    if (Number.isFinite(Number(commonGroupId)) && createdIds.length > 0) {
+        const gid = Number(commonGroupId);
+        const g = (state.groups || []).find((x) => Number(x?.id) === gid);
+        if (g) {
+            const merged = new Set((g.shapeIds || []).map(Number).filter(Number.isFinite));
+            for (const id of createdIds) merged.add(Number(id));
+            g.shapeIds = Array.from(merged);
+        }
+    }
+
+    if (createdIds.length > 0) setSelection(state, createdIds);
+    helpers.setStatus?.(`線<>多角形: polyline→line ${polylineToLineCount}, line→polyline ${lineToPolylineCount}`);
     helpers.draw?.();
 }
 

@@ -19,6 +19,9 @@
       --menu-scale: 1;
       --app-vw: 100vw;
       --app-vh: 100vh;
+      --ad-slot-h: 200px;
+      --ad-slot-gap: 0px;
+      --group-panel-right-gap: -6px;
     }
 
     * {
@@ -598,6 +601,11 @@
       gap: 4px;
       min-height: 20px;
       color: #334155;
+      white-space: nowrap;
+    }
+    .top-context label span {
+      white-space: nowrap;
+      display: inline-block;
     }
 
     .top-context input[type="number"],
@@ -651,6 +659,27 @@
     .top-context .section>div[style*="grid-template-columns:auto 1fr"] span {
       color: #475569;
       font-size: 12px;
+      white-space: nowrap;
+      display: inline-block;
+    }
+    .top-context .section[data-context] > div > span {
+      white-space: nowrap;
+      display: inline-block;
+      min-width: fit-content;
+    }
+    #applyDLineBtn {
+      min-height: 34px !important;
+      padding: 5px 14px !important;
+      font-size: 13px !important;
+      font-weight: 800 !important;
+      background: #dff7e8;
+      border-color: #86efac;
+      color: #14532d;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.55), 0 2px 6px rgba(22,101,52,0.18);
+    }
+    #applyDLineBtn:hover {
+      background: #cef1dc;
+      border-color: #4ade80;
     }
 
     .top-context-help {
@@ -673,13 +702,45 @@
     .right-stack {
       position: absolute;
       right: 10px;
+      top: 10px;
       bottom: 10px;
       z-index: 20;
       width: min(250px, calc(100% - 230px));
       display: flex;
       flex-direction: column;
       gap: 1px;
+      padding-top: calc(var(--ad-slot-h) - 40px);
       pointer-events: auto;
+      min-height: 0;
+      max-height: calc(var(--app-vh) - 20px);
+      overflow: hidden;
+    }
+
+    #rightAdSlot {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      z-index: 25;
+      width: min(340px, calc(100% - 230px));
+      height: var(--ad-slot-h);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed rgba(148, 163, 184, 0.55);
+      border-radius: 10px 10px 0 0;
+      background: rgba(255, 255, 255, 0.86);
+      color: #64748b;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      text-align: center;
+      padding: 10px;
+      box-shadow: var(--shadow-soft);
+    }
+
+    .right-stack .section:first-child {
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
     }
 
     /* Compact vertical rhythm for group/layer panels */
@@ -1238,9 +1299,12 @@
       max-height: calc(var(--app-vh) - 20px);
       min-height: 0;
       position: relative;
+      overflow: hidden;
+      margin-right: var(--group-panel-right-gap);
     }
 
     .right-stack .section[data-panel-id="groups"] #groupList {
+      flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
@@ -1252,9 +1316,11 @@
       flex-direction: column;
       min-height: 0;
       position: relative;
+      overflow: hidden;
     }
 
     .right-stack .section[data-panel-id="layers"] #layerList {
+      flex: 1 1 auto;
       min-height: 0;
       overflow-y: auto;
       overflow-x: hidden;
@@ -1270,8 +1336,8 @@
     .panel-resize-handle-top {
       left: 10px;
       right: 10px;
-      top: -4px;
-      height: 10px;
+      top: -7px;
+      height: 16px;
       cursor: ns-resize;
     }
 
@@ -2170,22 +2236,15 @@
 
           <div class="section" data-context="doubleline">
             <div class="section-title">二重線</div>
-            <div style="display:grid; grid-template-columns:auto 64px auto auto auto auto auto; gap:6px; align-items:center; justify-content:start;">
-              <span>Offset</span><input id="dlineOffsetInput" type="number" value="10" min="0.1" step="1"
-                style="width:100%; min-width:0;">
+            <div style="display:grid; grid-template-columns:auto 78px auto 66px auto auto 64px auto 84px auto 118px auto 124px; gap:6px; align-items:center; justify-content:start;">
               <span>Mode</span>
               <select id="dlineModeSelect" style="width:auto; min-width:68px;">
                 <option value="both" selected>両側</option>
                 <option value="single">片側</option>
               </select>
-              <label style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
-                <input id="dlineNoTrimToggle" type="checkbox">
-                <span>トリムしない</span>
-              </label>
-              <label style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
-                <input id="dlineAsPolylineToggle" type="checkbox" checked>
-                <span>Polylineで生成</span>
-              </label>
+              <span>Offset</span><input id="dlineOffsetInput" type="number" value="5" min="0.1" step="1"
+                style="width:100%; min-width:0;">
+              <span id="dlineOffsetUnitLabel">(mm)</span>
               <span>線幅(mm)</span>
               <select id="dlineToolLineWidthInput" style="width:auto; min-width:58px;">
                 <option value="0.1">0.1</option>
@@ -2206,6 +2265,9 @@
                 <option value="center">中心線</option>
                 <option value="hidden">隠れ線</option>
               </select>
+              <label for="dlineAsPolylineToggle" id="dlineAsPolylineLabel" style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
+                <input id="dlineAsPolylineToggle" type="checkbox"><span>Polylineで生成</span>
+              </label>
               <button id="applyDLineBtn" type="button">Apply</button>
             </div>
           </div>
@@ -2426,9 +2488,10 @@
                 </label>
             </div>
           </div>
-        </div>
-        <div id="topContextHelp" class="top-context-help"></div>
       </div>
+      <div id="topContextHelp" class="top-context-help"></div>
+      </div>
+      <div class="ad-slot" id="rightAdSlot">Ad Space</div>
       <div class="right-stack">
         <div class="section" data-panel-id="groups">
           <div id="groupPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="高さを変更"></div>

@@ -277,16 +277,8 @@ export function bindPageAndPatternEvents(state, dom, actions, helpers) {
       refreshUiDeferred();
     });
   }
-  if (dom.dlineNoTrimToggle) {
-    dom.dlineNoTrimToggle.addEventListener("change", () => {
-      if (actions.cancelDoubleLineTrimPending) actions.cancelDoubleLineTrimPending();
-      state.dlineSettings.noTrim = !!dom.dlineNoTrimToggle.checked;
-      refreshUiDeferred();
-    });
-  }
   if (dom.dlineAsPolylineToggle) {
     dom.dlineAsPolylineToggle.addEventListener("change", () => {
-      if (actions.cancelDoubleLineTrimPending) actions.cancelDoubleLineTrimPending();
       state.dlineSettings.asPolyline = !!dom.dlineAsPolylineToggle.checked;
       refreshUiDeferred();
     });

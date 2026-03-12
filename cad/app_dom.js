@@ -290,7 +290,6 @@
   applyHatchBtn: document.getElementById("applyHatchBtn"),
   dlineOffsetInput: document.getElementById("dlineOffsetInput"),
   dlineModeSelect: document.getElementById("dlineModeSelect"),
-  dlineNoTrimToggle: document.getElementById("dlineNoTrimToggle"),
   dlineAsPolylineToggle: document.getElementById("dlineAsPolylineToggle"),
   dlineToolLineWidthInput: document.getElementById("dlineToolLineWidthInput"),
   dlineToolLineTypeInput: document.getElementById("dlineToolLineTypeInput"),

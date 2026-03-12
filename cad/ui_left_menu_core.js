@@ -15,7 +15,7 @@ export function createHtmlLikeLeftMenuRegistry() {
     { type: "tool", id: "trim", label: "Trim", group: "edit" },
     { type: "tool", id: "doubleline", label: "Double Line", implemented: true, group: "edit" },
     { type: "tool", id: "patterncopy", label: "Pattern Copy", implemented: true, group: "edit" },
-    { type: "action", id: "lineToPolyline", label: "Line->Polyline", implemented: true, group: "edit" },
+    { type: "action", id: "lineToPolyline", label: "Line<>Polyline", implemented: true, group: "edit" },
     { type: "action", id: "undo", label: "Undo", implemented: true, group: "edit" },
     { type: "action", id: "redo", label: "Redo", implemented: true, group: "edit" },
     { type: "action", id: "delete", label: "Delete", implemented: true, group: "edit" },

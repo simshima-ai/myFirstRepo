@@ -140,6 +140,23 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
     const collapsed = !!state.ui?.rightPanelCollapsed?.[panelId];
     sec.classList.toggle("collapsed", collapsed);
   }
+  {
+    const rightSections = Array.from(document.querySelectorAll(".right-stack .section[data-panel-id]"));
+    let expandedOrder = 0;
+    let collapsedOrder = 100;
+    let firstCollapsedApplied = false;
+    for (const sec of rightSections) {
+      const panelId = String(sec.getAttribute("data-panel-id") || "");
+      const collapsed = !!state.ui?.rightPanelCollapsed?.[panelId];
+      sec.style.order = String(collapsed ? collapsedOrder++ : expandedOrder++);
+      if (collapsed && !firstCollapsedApplied) {
+        sec.style.marginTop = "auto";
+        firstCollapsedApplied = true;
+      } else {
+        sec.style.removeProperty("margin-top");
+      }
+    }
+  }
   const groupsSectionEl = document.querySelector(".right-stack .section[data-panel-id='groups']");
   if (groupsSectionEl) {
     const h = Number(state.ui?.panelLayout?.groupPanelHeight);
@@ -190,21 +207,37 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
         }
         chromeH = Math.max(0, Math.round(chromeH));
         const listNaturalH = Math.max(0, layerListEl.scrollHeight || 0);
-        // Small slack avoids clipping the last row due to rounding/borders.
-        const maxListH = Math.max(40, listNaturalH + 16);
+        const maxListH = 8000;
         if (!state.ui.panelLayout) state.ui.panelLayout = {};
         let desiredListH = Number(state.ui.panelLayout.layerPanelListHeight);
         if (!Number.isFinite(desiredListH) || desiredListH <= 0) {
           const fallbackOld = Number(state.ui.panelLayout.layerPanelHeight);
           desiredListH = (Number.isFinite(fallbackOld) && fallbackOld > chromeH)
             ? (fallbackOld - chromeH)
-            : Math.min(maxListH, Math.max(80, currentListH || listNaturalH || 120));
+            : Math.max(80, listNaturalH || currentListH || 120);
         }
         desiredListH = Math.max(40, Math.min(maxListH, Math.round(desiredListH)));
         state.ui.panelLayout.layerPanelListHeight = desiredListH;
         const targetH = chromeH + desiredListH + 8;
-        layersSectionEl.style.height = `min(calc(var(--app-vh) - 20px), ${targetH}px)`;
-        layersSectionEl.style.maxHeight = `min(calc(var(--app-vh) - 20px), ${targetH}px)`;
+        const rightStackEl = layersSectionEl.closest(".right-stack");
+        let maxByStack = Number.POSITIVE_INFINITY;
+        if (rightStackEl) {
+          const stackRect = rightStackEl.getBoundingClientRect();
+          const stackGap = Math.max(0, parseFloat(window.getComputedStyle(rightStackEl).gap || "0") || 0);
+          const siblings = Array.from(rightStackEl.querySelectorAll(":scope > [data-panel-id]"))
+            .filter(el => el !== layersSectionEl && window.getComputedStyle(el).display !== "none");
+          let siblingsH = 0;
+          for (const sib of siblings) {
+            siblingsH += Math.max(0, sib.getBoundingClientRect().height || sib.offsetHeight || 0);
+          }
+          const gapsTotal = Math.max(0, (siblings.length + 1) * stackGap);
+          maxByStack = Math.max(120, Math.floor((stackRect.height || 0) - siblingsH - gapsTotal));
+        }
+        const cappedH = Number.isFinite(maxByStack)
+          ? Math.max(120, Math.min(Math.round(targetH), Math.round(maxByStack)))
+          : Math.round(targetH);
+        layersSectionEl.style.height = `${cappedH}px`;
+        layersSectionEl.style.maxHeight = `${cappedH}px`;
       } else {
         layersSectionEl.style.removeProperty("height");
         layersSectionEl.style.removeProperty("max-height");

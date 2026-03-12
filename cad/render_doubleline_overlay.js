@@ -39,6 +39,22 @@ export function createRenderDoubleLineOverlayOps(deps) {
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
     }
+    const dbg = Array.isArray(state?.dlineDebugMarkers) ? state.dlineDebugMarkers : [];
+    if (dbg.length) {
+      ctx.save();
+      ctx.setLineDash([]);
+      ctx.lineWidth = 1.1;
+      for (const m of dbg) {
+        if (!m || String(m.type || "") !== "circle") continue;
+        ctx.strokeStyle = String(m.color || "#16a34a");
+        const c = worldToScreen(state.view, { x: Number(m.cx), y: Number(m.cy) });
+        const rr = Math.max(1.5, Number(m.r) * state.view.scale);
+        ctx.beginPath();
+        ctx.arc(c.x, c.y, rr, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     ctx.restore();
   }
 
@@ -81,9 +97,66 @@ export function createRenderDoubleLineOverlayOps(deps) {
     ctx.restore();
   }
 
+  function drawDoubleLineConnectDebug(ctx, state) {
+    if (state.tool !== "doubleline") return;
+    if (!state?.ui?.debugDoubleLineConnect) return;
+    const dbg = state?.dlineConnectDebug;
+    if (!dbg || !Array.isArray(dbg.markers)) return;
+    const markerById = new Map();
+    for (const m of dbg.markers) {
+      const i = Number(m?.i);
+      if (!Number.isFinite(i)) continue;
+      markerById.set(i, m);
+    }
+    ctx.save();
+    ctx.setLineDash([]);
+    ctx.lineWidth = 1.4;
+    ctx.strokeStyle = "#22c55e";
+    for (const e of (dbg.edges || [])) {
+      const a = markerById.get(Number(e?.u));
+      const b = markerById.get(Number(e?.v));
+      if (!a || !b) continue;
+      const p1 = worldToScreen(state.view, { x: Number(a.x), y: Number(a.y) });
+      const p2 = worldToScreen(state.view, { x: Number(b.x), y: Number(b.y) });
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p2.x, p2.y);
+      ctx.stroke();
+    }
+    ctx.font = "10px monospace";
+    ctx.textBaseline = "top";
+    for (const m of dbg.markers) {
+      const x = Number(m?.x), y = Number(m?.y);
+      if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+      const s = worldToScreen(state.view, { x, y });
+      const label = `#${Number(m?.i)}`;
+      ctx.fillStyle = "#111827";
+      ctx.fillText(label, s.x + 5, s.y - 14);
+      let yoff = 0;
+      for (const lr of (m?.lanes || [])) {
+        const sid = Number(lr?.sid);
+        const rj = lr?.reject || null;
+        const p = Number(rj?.parallel || 0);
+        const c = Number(rj?.cross || 0);
+        const ii = Number(rj?.intermediate || 0);
+        const txt = `sid:${sid} P${p} C${c} I${ii}`;
+        ctx.fillStyle = "#334155";
+        ctx.fillText(txt, s.x + 5, s.y + yoff);
+        yoff += 10;
+      }
+      const chosen = Array.isArray(m?.chosen) ? m.chosen.filter((v) => Number.isFinite(Number(v))).map((v) => Number(v)) : [];
+      if (chosen.length) {
+        ctx.fillStyle = "#065f46";
+        ctx.fillText(`to:${chosen.join(",")}`, s.x + 5, s.y + yoff);
+      }
+    }
+    ctx.restore();
+  }
+
   return {
     drawDoubleLinePreview,
     drawDoubleLineTrimCandidates,
     drawDoubleLineTrimIntersections,
+    drawDoubleLineConnectDebug,
   };
 }

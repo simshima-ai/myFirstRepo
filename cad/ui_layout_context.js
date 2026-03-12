@@ -60,19 +60,53 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     const stackEl = rightStackEl || groupsSectionEl?.closest?.(".right-stack");
     const vp = getViewportSizeForUi();
     if (!stackEl || !groupsSectionEl) return Math.max(120, Math.floor(vp.height - 20));
-    const availableTotal = Math.max(120, Math.floor(vp.height - 20));
+    const stackRect = stackEl.getBoundingClientRect();
+    const availableTotal = Math.max(
+      120,
+      Math.floor(
+        (Number(stackRect.height) > 0 ? Number(stackRect.height) : Number(vp.height) - 20)
+      )
+    );
     const gap = Math.max(0, parseFloat(window.getComputedStyle(stackEl).gap || "0") || 0);
-    const sections = Array.from(stackEl.querySelectorAll(":scope > .section[data-panel-id]"))
+    const sections = Array.from(stackEl.querySelectorAll(":scope > [data-panel-id]"))
       .filter(el => window.getComputedStyle(el).display !== "none");
     let othersTotal = 0;
     for (const sec of sections) {
       if (sec === groupsSectionEl) continue;
-      othersTotal += Math.max(0, sec.getBoundingClientRect().height || sec.offsetHeight || 0);
+      const panelId = String(sec.getAttribute("data-panel-id") || "");
+      if (panelId === "layers") {
+        const listEl = sec.querySelector("#layerList");
+        let chromeH = 0;
+        for (const child of Array.from(sec.children || [])) {
+          if (!(child instanceof HTMLElement)) continue;
+          if (child === listEl) continue;
+          if (child.classList.contains("panel-resize-handle")) continue;
+          const style = window.getComputedStyle(child);
+          if (style.display === "none") continue;
+          chromeH += child.offsetHeight;
+          const mt = parseFloat(style.marginTop || "0");
+          const mb = parseFloat(style.marginBottom || "0");
+          if (Number.isFinite(mt)) chromeH += mt;
+          if (Number.isFinite(mb)) chromeH += mb;
+        }
+        chromeH = Math.max(0, Math.round(chromeH));
+        const desiredListH = Number(state.ui?.panelLayout?.layerPanelListHeight);
+        const naturalListH = Math.max(40, Math.round(Number(listEl?.scrollHeight || listEl?.clientHeight || 0) + 16));
+        const reserveListH = Number.isFinite(desiredListH) && desiredListH > 0
+          ? Math.max(40, Math.round(desiredListH))
+          : naturalListH;
+        const reserveH = chromeH + reserveListH + 8;
+        const currentH = Math.max(0, sec.getBoundingClientRect().height || sec.offsetHeight || 0);
+        othersTotal += Math.max(currentH, reserveH);
+      } else {
+        othersTotal += Math.max(0, sec.getBoundingClientRect().height || sec.offsetHeight || 0);
+      }
     }
     const gapsTotal = Math.max(0, (sections.length - 1) * gap);
     return Math.max(120, Math.floor(availableTotal - othersTotal - gapsTotal));
   };
   if (rightStackEl) {
+    rightStackEl.style.removeProperty("top");
     const w = Number(state.ui?.panelLayout?.rightPanelWidth);
     if (Number.isFinite(w) && w > 0) {
       rightStackEl.style.width = `min(${w}px, calc(100% - 230px))`;

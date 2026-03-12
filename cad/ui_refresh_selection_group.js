@@ -267,9 +267,6 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     const v = state.dlineSettings?.mode || "both";
     if (dom.dlineModeSelect.value !== v) dom.dlineModeSelect.value = v;
   }
-  if (dom.dlineNoTrimToggle) {
-    dom.dlineNoTrimToggle.checked = !!state.dlineSettings?.noTrim;
-  }
   if (dom.dlineAsPolylineToggle) {
     dom.dlineAsPolylineToggle.checked = !!state.dlineSettings?.asPolyline;
   }

@@ -1,6 +1,7 @@
 import { nextShapeId, addShape, addGroup, nextGroupId } from "./state.js";
 import { segmentIntersectionParamPoint, segmentCircleIntersectionPoints, lineCircleInfiniteIntersectionPoints, circleCircleIntersectionPoints, isAngleOnArc } from "./solvers.js";
 import { getEffectiveGridSize, snapPoint } from "./geom.js";
+import { sampleBSplinePoints } from "./bspline_utils.js";
 
 export function lineIntersectionInfinite(p1, p2, p3, p4) {
     const x1 = p1.x, y1 = p1.y, x2 = p2.x, y2 = p2.y;
@@ -760,6 +761,30 @@ function expandDoubleLineBasesFromSelection(state) {
                 sourceByExpandedId.set(Number(seg.id), s);
             }
         }
+        continue;
+    }
+    for (const s of selected) {
+        const t = String(s?.type || "");
+        if (t !== "bspline") continue;
+        const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
+        if (!Array.isArray(sampled) || sampled.length < 2) continue;
+        const makeLine = (a, b) => {
+            const x1 = Number(a?.x), y1 = Number(a?.y), x2 = Number(b?.x), y2 = Number(b?.y);
+            if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+            if (Math.hypot(x2 - x1, y2 - y1) <= 1e-9) return null;
+            return {
+                id: virtualLineId--,
+                type: "line",
+                x1, y1, x2, y2,
+                rootBaseId: Number(s.id)
+            };
+        };
+        for (let i = 0; i < sampled.length - 1; i++) {
+            const seg = makeLine(sampled[i], sampled[i + 1]);
+            if (!seg) continue;
+            expanded.push(seg);
+            sourceByExpandedId.set(Number(seg.id), s);
+        }
     }
     return { bases: expanded, sourceByExpandedId };
 }
@@ -1276,10 +1301,13 @@ function findAdjacentLineArcPairs(lines, arcs, tol = 1e-4) {
     return out;
 }
 
-function connectLineArcOffsets(offsets, lineArcPairs) {
+function connectLineArcOffsets(offsets, lineArcPairs, lineBases = null, debugConnMarkers = null, lastSourceRef = null) {
     if (!Array.isArray(offsets) || !offsets.length || !Array.isArray(lineArcPairs) || !lineArcPairs.length) return;
     const lineMap = new Map();
     const arcMap = new Map();
+    const baseLineMap = new Map((Array.isArray(lineBases) ? lineBases : [])
+        .map((l) => [Number(l?.id), l])
+        .filter((row) => Number.isFinite(Number(row[0]))));
     for (const o of offsets) {
         if (!o) continue;
         const key = `${Number(o.baseId)}:${Number(o.side)}`;
@@ -1297,30 +1325,107 @@ function connectLineArcOffsets(offsets, lineArcPairs) {
         const th = (key === "a2") ? Number(a.a2) : Number(a.a1);
         return { x: Number(a.cx) + Math.cos(th) * Number(a.r), y: Number(a.cy) + Math.sin(th) * Number(a.r) };
     };
+    const signedSideOnBaseLine = (baseLine, pt) => {
+        const x1 = Number(baseLine?.x1), y1 = Number(baseLine?.y1);
+        const x2 = Number(baseLine?.x2), y2 = Number(baseLine?.y2);
+        const px = Number(pt?.x), py = Number(pt?.y);
+        if (![x1, y1, x2, y2, px, py].every(Number.isFinite)) return NaN;
+        const dx = x2 - x1, dy = y2 - y1;
+        const len = Math.hypot(dx, dy);
+        if (len <= 1e-9) return NaN;
+        const nx = -dy / len, ny = dx / len; // base normal (+ side)
+        return (px - x1) * nx + (py - y1) * ny;
+    };
+    const baseSegs = Array.from(baseLineMap.values()).filter(Boolean);
+    const segmentCrossCountOnBaseLines = (a, b, ignoreBaseId = NaN) => {
+        const a1 = { x: Number(a?.x), y: Number(a?.y) };
+        const a2 = { x: Number(b?.x), y: Number(b?.y) };
+        if (![a1.x, a1.y, a2.x, a2.y].every(Number.isFinite)) return 9999;
+        let count = 0;
+        for (const s of baseSegs) {
+            if (!s) continue;
+            const sid = Number(s.id);
+            if (Number.isFinite(ignoreBaseId) && sid === Number(ignoreBaseId)) continue;
+            const b1 = { x: Number(s.x1), y: Number(s.y1) };
+            const b2 = { x: Number(s.x2), y: Number(s.y2) };
+            if (![b1.x, b1.y, b2.x, b2.y].every(Number.isFinite)) continue;
+            const ip = segmentIntersectionParamPoint(a1, a2, b1, b2);
+            if (!ip) continue;
+            const t = Number(ip.t), u = Number(ip.u);
+            if (!Number.isFinite(t) || !Number.isFinite(u)) continue;
+            // Endpoint touch is allowed. Interior-interior crossing is penalized.
+            if (t > 1e-6 && t < 1 - 1e-6 && u > 1e-6 && u < 1 - 1e-6) count += 1;
+        }
+        return count;
+    };
     const pairs = lineArcPairs.slice().sort((a, b) => Number(a.dist || 0) - Number(b.dist || 0));
     for (const p of pairs) {
+        const baseLine = baseLineMap.get(Number(p.lineId)) || null;
         for (const side of [1, -1]) {
             const lo = lineMap.get(`${Number(p.lineId)}:${side}`);
-            const ao = arcMap.get(`${Number(p.arcId)}:${side}`);
-            if (!lo || !ao) continue;
+            if (!lo) continue;
             const anchor = getLineEnd(lo, p.lineEnd);
-            const other = getLineEnd(lo, p.lineEnd === "p1" ? "p2" : "p1");
-            const arcAnchor = arcEndPoint(ao, p.arcEnd);
-            const ips = lineCircleInfiniteIntersectionPoints(anchor, other, ao, Number(ao.r) || 0) || [];
-            if (!ips.length) continue;
-            let best = null;
-            let bestScore = Infinity;
-            for (const ip of ips) {
-                const dLine = Math.hypot(Number(ip.x) - Number(anchor.x), Number(ip.y) - Number(anchor.y));
-                const dArc = Math.hypot(Number(ip.x) - Number(arcAnchor.x), Number(ip.y) - Number(arcAnchor.y));
-                const score = dLine + dArc * 0.75;
-                if (score < bestScore) {
-                    bestScore = score;
-                    best = ip;
+            const otherEnd = (p.lineEnd === "p2")
+                ? { x: Number(lo.x1), y: Number(lo.y1) }
+                : { x: Number(lo.x2), y: Number(lo.y2) };
+            const aoSame = arcMap.get(`${Number(p.arcId)}:${side}`);
+            const aoOpp = arcMap.get(`${Number(p.arcId)}:${-side}`);
+            const candidates = [];
+            if (aoSame) {
+                const pt = arcEndPoint(aoSame, p.arcEnd);
+                if ([Number(pt.x), Number(pt.y)].every(Number.isFinite)) {
+                    const d = Math.hypot(Number(pt.x) - Number(anchor.x), Number(pt.y) - Number(anchor.y));
+                    candidates.push({ pt, d, pref: 0 });
                 }
             }
-            if (!best) continue;
-            setLineEnd(lo, p.lineEnd, best);
+            if (aoOpp) {
+                const pt = arcEndPoint(aoOpp, p.arcEnd);
+                if ([Number(pt.x), Number(pt.y)].every(Number.isFinite)) {
+                    const d = Math.hypot(Number(pt.x) - Number(anchor.x), Number(pt.y) - Number(anchor.y));
+                    candidates.push({ pt, d, pref: 1 });
+                }
+            }
+            if (!candidates.length) continue;
+            // Prefer endpoint that stays on the same side of the source line.
+            // This prevents final connection from flipping inner/outer.
+            const scored = candidates.map((c) => {
+                const ss = signedSideOnBaseLine(baseLine, c.pt);
+                const sideMatch = Number.isFinite(ss) ? (Number(side) * Number(ss) >= -1e-7 ? 1 : 0) : 0;
+                const crossCount = segmentCrossCountOnBaseLines(otherEnd, c.pt, Number(p.lineId));
+                return { ...c, sideMatch, crossCount };
+            });
+            scored.sort((a, b) =>
+                Number(b.sideMatch) - Number(a.sideMatch)
+                || Number(a.crossCount) - Number(b.crossCount)
+                || Number(a.d) - Number(b.d)
+                || Number(a.pref) - Number(b.pref)
+            );
+            const picked = scored[0]?.pt;
+            if (debugConnMarkers && picked) {
+                const rr = Math.max(0.4, Math.abs(Number(lo?.side) || 1) * 0.0 + 0.7);
+                debugConnMarkers.push({
+                    type: "circle",
+                    cx: Number(anchor.x),
+                    cy: Number(anchor.y),
+                    r: rr,
+                    color: "#f59e0b", // start
+                });
+                debugConnMarkers.push({
+                    type: "circle",
+                    cx: Number(picked.x),
+                    cy: Number(picked.y),
+                    r: rr,
+                    color: "#06b6d4", // end
+                });
+            }
+            if (lastSourceRef && typeof lastSourceRef === "object") {
+                const bx = (p.lineEnd === "p2") ? Number(baseLine?.x2) : Number(baseLine?.x1);
+                const by = (p.lineEnd === "p2") ? Number(baseLine?.y2) : Number(baseLine?.y1);
+                if (Number.isFinite(bx) && Number.isFinite(by)) {
+                    lastSourceRef.point = { x: bx, y: by };
+                }
+            }
+            setLineEnd(lo, p.lineEnd, picked);
         }
     }
 }
@@ -1378,6 +1483,8 @@ export function buildDoubleLinePreview(state, mousePt = null) {
     const signsMap = mixedSigns?.lineSigns || null;
     const arcSignsMap = mixedSigns?.arcSigns || null;
     const offsets = [];
+    const debugArcSide = !!state?.ui?.debugDoubleLineArcSide;
+    const debugMarkers = [];
     for (const s of bases) {
         if (s.type === 'line') {
             if (mode === 'single') {
@@ -1442,11 +1549,26 @@ export function buildDoubleLinePreview(state, mousePt = null) {
         o.fullX2 = Number(o.x2);
         o.fullY2 = Number(o.y2);
     }
+    const lineArcDebugMarkers = [];
+    const lineArcLastSourceRef = { point: null };
+    state.dlineLastConnectSourcePoint = null;
     if (!state.dlineSettings?.noTrim) {
         // Trim mode: resolve connected line segments by intersection-first geometry.
         // This avoids angle-dependent misses/overshoots on non-right corners.
         trimOffsetLineConnections(lineOffsets, pairs, lineBases, Math.abs(off));
-        connectLineArcOffsets(offsets, lineArcPairs);
+        connectLineArcOffsets(
+            offsets,
+            lineArcPairs,
+            lineBases,
+            (debugArcSide ? lineArcDebugMarkers : null),
+            lineArcLastSourceRef
+        );
+    }
+    if (lineArcLastSourceRef?.point && Number.isFinite(Number(lineArcLastSourceRef.point.x)) && Number.isFinite(Number(lineArcLastSourceRef.point.y))) {
+        state.dlineLastConnectSourcePoint = {
+            x: Number(lineArcLastSourceRef.point.x),
+            y: Number(lineArcLastSourceRef.point.y),
+        };
     }
     // Arc offset should preserve original angular span.
     const baseArcById = new Map();
@@ -1460,6 +1582,101 @@ export function buildDoubleLinePreview(state, mousePt = null) {
         o.a1 = Number(baseArc.a1) || 0;
         o.a2 = Number(baseArc.a2) || 0;
         o.ccw = baseArc.ccw !== false;
+    }
+    if (debugArcSide) {
+        const markerDist = Math.max(0.5, Math.abs(Number(off) || 0) * 0.35);
+        const getBaseRefPoint = (b) => {
+            const t = String(b?.type || "");
+            if (t === "line") {
+                const x1 = Number(b.x1), y1 = Number(b.y1), x2 = Number(b.x2), y2 = Number(b.y2);
+                if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+                return { x: (x1 + x2) * 0.5, y: (y1 + y2) * 0.5 };
+            }
+            if (t === "arc") {
+                const cx = Number(b.cx), cy = Number(b.cy), r = Number(b.r);
+                const a1 = Number(b.a1), a2 = Number(b.a2);
+                if (![cx, cy, r, a1, a2].every(Number.isFinite) || r <= 1e-9) return null;
+                let da = a2 - a1;
+                if (!!b.ccw && da < 0) da += Math.PI * 2;
+                if (!b.ccw && da > 0) da -= Math.PI * 2;
+                const am = a1 + da * 0.5;
+                return { x: cx + Math.cos(am) * r, y: cy + Math.sin(am) * r };
+            }
+            if (t === "circle") {
+                const cx = Number(b.cx), cy = Number(b.cy);
+                if (![cx, cy].every(Number.isFinite)) return null;
+                return { x: cx, y: cy };
+            }
+            return null;
+        };
+        const getMarkerPoint = (b, side) => {
+            const sg = (Number(side) === -1) ? -1 : 1;
+            const t = String(b?.type || "");
+            if (t === "line") {
+                const x1 = Number(b.x1), y1 = Number(b.y1), x2 = Number(b.x2), y2 = Number(b.y2);
+                if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+                const mx = (x1 + x2) * 0.5;
+                const my = (y1 + y2) * 0.5;
+                const dx = x2 - x1, dy = y2 - y1;
+                const len = Math.hypot(dx, dy);
+                if (len <= 1e-9) return null;
+                const nx = -dy / len;
+                const ny = dx / len;
+                return { x: mx + nx * sg * markerDist, y: my + ny * sg * markerDist };
+            }
+            if (t === "arc") {
+                const cx = Number(b.cx), cy = Number(b.cy), r = Number(b.r);
+                const a1 = Number(b.a1), a2 = Number(b.a2);
+                if (![cx, cy, r, a1, a2].every(Number.isFinite) || r <= 1e-9) return null;
+                let da = a2 - a1;
+                if (!!b.ccw && da < 0) da += Math.PI * 2;
+                if (!b.ccw && da > 0) da -= Math.PI * 2;
+                const am = a1 + da * 0.5;
+                const rr = Math.max(1e-9, r + sg * markerDist);
+                return { x: cx + Math.cos(am) * rr, y: cy + Math.sin(am) * rr };
+            }
+            if (t === "circle") {
+                const cx = Number(b.cx), cy = Number(b.cy), r = Number(b.r);
+                if (![cx, cy, r].every(Number.isFinite) || r <= 1e-9) return null;
+                const th = Math.PI * 0.25;
+                const rr = Math.max(1e-9, r + sg * markerDist);
+                return { x: cx + Math.cos(th) * rr, y: cy + Math.sin(th) * rr };
+            }
+            return null;
+        };
+        const refs = [];
+        for (const b of bases) {
+            const rp = getBaseRefPoint(b);
+            if (rp) refs.push(rp);
+        }
+        let ccx = 0, ccy = 0;
+        if (refs.length) {
+            for (const p of refs) { ccx += p.x; ccy += p.y; }
+            ccx /= refs.length; ccy /= refs.length;
+        }
+        for (const b of bases) {
+            if (!b) continue;
+            const t = String(b.type || "");
+            if (t !== "line" && t !== "arc" && t !== "circle") continue;
+            const pPos = getMarkerPoint(b, 1);
+            const pNeg = getMarkerPoint(b, -1);
+            if (!pPos && !pNeg) continue;
+            let chosen = pPos || pNeg;
+            if (pPos && pNeg) {
+                const dPos = (pPos.x - ccx) * (pPos.x - ccx) + (pPos.y - ccy) * (pPos.y - ccy);
+                const dNeg = (pNeg.x - ccx) * (pNeg.x - ccx) + (pNeg.y - ccy) * (pNeg.y - ccy);
+                chosen = (dPos >= dNeg) ? pPos : pNeg;
+            }
+            debugMarkers.push({
+                type: "circle",
+                cx: chosen.x,
+                cy: chosen.y,
+                r: Math.max(0.4, markerDist * 0.22),
+            });
+        }
+        state.dlineDebugMarkers = debugMarkers.concat(lineArcDebugMarkers);
+    } else {
+        state.dlineDebugMarkers = [];
     }
     return offsets.filter(o => !o.__drop).map(o => {
         if (o.type === 'circle') {

@@ -84,8 +84,11 @@ export function initUiMain(state, dom, actions, deps = {}) {
   const onGroupPanelResizeMove = (e) => {
     if (!groupPanelResizeDrag) return;
     if (!state.ui.panelLayout) state.ui.panelLayout = {};
-    const dx = e.clientX - groupPanelResizeDrag.startX;
-    const dy = e.clientY - groupPanelResizeDrag.startY;
+    const scalePct = Number(state.ui?.menuScalePct ?? 100);
+    const scale = (Number.isFinite(scalePct) && scalePct > 0) ? (scalePct / 100) : 1;
+    const invScale = (scale > 0) ? (1 / scale) : 1;
+    const dx = (e.clientX - groupPanelResizeDrag.startX) * invScale;
+    const dy = (e.clientY - groupPanelResizeDrag.startY) * invScale;
     if (groupPanelResizeDrag.mode === "width" || groupPanelResizeDrag.mode === "both") {
       state.ui.panelLayout.rightPanelWidth = Math.max(180, Math.min(900, Math.round(groupPanelResizeDrag.startWidth - dx)));
     }
@@ -93,7 +96,8 @@ export function initUiMain(state, dom, actions, deps = {}) {
       state.ui.panelLayout.groupPanelHeight = Math.max(180, Math.min(2000, Math.round(groupPanelResizeDrag.startHeight - dy)));
     }
     if (groupPanelResizeDrag.mode === "layerHeight") {
-      const nextListH = Math.max(40, Math.min(2000, Math.round((groupPanelResizeDrag.startListHeight ?? 120) - dy)));
+      const maxListH = 8000;
+      const nextListH = Math.max(40, Math.min(maxListH, Math.round((groupPanelResizeDrag.startListHeight ?? 120) - dy)));
       state.ui.panelLayout.layerPanelListHeight = nextListH;
     }
     refreshUi(state, dom);
@@ -468,6 +472,7 @@ export function initUiMain(state, dom, actions, deps = {}) {
           mode,
           startX: e.clientX,
           startY: e.clientY,
+          sectionEl: sectionEl || null,
           startWidth: Math.round(stackRect.width),
           startHeight: Math.round(secRect.height),
           startListHeight: (mode === "layerHeight")

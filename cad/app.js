@@ -105,7 +105,19 @@ const ctx = dom.canvas.getContext("2d");
 const debugConsoleState = {
   maxRows: 300,
   rows: [],
+  saveTimer: null,
+  saveInFlight: false,
+  saveDirty: false,
+  sinkAvailable: null,
 };
+const isLocalDebugLogWritable = (() => {
+  try {
+    const host = String(window.location?.hostname || "").toLowerCase();
+    return host === "localhost" || host === "127.0.0.1";
+  } catch (_) {
+    return false;
+  }
+})();
 
 function formatConsoleArg(v) {
   if (typeof v === "string") return v;
@@ -136,6 +148,58 @@ function appendDebugConsole(text, level = "info") {
     body.removeChild(body.firstElementChild);
   }
   body.scrollTop = body.scrollHeight;
+  scheduleDebugLogSave();
+}
+
+async function saveDebugLogNow() {
+  if (!isLocalDebugLogWritable) return;
+  if (debugConsoleState.sinkAvailable === false) return;
+  if (debugConsoleState.saveInFlight) {
+    debugConsoleState.saveDirty = true;
+    return;
+  }
+  debugConsoleState.saveInFlight = true;
+  try {
+    const payload = debugConsoleState.rows.join("\n");
+    await fetch("/__debuglog", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+      body: payload,
+      keepalive: true,
+    });
+    debugConsoleState.sinkAvailable = true;
+  } catch (_) {
+    debugConsoleState.sinkAvailable = false;
+  } finally {
+    debugConsoleState.saveInFlight = false;
+    if (debugConsoleState.saveDirty) {
+      debugConsoleState.saveDirty = false;
+      scheduleDebugLogSave();
+    }
+  }
+}
+
+function scheduleDebugLogSave() {
+  if (!isLocalDebugLogWritable) return;
+  if (debugConsoleState.saveTimer) clearTimeout(debugConsoleState.saveTimer);
+  debugConsoleState.saveTimer = setTimeout(() => {
+    debugConsoleState.saveTimer = null;
+    saveDebugLogNow();
+  }, 180);
+}
+
+async function probeDebugLogSink() {
+  if (!isLocalDebugLogWritable) return;
+  try {
+    const r = await fetch("/__debuglog_status", { method: "GET", cache: "no-store" });
+    if (!r.ok) throw new Error(`status=${r.status}`);
+    const j = await r.json();
+    debugConsoleState.sinkAvailable = true;
+    appendDebugConsole(`Debug log sink: OK (${String(j?.log_path || "")})`, "info");
+  } catch (_) {
+    debugConsoleState.sinkAvailable = false;
+    appendDebugConsole("Debug log sink: NG (run run_s-cad.bat local_server.py)", "warn");
+  }
 }
 
 function setStatus(text) {
@@ -148,6 +212,7 @@ function initDebugConsole() {
     dom.debugConsoleClearBtn.addEventListener("click", () => {
       debugConsoleState.rows = [];
       if (dom.debugConsoleBody) dom.debugConsoleBody.textContent = "";
+      scheduleDebugLogSave();
     });
   }
   if (dom.debugConsoleCopyBtn) {
@@ -176,14 +241,20 @@ function initDebugConsole() {
     };
   }
   appendDebugConsole("Debug Console ready", "info");
+  probeDebugLogSink();
 }
 
 function toggleDebugConsolePanel() {
   const panel = dom.debugConsolePanel;
   if (!panel) return false;
-  const hidden = panel.style.display === "none";
-  panel.style.display = hidden ? "flex" : "none";
-  setStatus(hidden ? "Debug Console: ON" : "Debug Console: OFF");
+  if (!state.ui) state.ui = {};
+  const nextEnabled = !state.ui.debugDoubleLineConnect;
+  state.ui.debugDoubleLineConnect = nextEnabled;
+  panel.style.display = nextEnabled ? "flex" : "none";
+  setStatus(nextEnabled ? "Debug Console: ON" : "Debug Console: OFF");
+  try {
+    console.info(`[dline-connect] debug ${nextEnabled ? "enabled" : "disabled"}`);
+  } catch (_) {}
   return true;
 }
 

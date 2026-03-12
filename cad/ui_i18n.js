@@ -47,8 +47,10 @@ export function refreshGridUnitLabels(state) {
   const text = `(${unit})`;
   const base = document.getElementById("baseGridUnitLabel");
   const custom = document.getElementById("customGridUnitLabel");
+  const dlineOffset = document.getElementById("dlineOffsetUnitLabel");
   if (base) base.textContent = text;
   if (custom) custom.textContent = text;
+  if (dlineOffset) dlineOffset.textContent = text;
 }
 
 export function applyLanguageUi(state, dom) {
@@ -128,7 +130,7 @@ export function applyLanguageUi(state, dom) {
       trim: "トリム",
       doubleline: "二重線",
       patterncopy: "パターンコピー",
-      lineToPolyline: "線→ポリライン",
+      lineToPolyline: "線<>多角形",
       undo: "Undo",
       redo: "Redo",
       del: "削除",
@@ -377,7 +379,7 @@ export function applyLanguageUi(state, dom) {
       trim: "Trim",
       doubleline: "Double Line",
       patterncopy: "Pattern Copy",
-      lineToPolyline: "Line->Polyline",
+      lineToPolyline: "Line<>Polyline",
       undo: "Undo",
       redo: "Redo",
       del: "Delete",
@@ -819,7 +821,6 @@ export function applyLanguageUi(state, dom) {
   setPrevSpanByControl("hatchToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("dlineOffsetInput", t.offset);
   setPrevSpanByControl("dlineModeSelect", t.mode);
-  setLabelByControl("dlineNoTrimToggle", t.noTrim);
   setLabelByControl("dlineAsPolylineToggle", t.dlineAsPolyline);
   setPrevSpanByControl("dlineToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("dlineToolLineTypeInput", t.lineType);

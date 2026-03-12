@@ -609,6 +609,10 @@ function drawDoubleLineTrimCandidates(ctx, state) {
 function drawDoubleLineTrimIntersections(ctx, state) {
   return doubleLineOverlayOps.drawDoubleLineTrimIntersections(ctx, state);
 }
+
+function drawDoubleLineConnectDebug(ctx, state) {
+  return doubleLineOverlayOps.drawDoubleLineConnectDebug(ctx, state);
+}
 const boundsOps = createRenderBoundsOps({
   sampleBSplinePoints,
 });
@@ -705,6 +709,7 @@ export function render(ctx, canvas, state) {
   drawDoubleLinePreview(ctx, state);
   drawDoubleLineTrimCandidates(ctx, state);
   drawDoubleLineTrimIntersections(ctx, state);
+  drawDoubleLineConnectDebug(ctx, state);
   drawPolylineDraft(ctx, state);
   drawDimDraft(ctx, state);
   drawDimHoveredShape(ctx, state);

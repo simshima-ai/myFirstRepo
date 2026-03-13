@@ -1,4 +1,4 @@
-export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
+﻿export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
     const { e, worldRaw, world } = ctx;
     const {
         draw,
@@ -41,12 +41,12 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
                 x2: Number(draft.candidateEnd.x),
                 y2: Number(draft.candidateEnd.y),
             };
-            if (setStatus) setStatus("四角: 2点目候補を更新。左上の「決定」で作成");
+            if (setStatus) setStatus("RECT: tap Confirm to create from the 2 selected points");
         } else {
             draft.candidateStart = { x: world.x, y: world.y };
             state.preview = createPosition(world);
             state.preview.positionPreviewMode = "marker";
-            if (setStatus) setStatus("四角: 1点目候補を更新。左上の「決定」で確定");
+            if (setStatus) setStatus("RECT: tap Confirm after selecting the 1st point");
         }
         if (draw) draw();
         return true;
@@ -69,7 +69,7 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
             const hit = hitTestShapes(state, worldRaw, dom);
             const canSelect = !!hit && (hit.type === "position" || hit.type === "circle" || hit.type === "arc");
             if (!canSelect) {
-                if (setStatus) setStatus("三点指示: 位置/円/円弧をクリックしてターゲット選択してください");
+                if (setStatus) setStatus("3-point circle: select a position, circle, or arc with a valid center");
                 if (draw) draw();
                 return true;
             }
@@ -82,9 +82,9 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
                 setSelection([Number(hit.id)]);
             }
             state.activeGroupId = null;
-            const label = (hit.type === "position") ? "位置" : ((hit.type === "circle") ? "円" : "円弧");
+            const label = (hit.type === "position") ? "Position" : ((hit.type === "circle") ? "Circle" : "Arc");
             const count = (state.selection?.ids || []).length;
-            if (setStatus) setStatus(`三点指示: ${label} #${Number(hit.id)} を選択 (選択数:${count})。『ターゲットとして登録』を押してください`);
+            if (setStatus) setStatus(`3-point circle: selected ${label} #${Number(hit.id)} (selected: ${count})`);
             if (draw) draw();
             return true;
         }
@@ -101,7 +101,7 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
                 addShape(shape);
                 clearSelection();
                 state.activeGroupId = null;
-                if (setStatus) setStatus("CIRCLE created (半径固定)");
+                if (setStatus) setStatus("CIRCLE created (fixed radius)");
                 if (draw) draw();
             }
             return true;
@@ -114,8 +114,8 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         if (setStatus) {
             const touchMode = !!state.ui?.touchMode;
             setStatus(touchMode
-                ? "Bスプライン: 制御点を追加（左上の「確定」で作成）"
-                : "Bスプライン: 制御点を追加（Enter/ダブルクリックで確定）");
+                ? "B-spline: tap Confirm to finish"
+                : "B-spline: click to add points. Press Enter or double-click to finish");
         }
         if (draw) draw();
         return true;
@@ -134,7 +134,7 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
             addShape(shape);
             clearSelection();
             state.activeGroupId = null;
-            if (setStatus) setStatus("LINE created (サイズ固定)");
+            if (setStatus) setStatus("LINE created (size-locked)");
             if (draw) draw();
         }
         return true;
@@ -145,20 +145,24 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         if (ww > 0 && hh > 0) {
             const anchorKey = String(state.rectSettings?.anchor || "c");
             const { p1, p2 } = getRectFromAnchor(world, ww, hh, anchorKey);
-            const lines = [
-                { type: "line", x1: p1.x, y1: p1.y, x2: p2.x, y2: p1.y },
-                { type: "line", x1: p2.x, y1: p1.y, x2: p2.x, y2: p2.y },
-                { type: "line", x1: p2.x, y1: p2.y, x2: p1.x, y2: p2.y },
-                { type: "line", x1: p1.x, y1: p2.y, x2: p1.x, y2: p1.y }
-            ];
-            lines.forEach((l) => {
-                l.id = nextShapeId();
-                l.layerId = state.activeLayerId;
-                applyToolStrokeToShape(l, "rect");
-            });
+            const shape = {
+                type: "polyline",
+                points: [
+                    { x: Number(p1.x), y: Number(p1.y) },
+                    { x: Number(p2.x), y: Number(p1.y) },
+                    { x: Number(p2.x), y: Number(p2.y) },
+                    { x: Number(p1.x), y: Number(p2.y) },
+                ],
+                closed: true,
+            };
             pushHistory();
-            helpers.addShapesAsGroup(lines);
-            if (setStatus) setStatus("RECT created (サイズ固定)");
+            shape.id = nextShapeId();
+            shape.layerId = state.activeLayerId;
+            applyToolStrokeToShape(shape, "rect");
+            addShape(shape);
+            clearSelection();
+            state.activeGroupId = null;
+            if (setStatus) setStatus("RECT created (size-locked)");
             if (draw) draw();
         }
         return true;
@@ -168,8 +172,8 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         if (setStatus) {
             const touchMode = !!state.ui?.touchMode;
             setStatus(touchMode
-                ? "クリックで頂点追加  左上の「確定」で作成"
-                : "クリックで頂点追加  Enterキーで決定");
+                ? "Continuous line: tap Confirm to finish"
+                : "Continuous line: press Enter to finish");
         }
         if (draw) draw();
         return true;
@@ -206,18 +210,22 @@ export function handlePointerDownDrawMode(state, dom, helpers, deps, ctx) {
         } else if (state.tool === "rect") {
             const p1 = state.input.dragStartWorld;
             const p2 = world;
-            const lines = [
-                { type: "line", x1: p1.x, y1: p1.y, x2: p2.x, y2: p1.y },
-                { type: "line", x1: p2.x, y1: p1.y, x2: p2.x, y2: p2.y },
-                { type: "line", x1: p2.x, y1: p2.y, x2: p1.x, y2: p2.y },
-                { type: "line", x1: p1.x, y1: p2.y, x2: p1.x, y2: p1.y }
-            ];
-            lines.forEach((l) => {
-                l.id = nextShapeId();
-                l.layerId = state.activeLayerId;
-                applyToolStrokeToShape(l, "rect");
-            });
-            helpers.addShapesAsGroup(lines);
+            const shape = {
+                type: "polyline",
+                points: [
+                    { x: Number(p1.x), y: Number(p1.y) },
+                    { x: Number(p2.x), y: Number(p1.y) },
+                    { x: Number(p2.x), y: Number(p2.y) },
+                    { x: Number(p1.x), y: Number(p2.y) },
+                ],
+                closed: true,
+            };
+            shape.id = nextShapeId();
+            shape.layerId = state.activeLayerId;
+            applyToolStrokeToShape(shape, "rect");
+            addShape(shape);
+            clearSelection();
+            state.activeGroupId = null;
         }
         state.input.dragStartWorld = null;
         if (setStatus) setStatus(`${state.tool.toUpperCase()} created`);

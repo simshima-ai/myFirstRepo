@@ -1,3 +1,11 @@
+import {
+  applyPanelVisibilityPatch,
+  ensurePanelVisibilityState,
+  normalizePanelVisibilityKey,
+  setPanelVisibleState,
+} from "./ui_panel_visibility.js";
+import { applyDisplayModePreset, normalizeDisplayMode } from "./ui_display_mode_presets.js";
+
 export function createUiPrefsOps(config) {
   const {
     state,
@@ -44,6 +52,81 @@ export function createUiPrefsOps(config) {
     state.ui.showObjectCount = !!on;
     scheduleSaveAppSettings();
     draw();
+  }
+
+  function setAdZoneEnabled(zone, on) {
+    if (!state.ui) state.ui = {};
+    if (!state.ui.adZones || typeof state.ui.adZones !== "object") {
+      state.ui.adZones = { topRight: true, bottomLeft: true, bottomCenter: true };
+    }
+    const key = String(zone || "");
+    if (!(key === "topRight" || key === "bottomLeft" || key === "bottomCenter")) return;
+    state.ui.adZones[key] = !!on;
+    scheduleSaveAppSettings();
+    draw();
+  }
+
+  function setAllAdZonesEnabled(on) {
+    if (!state.ui) state.ui = {};
+    if (!state.ui.adZones || typeof state.ui.adZones !== "object") {
+      state.ui.adZones = { topRight: true, bottomLeft: true, bottomCenter: true };
+    }
+    const nextOn = !!on;
+    state.ui.adZones.topRight = nextOn;
+    state.ui.adZones.bottomLeft = nextOn;
+    state.ui.adZones.bottomCenter = nextOn;
+    scheduleSaveAppSettings();
+    draw();
+    return nextOn;
+  }
+
+  function toggleAllAdZones() {
+    const zones = state.ui?.adZones || {};
+    const allOff =
+      zones.topRight === false &&
+      zones.bottomLeft === false &&
+      zones.bottomCenter === false;
+    return setAllAdZonesEnabled(allOff);
+  }
+
+  function setPanelVisible(panel, on) {
+    ensurePanelVisibilityState(state);
+    const applied = setPanelVisibleState(state, panel, on);
+    if (applied == null) return null;
+    if (String(panel) === "groupsPanel" && !applied) {
+      state.ui.selectPickMode = "object";
+      state.activeGroupId = null;
+    }
+    scheduleSaveAppSettings();
+    draw();
+    return applied;
+  }
+
+  function togglePanelVisible(panel) {
+    ensurePanelVisibilityState(state);
+    const key = normalizePanelVisibilityKey(panel);
+    const current = state.ui?.panelVisibility?.[key] !== false;
+    return setPanelVisible(panel, !current);
+  }
+
+  function setPanelVisibility(patch) {
+    ensurePanelVisibilityState(state);
+    const next = applyPanelVisibilityPatch(state, patch);
+    if (next.groupsPanel === false) {
+      state.ui.selectPickMode = "object";
+      state.activeGroupId = null;
+    }
+    scheduleSaveAppSettings();
+    draw();
+    return next;
+  }
+
+  function setDisplayMode(mode) {
+    const preset = applyDisplayModePreset(state, normalizeDisplayMode(mode));
+    refreshAutoBackupTimer();
+    scheduleSaveAppSettings();
+    draw();
+    return preset?.mode || "cad";
   }
 
   function setAutoBackupEnabled(on) {
@@ -114,10 +197,17 @@ export function createUiPrefsOps(config) {
   }
 
   return {
+    setPanelVisible,
+    togglePanelVisible,
+    setPanelVisibility,
+    setDisplayMode,
     setLanguage,
     setMenuScalePct,
     setFpsDisplay,
     setObjectCountDisplay,
+    setAdZoneEnabled,
+    setAllAdZonesEnabled,
+    toggleAllAdZones,
     setAutoBackupEnabled,
     setAutoBackupIntervalSec,
     setTouchMode,
@@ -128,3 +218,8 @@ export function createUiPrefsOps(config) {
     resetToolShortcuts
   };
 }
+
+
+
+
+

@@ -1,4 +1,4 @@
-export function createGroupAimOps(config) {
+﻿export function createGroupAimOps(config) {
   const {
     state,
     getGroup,
@@ -40,7 +40,7 @@ export function createGroupAimOps(config) {
       state.input.groupOriginPick.active = false;
       state.input.groupOriginPick.dragging = false;
     }
-    setStatus("Aim target: 位置マーカー or オブジェクトをクリック");
+    setStatus("Aim target: click a position marker or object");
     draw();
   }
 
@@ -54,7 +54,7 @@ export function createGroupAimOps(config) {
     const candidateType = String(pick.candidateType || "");
     const candidateId = Number(pick.candidateId);
     if (!(candidateType === "group" || candidateType === "position") || !Number.isFinite(candidateId)) {
-      setStatus("Aim target: 先に候補をクリックしてください");
+      setStatus("Aim target: click a candidate first");
       draw();
       return;
     }

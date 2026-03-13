@@ -1,4 +1,4 @@
-export function bindGroupListInitEvents({
+﻿export function bindGroupListInitEvents({
   state,
   dom,
   actions,
@@ -45,14 +45,14 @@ export function bindGroupListInitEvents({
   const showLayerRestrictionMessage = (reason) => {
     const lang = String(state.ui?.language || "en").toLowerCase();
     if (reason === "hidden") {
-      actions.setStatus?.(lang === "en" ? "Group is hidden." : "グループが非表示です。");
+      actions.setStatus?.("Group is hidden.");
       return;
     }
     if (reason === "locked") {
-      actions.setStatus?.(lang === "en" ? "Layer is locked." : "レイヤーがロックされています。");
+      actions.setStatus?.("Layer is locked.");
       return;
     }
-    actions.setStatus?.(lang === "en" ? "Out-of-scope layer." : "対象外レイヤーです。");
+    actions.setStatus?.("Out-of-scope layer.");
   };
   const getLayerMeta = (layerId) => {
     const lid = Number(layerId);

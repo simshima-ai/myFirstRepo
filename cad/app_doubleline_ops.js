@@ -893,9 +893,8 @@ export function createDoubleLineOps(config) {
               const len = Math.hypot(dx, dy);
               const ux = len > 1e-9 ? (dx / len) : 0;
               const uy = len > 1e-9 ? (dy / len) : 0;
-              const comboBias = (Number(c.sa) * 2 + Number(c.sb)) * 0.15;
-              debugCandidatesRaw.push({ x: Number(c.x) + ux * comboBias, y: Number(c.y) + uy * comboBias, markerHalfPx: 3, markerColor: "#f97316", nn: isNN, ff: isFF });
-              pushPt(Number(c.x) + ux * comboBias, Number(c.y) + uy * comboBias, [junction.dirA, junction.dirB], {
+              debugCandidatesRaw.push({ x: Number(c.x), y: Number(c.y), markerHalfPx: 3, markerColor: "#f97316", nn: isNN, ff: isFF });
+              pushPt(Number(c.x), Number(c.y), [junction.dirA, junction.dirB], {
                 debugCandidate: true,
                 markerHalfPx: 2,
                 markerColor: "#64748b",
@@ -960,9 +959,8 @@ export function createDoubleLineOps(config) {
               const len = Math.hypot(dx, dy);
               const ux = len > 1e-9 ? (dx / len) : 0;
               const uy = len > 1e-9 ? (dy / len) : 0;
-              const nudge = (ci - 1.5) * 0.15;
-              debugCandidatesRaw.push({ x: Number(c.x) + ux * nudge, y: Number(c.y) + uy * nudge, markerHalfPx: 3, markerColor: "#2563eb", tFourCandidate: true });
-              pushPt(Number(c.x) + ux * nudge, Number(c.y) + uy * nudge, [junction.dirA, junction.dirB], {
+              debugCandidatesRaw.push({ x: Number(c.x), y: Number(c.y), markerHalfPx: 3, markerColor: "#2563eb", tFourCandidate: true });
+              pushPt(Number(c.x), Number(c.y), [junction.dirA, junction.dirB], {
                 debugCandidate: true,
                 tFourCandidate: true,
                 markerHalfPx: 3,
@@ -1848,6 +1846,7 @@ export function createDoubleLineOps(config) {
       }
     }
     if (returnConnectedPreview) {
+      state.dlineConnectedPreviewDebug = connectedPreview.map((seg) => ({ ...seg }));
       return {
         ok: connectedPreview.length > 0,
         connectedPreview,
@@ -1984,6 +1983,7 @@ export function createDoubleLineOps(config) {
     } catch (_) {}
     if (state.tool !== "doubleline") {
       state.dlineConnectDebug = null;
+      state.dlineConnectedPreviewDebug = null;
       draw();
       return false;
     }
@@ -2005,6 +2005,7 @@ export function createDoubleLineOps(config) {
       const previewForMarkers = Array.isArray(state.dlinePreview) ? state.dlinePreview : [];
       if (!previewForMarkers.length) {
         state.dlineConnectDebug = null;
+        state.dlineConnectedPreviewDebug = null;
         if (setStatus) setStatus(getStatusText(lang, "needSelect"));
         draw();
         return false;
@@ -2028,17 +2029,20 @@ export function createDoubleLineOps(config) {
         return true;
       }
       state.dlineConnectDebug = null;
+      state.dlineConnectedPreviewDebug = null;
       if (setStatus) setStatus("DLine debug: no candidate crosses");
       draw();
       return false;
     }
     state.dlineConnectDebug = null;
+    state.dlineConnectedPreviewDebug = null;
 
     if (!!state.dlineSettings?.noTrim) {
       const res = withResolvedDoubleLineSources(() => executeDoubleLineGeom(state, null, { returnMeta: true }), { restoreOriginalSelection: false });
       const ok = !!res?.ok;
       if (ok && state.dlineSettings?.asPolyline !== false) mergeCreatedLinesToPolylines(res.groupId);
       if (ok) ensurePolylinesInGroup(res.groupId);
+      if (ok) selectCreatedDoubleLineGroup(res.groupId);
       const changed = (Array.isArray(state.shapes) ? state.shapes.length : 0) !== shapeCountBefore
         || (Array.isArray(state.groups) ? state.groups.length : 0) !== groupCountBefore;
       if (ok || changed) helpers.pushHistorySnapshot(snap);
@@ -2096,6 +2100,7 @@ export function createDoubleLineOps(config) {
     if (ok) {
       if (state.dlineSettings?.asPolyline !== false) mergeCreatedLinesToPolylines(res.groupId);
       ensurePolylinesInGroup(res.groupId);
+      selectCreatedDoubleLineGroup(res.groupId);
       clearDoubleLineTrimPendingState(state);
     }
 
@@ -2117,10 +2122,15 @@ export function createDoubleLineOps(config) {
     const preview = Array.isArray(state.dlinePreview) ? state.dlinePreview : [];
     if (!preview.length) {
       state.dlineDebugMarkers = [];
+      state.dlineConnectedPreviewDebug = null;
       return;
     }
     const selectedBases = getExpandedSelectedBases();
     const intersections = collectIntersectionsFromPreview(preview, selectedBases, 1e-6);
+    const conn = createIntersectionMarkerGroup(intersections, selectedBases, { returnConnectedPreview: true });
+    state.dlineConnectedPreviewDebug = (conn?.ok && Array.isArray(conn.connectedPreview) && conn.connectedPreview.length)
+      ? conn.connectedPreview.map((seg) => ({ ...seg }))
+      : null;
     const debugCandidates = (Array.isArray(intersections?.debugCandidatesRaw) && intersections.debugCandidatesRaw.length) ? intersections.debugCandidatesRaw : intersections.filter((p) => !!p?.debugCandidate);
     const ringR = Math.max(0.8, (Number(state?.dlineSettings?.offset) || 5) * 0.12);
     const circles = intersections
@@ -2144,6 +2154,22 @@ export function createDoubleLineOps(config) {
       }))
       .filter((m) => Number.isFinite(m.x) && Number.isFinite(m.y));
     state.dlineDebugMarkers = circles.concat(crosses);
+  }
+
+  function selectCreatedDoubleLineGroup(groupId) {
+    const gid = Number(groupId);
+    if (!Number.isFinite(gid)) return;
+    if (!state.selection) state.selection = { ids: [], groupIds: [] };
+    state.tool = "select";
+    if (!state.ui) state.ui = {};
+    state.ui.selectPickMode = "group";
+    state.selection.ids = [];
+    state.selection.groupIds = [gid];
+    state.activeGroupId = gid;
+    state.dlineSingleSidePickPoint = null;
+    state.dlinePreview = null;
+    state.dlineDebugMarkers = [];
+    state.dlineConnectedPreviewDebug = null;
   }
 
   function cancelDoubleLineTrimPendingAction() {

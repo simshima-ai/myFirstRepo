@@ -1,4 +1,4 @@
-﻿let _groupListRenderSignature = "";
+let _groupListRenderSignature = "";
 let _inAnyGroupCacheSig = "";
 let _inAnyGroupCache = null;
 let _unGroupedShapesCacheSig = "";
@@ -213,7 +213,7 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
       treeBtn.style.lineHeight = "1";
       treeBtn.style.visibility = hasChildren ? "visible" : "hidden";
       const expanded = state.ui.groupTreeExpanded[Number(group.id)] !== false;
-      treeBtn.textContent = hasChildren ? (expanded ? "▾" : "▸") : "";
+      treeBtn.textContent = hasChildren ? (expanded ? "v" : ">") : "";
       const name = document.createElement("div");
       name.textContent = `${group.name} (${visibleShapeCount})`;
       const groupHasSelectedObject = (!selectedGroupIdSet.size)
@@ -293,7 +293,7 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
       unGroupHeader.style.fontWeight = "600";
 
       const icon = document.createElement("div");
-      icon.textContent = "•";
+      icon.textContent = "*";
       icon.style.textAlign = "center";
       const name = document.createElement("div");
       name.textContent = `${panelText.ungrouped} (${unGroupedShapes.length})`;
@@ -337,17 +337,17 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
       }
       chromeH = Math.max(0, Math.round(chromeH));
       // Keep extra bottom slack so the last row is never visually clipped.
-      const naturalTargetH = chromeH + neededListH + 28;
-      const maxByView = getMaxGroupPanelHeight(groupsSectionAuto);
-      const minH = 180;
-      const nextH = Math.max(minH, Math.min(maxByView, Math.ceil(naturalTargetH)));
-      if (!state.ui.panelLayout) state.ui.panelLayout = {};
-      const currentH = Number(state.ui.panelLayout.groupPanelHeight || groupsSectionAuto.getBoundingClientRect().height || 0);
-      if (Math.abs(nextH - currentH) > 1) {
-        state.ui.panelLayout.groupPanelHeight = nextH;
-        groupsSectionAuto.style.height = `${nextH}px`;
-        groupsSectionAuto.style.maxHeight = `${nextH}px`;
-      }
+
+
+
+
+
+
+
+
+
+
+
     }
   }
 
@@ -378,7 +378,7 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
     objRow.title = panelText.clickToSelectObject;
 
     const bullet = document.createElement("div");
-    bullet.textContent = "•";
+    bullet.textContent = "*";
     bullet.style.color = "var(--muted)";
     bullet.style.fontSize = "12px";
     bullet.style.lineHeight = "1";

@@ -1,8 +1,39 @@
 import { applyPendingLineCircleFillet, applyPendingArcArcFillet } from "./app_tools.js";
 import { circleCircleIntersectionPoints, isAngleOnArc, solveLineCircleFillet } from "./solvers.js";
 
+export function getFilletTargetRef(shape, worldRaw = null) {
+    if (!shape) return null;
+    const t = String(shape.type || "").toLowerCase();
+    if (t === "line" || t === "circle" || t === "arc") {
+        return { shapeId: Number(shape.id), type: t };
+    }
+    if (t !== "polyline" || !Array.isArray(shape.points)) return null;
+    const pts = shape.points;
+    if (pts.length < 2) return null;
+    const wx = Number(worldRaw?.x), wy = Number(worldRaw?.y);
+    if (![wx, wy].every(Number.isFinite)) return { shapeId: Number(shape.id), type: "polyline", segIndex: 0, i1: 0, i2: 1 };
+    let best = null;
+    for (let si = 0; si < pts.length - 1 + (shape.closed ? 1 : 0); si++) {
+        const i1 = si;
+        const i2 = (si + 1) % pts.length;
+        const a = pts[i1], b = pts[i2];
+        const ax = Number(a?.x), ay = Number(a?.y), bx = Number(b?.x), by = Number(b?.y);
+        if (![ax, ay, bx, by].every(Number.isFinite)) continue;
+        const vx = bx - ax, vy = by - ay;
+        const vv = vx * vx + vy * vy;
+        if (vv <= 1e-12) continue;
+        let tt = ((wx - ax) * vx + (wy - ay) * vy) / vv;
+        if (tt < 0) tt = 0;
+        if (tt > 1) tt = 1;
+        const px = ax + vx * tt, py = ay + vy * tt;
+        const d2 = (wx - px) * (wx - px) + (wy - py) * (wy - py);
+        if (!best || d2 < best.d2) best = { segIndex: si, i1, i2, d2 };
+    }
+    if (!best) return null;
+    return { shapeId: Number(shape.id), type: "polyline", segIndex: Number(best.segIndex), i1: Number(best.i1), i2: Number(best.i2) };
+}
 export function isFilletTargetShape(shape) {
-    return !!shape && (shape.type === "line" || shape.type === "circle" || shape.type === "arc");
+    return !!shape && (shape.type === "line" || shape.type === "polyline" || shape.type === "circle" || shape.type === "arc");
 }
 
 function getArcKeepSideByTangent(arcShape, tangentPoint) {
@@ -16,6 +47,35 @@ function getArcKeepSideByTangent(arcShape, tangentPoint) {
 }
 
 const TAU = Math.PI * 2;
+
+function applyLineLikeFilletTrim(source, tangentPoint, keepEnd) {
+    if (!source || !tangentPoint) return false;
+    const tx = Number(tangentPoint.x), ty = Number(tangentPoint.y);
+    if (![tx, ty].every(Number.isFinite)) return false;
+    if (source.kind === "line") {
+        const line = source.shape;
+        if (!line || String(line.type || "") !== "line") return false;
+        const e = source.keepEnd || keepEnd;
+        if (e === "p1") {
+            line.x2 = tx; line.y2 = ty;
+        } else {
+            line.x1 = tx; line.y1 = ty;
+        }
+        return Math.hypot(Number(line.x2) - Number(line.x1), Number(line.y2) - Number(line.y1)) > 1e-6;
+    }
+    if (source.kind === "polyline") {
+        const poly = source.shape;
+        const pts = Array.isArray(poly?.points) ? poly.points : null;
+        if (!pts || pts.length < 2) return false;
+        const idx = (source.keepEnd || keepEnd) === "p1" ? Number(source.i2) : Number(source.i1);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= pts.length) return false;
+        pts[idx] = { x: tx, y: ty };
+        const a = pts[Number(source.i1)];
+        const b = pts[Number(source.i2) % pts.length];
+        return Math.hypot(Number(b?.x) - Number(a?.x), Number(b?.y) - Number(a?.y)) > 1e-6;
+    }
+    return false;
+}
 const normAng = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const spanCCW = (aFrom, aTo) => ((aTo - aFrom) + TAU) % TAU;
 
@@ -90,11 +150,13 @@ export function commitFilletFromHover(state, helpers, deps, worldRawHint = null)
     }
     const r = Number(state.filletSettings?.radius) || 20;
     if (cand.mode === "line-line") {
+        const sources = Array.isArray(cand.sources) && cand.sources.length === 2 ? cand.sources : null;
         const selIdSet = new Set((state.selection.ids || []).map(Number));
-        const selLines = (state.shapes || [])
-            .filter((s) => selIdSet.has(Number(s.id)) && s.type === "line");
+        const selLines = sources || (state.shapes || [])
+            .filter((s) => selIdSet.has(Number(s.id)) && s.type === "line")
+            .map((shape) => ({ kind: "line", shape, line: shape }));
         if (selLines.length !== 2) {
-            if (setStatus) setStatus("Fillet failed: select exactly 2 lines.");
+            if (setStatus) setStatus("Fillet failed: select exactly 2 line/polyline targets.");
             return false;
         }
         const sol = cand.sol;
@@ -107,10 +169,10 @@ export function commitFilletFromHover(state, helpers, deps, worldRawHint = null)
             a1: Number(sol.arc?.a1),
             a2: Number(sol.arc?.a2),
             ccw: sol.arc?.ccw !== false,
-            layerId: selLines[0].layerId ?? state.activeLayerId
+            layerId: selLines[0].line?.layerId ?? state.activeLayerId
         };
-        arc.lineWidthMm = Math.max(0.01, Number(selLines[0]?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
-        arc.lineType = String(selLines[0]?.lineType || "solid");
+        arc.lineWidthMm = Math.max(0.01, Number(selLines[0]?.line?.lineWidthMm ?? selLines[0]?.shape?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+        arc.lineType = String(selLines[0]?.line?.lineType || selLines[0]?.shape?.lineType || "solid");
         if (![arc.cx, arc.cy, arc.r, arc.a1, arc.a2].every(Number.isFinite) || arc.r <= 0) {
             if (setStatus) setStatus("Fillet failed: invalid arc geometry.");
             return false;
@@ -122,27 +184,19 @@ export function commitFilletFromHover(state, helpers, deps, worldRawHint = null)
         // Always add fillet arc first (same behavior as no-trim), then trim source lines.
         addShape(arc);
         if (doTrim) {
-            const line1Snap = { x1: Number(selLines[0].x1), y1: Number(selLines[0].y1), x2: Number(selLines[0].x2), y2: Number(selLines[0].y2) };
-            const line2Snap = { x1: Number(selLines[1].x1), y1: Number(selLines[1].y1), x2: Number(selLines[1].x2), y2: Number(selLines[1].y2) };
+            const line1Snap = JSON.stringify(selLines[0].shape);
+            const line2Snap = JSON.stringify(selLines[1].shape);
             let okAll = true;
             const s1 = sol.t1, s2 = sol.t2;
             if (!s1 || !s2) {
                 okAll = false;
             } else {
-                const e1 = helpers.chooseEndsForLineByKeepEnd(selLines[0], s1, sol.keepEnd1 || "p1");
-                const e2 = helpers.chooseEndsForLineByKeepEnd(selLines[1], s2, sol.keepEnd2 || "p1");
-                const n1x1 = Number(e1.keepPoint?.x), n1y1 = Number(e1.keepPoint?.y), n1x2 = Number(s1.x), n1y2 = Number(s1.y);
-                const n2x1 = Number(e2.keepPoint?.x), n2y1 = Number(e2.keepPoint?.y), n2x2 = Number(s2.x), n2y2 = Number(s2.y);
-                if ([n1x1, n1y1, n1x2, n1y2].every(Number.isFinite) && Math.hypot(n1x2 - n1x1, n1y2 - n1y1) > 1e-6) {
-                    selLines[0].x1 = n1x1; selLines[0].y1 = n1y1; selLines[0].x2 = n1x2; selLines[0].y2 = n1y2;
-                } else okAll = false;
-                if ([n2x1, n2y1, n2x2, n2y2].every(Number.isFinite) && Math.hypot(n2x2 - n2x1, n2y2 - n2y1) > 1e-6) {
-                    selLines[1].x1 = n2x1; selLines[1].y1 = n2y1; selLines[1].x2 = n2x2; selLines[1].y2 = n2y2;
-                } else okAll = false;
+                okAll = applyLineLikeFilletTrim(selLines[0], s1, sol.keepEnd1 || "p1")
+                    && applyLineLikeFilletTrim(selLines[1], s2, sol.keepEnd2 || "p1");
             }
             if (!okAll) {
-                selLines[0].x1 = line1Snap.x1; selLines[0].y1 = line1Snap.y1; selLines[0].x2 = line1Snap.x2; selLines[0].y2 = line1Snap.y2;
-                selLines[1].x1 = line2Snap.x1; selLines[1].y1 = line2Snap.y1; selLines[1].x2 = line2Snap.x2; selLines[1].y2 = line2Snap.y2;
+                Object.assign(selLines[0].shape, JSON.parse(line1Snap));
+                Object.assign(selLines[1].shape, JSON.parse(line2Snap));
                 trimWarning = true;
             }
         }

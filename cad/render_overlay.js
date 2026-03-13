@@ -188,7 +188,8 @@ export function createRenderOverlayOps(deps) {
       }
       return;
     }
-    if (!s || !isLayerVisible(state, s.layerId) || !isVisibleByCurrentLayerFilter(state, s)) return;
+    const visShape = (th.targetType === "polyline") ? th.polyline : s;
+    if (!s || !visShape || !isLayerVisible(state, visShape.layerId) || !isVisibleByCurrentLayerFilter(state, visShape)) return;
     const p1 = worldToScreen(state.view, { x: Number(s.x1), y: Number(s.y1) });
     const p2 = worldToScreen(state.view, { x: Number(s.x2), y: Number(s.y2) });
     ctx.save();

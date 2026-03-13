@@ -131,55 +131,47 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
     const collapsed = !!state.ui?.layerPanelInnerCollapsed?.[key];
     btn.classList.toggle("is-collapsed", collapsed);
     if (!btn.dataset.innerLabel) {
-      btn.dataset.innerLabel = String(btn.textContent || "").replace(/^[▾▸]\s*/, "");
+      btn.dataset.innerLabel = String(btn.textContent || "").replace(/^[\u25BC\u25B6]\s*/, "");
     }
-    btn.innerHTML = `<span class="inner-arrow">${collapsed ? "▸" : "▾"}</span><span class="inner-label">${btn.dataset.innerLabel}</span>`;
+    btn.innerHTML = `<span class="inner-arrow">${collapsed ? "&#9654;" : "&#9660;"}</span><span class="inner-label">${btn.dataset.innerLabel}</span>`;
   }
   for (const sec of document.querySelectorAll(".right-stack .section[data-panel-id], .left-aux-stack .section[data-panel-id], .sidebar .section[data-panel-id]")) {
     const panelId = sec.getAttribute("data-panel-id");
     const collapsed = !!state.ui?.rightPanelCollapsed?.[panelId];
     sec.classList.toggle("collapsed", collapsed);
   }
-  {
-    const rightSections = Array.from(document.querySelectorAll(".right-stack .section[data-panel-id]"));
-    let expandedOrder = 0;
-    let collapsedOrder = 100;
-    let firstCollapsedApplied = false;
-    for (const sec of rightSections) {
-      const panelId = String(sec.getAttribute("data-panel-id") || "");
-      const collapsed = !!state.ui?.rightPanelCollapsed?.[panelId];
-      sec.style.order = String(collapsed ? collapsedOrder++ : expandedOrder++);
-      if (collapsed && !firstCollapsedApplied) {
-        sec.style.marginTop = "auto";
-        firstCollapsedApplied = true;
-      } else {
-        sec.style.removeProperty("margin-top");
-      }
-    }
-  }
   const groupsSectionEl = document.querySelector(".right-stack .section[data-panel-id='groups']");
   if (groupsSectionEl) {
+    const groupPanelUserSet = !!state.ui?.panelLayout?.groupPanelHeightUserSet;
     const h = Number(state.ui?.panelLayout?.groupPanelHeight);
     const collapsed = !!state.ui?.rightPanelCollapsed?.groups;
     const isGroupPanelEmpty = ((state.groups || []).length === 0) && ((state.shapes || []).length === 0);
-    if (collapsed) {
+    if (collapsed || isGroupPanelEmpty) {
+      groupsSectionEl.style.removeProperty("margin-top");
       groupsSectionEl.style.removeProperty("height");
       groupsSectionEl.style.removeProperty("max-height");
-    } else if (isGroupPanelEmpty) {
-      groupsSectionEl.style.removeProperty("height");
-      groupsSectionEl.style.removeProperty("max-height");
-    } else if (Number.isFinite(h) && h > 0) {
-      const maxGroupH = getMaxGroupPanelHeight(groupsSectionEl);
-      const cappedH = Math.max(120, Math.min(maxGroupH, Math.round(h)));
-      groupsSectionEl.style.height = `${cappedH}px`;
-      groupsSectionEl.style.maxHeight = `${cappedH}px`;
+    } else if (groupPanelUserSet && Number.isFinite(h) && h > 0) {
+      const fixedH = Math.max(120, Math.round(h));
+      groupsSectionEl.style.removeProperty("margin-top");
+      groupsSectionEl.style.flex = "0 0 auto";
+      groupsSectionEl.style.height = `${fixedH}px`;
+      groupsSectionEl.style.maxHeight = `${fixedH}px`;
     } else {
+      groupsSectionEl.style.removeProperty("margin-top");
       groupsSectionEl.style.removeProperty("height");
       groupsSectionEl.style.removeProperty("max-height");
     }
   }
   const layersSectionEl = document.querySelector(".right-stack .section[data-panel-id='layers']");
   if (layersSectionEl) {
+    const layersPanelVisible = state.ui?.panelVisibility?.layersPanel !== false;
+    if (!layersPanelVisible) {
+      layersSectionEl.style.display = "none";
+      layersSectionEl.style.removeProperty("height");
+      layersSectionEl.style.removeProperty("max-height");
+      layersSectionEl.style.removeProperty("min-height");
+      return;
+    }
     const collapsed = !!state.ui?.rightPanelCollapsed?.layers;
     if (collapsed) {
       layersSectionEl.style.removeProperty("height");
@@ -190,12 +182,10 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
       layersSectionEl.style.display = "flex";
       layersSectionEl.style.flexDirection = "column";
       if (layerListEl) {
-        const currentListH = Math.max(0, layerListEl.clientHeight || 0);
         let chromeH = 0;
         for (const child of Array.from(layersSectionEl.children || [])) {
           if (!(child instanceof HTMLElement)) continue;
           if (child === layerListEl) continue;
-          // Absolute resize handles should not contribute to layout height.
           if (child.classList.contains("panel-resize-handle")) continue;
           const style = window.getComputedStyle(child);
           if (style.display === "none") continue;
@@ -206,38 +196,18 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
           if (Number.isFinite(mb)) chromeH += mb;
         }
         chromeH = Math.max(0, Math.round(chromeH));
-        const listNaturalH = Math.max(0, layerListEl.scrollHeight || 0);
-        const maxListH = 8000;
-        if (!state.ui.panelLayout) state.ui.panelLayout = {};
-        let desiredListH = Number(state.ui.panelLayout.layerPanelListHeight);
-        if (!Number.isFinite(desiredListH) || desiredListH <= 0) {
-          const fallbackOld = Number(state.ui.panelLayout.layerPanelHeight);
-          desiredListH = (Number.isFinite(fallbackOld) && fallbackOld > chromeH)
-            ? (fallbackOld - chromeH)
-            : Math.max(80, listNaturalH || currentListH || 120);
+        const layerPanelUserSet = !!state.ui?.panelLayout?.layerPanelListHeightUserSet;
+        const desiredListH = Number(state.ui?.panelLayout?.layerPanelListHeight);
+        if (layerPanelUserSet && Number.isFinite(desiredListH) && desiredListH > 0) {
+          const targetH = chromeH + Math.max(40, Math.round(desiredListH)) + 8;
+          layersSectionEl.style.flex = "0 0 auto";
+          layersSectionEl.style.removeProperty("margin-top");
+          layersSectionEl.style.height = `${Math.round(targetH)}px`;
+          layersSectionEl.style.maxHeight = `${Math.round(targetH)}px`;
+        } else {
+          layersSectionEl.style.removeProperty("height");
+          layersSectionEl.style.removeProperty("max-height");
         }
-        desiredListH = Math.max(40, Math.min(maxListH, Math.round(desiredListH)));
-        state.ui.panelLayout.layerPanelListHeight = desiredListH;
-        const targetH = chromeH + desiredListH + 8;
-        const rightStackEl = layersSectionEl.closest(".right-stack");
-        let maxByStack = Number.POSITIVE_INFINITY;
-        if (rightStackEl) {
-          const stackRect = rightStackEl.getBoundingClientRect();
-          const stackGap = Math.max(0, parseFloat(window.getComputedStyle(rightStackEl).gap || "0") || 0);
-          const siblings = Array.from(rightStackEl.querySelectorAll(":scope > [data-panel-id]"))
-            .filter(el => el !== layersSectionEl && window.getComputedStyle(el).display !== "none");
-          let siblingsH = 0;
-          for (const sib of siblings) {
-            siblingsH += Math.max(0, sib.getBoundingClientRect().height || sib.offsetHeight || 0);
-          }
-          const gapsTotal = Math.max(0, (siblings.length + 1) * stackGap);
-          maxByStack = Math.max(120, Math.floor((stackRect.height || 0) - siblingsH - gapsTotal));
-        }
-        const cappedH = Number.isFinite(maxByStack)
-          ? Math.max(120, Math.min(Math.round(targetH), Math.round(maxByStack)))
-          : Math.round(targetH);
-        layersSectionEl.style.height = `${cappedH}px`;
-        layersSectionEl.style.maxHeight = `${cappedH}px`;
       } else {
         layersSectionEl.style.removeProperty("height");
         layersSectionEl.style.removeProperty("max-height");
@@ -246,3 +216,9 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
   }
 
 }
+
+
+
+
+
+

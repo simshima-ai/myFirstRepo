@@ -1,4 +1,4 @@
-﻿export const TOOL_SHORTCUT_TOOL_ORDER = Object.freeze([
+export const TOOL_SHORTCUT_TOOL_ORDER = Object.freeze([
   "select",
   "line",
   "rect",
@@ -389,6 +389,7 @@ export function createState() {
       trimHover: null,
       filletHover: null,
       filletFlow: null,
+      filletTargets: [],
       hatchHover: null,
       hatchValidation: null,
       dimHoveredShapeId: null,
@@ -434,6 +435,7 @@ export function createState() {
       },
       selectPickMode: "object", // "object" | "group"
       language: "en",
+      displayMode: "cad",
       menuScalePct: 100,
       touchMode: false,
       touchMultiSelect: false,
@@ -441,6 +443,30 @@ export function createState() {
       importAsPolyline: false,
       showFps: false,
       showObjectCount: false,
+      panelVisibility: {
+        sidebar: true,
+        snapPanel: true,
+        attrPanel: true,
+        createToolsPanel: true,
+        editToolsPanel: true,
+        fileToolsPanel: true,
+        topContext: true,
+        rightPanels: true,
+        groupsPanel: true,
+        layersPanel: true,
+        topOverlay: true,
+        statusOverlay: true,
+        scaleOverlay: true,
+        debugConsole: true,
+        touchConfirmOverlay: true,
+        touchMultiSelectOverlay: true,
+        touchSelectBackOverlay: true,
+      },
+      adZones: {
+        topRight: true,
+        bottomLeft: true,
+        bottomCenter: true,
+      },
       autoBackupEnabled: true,
       autoBackupIntervalSec: 60,
       toolShortcuts: sanitizeToolShortcuts(null),
@@ -1175,5 +1201,9 @@ export function moveGroupOrigin(state, groupId, dx, dy) {
   g.originY = (Number(g.originY) || 0) + dy;
   return true;
 }
+
+
+
+
 
 

@@ -31,6 +31,7 @@ function getPageFrameWorldSize(pageSetup) {
 }
 
 export function drawPageFrame(ctx, canvas, state) {
+  if (String(state.ui?.displayMode || "cad").toLowerCase() === "viewer") return;
   if (!state.pageSetup?.showFrame) return;
   const { cadW, cadH, mmW, mmH, scale, unit } = getPageFrameWorldSize(state.pageSetup);
 
@@ -99,7 +100,7 @@ export function drawPageFrame(ctx, canvas, state) {
   const pageSizeLabel = !!state.pageSetup?.customSizeEnabled
     ? `${Number(mmW.toFixed(1)).toString()}x${Number(mmH.toFixed(1)).toString()}mm`
     : String(state.pageSetup?.size || "A4");
-  const labelStr = `${pageSizeLabel} ${state.pageSetup?.orientation === "portrait" ? "縦" : "横"} | 1:${scale} | ${unit}`;
+  const labelStr = `${pageSizeLabel} ${state.pageSetup?.orientation === "portrait" ? "邵ｦ" : "讓ｪ"} | 1:${scale} | ${unit}`;
   ctx.fillStyle = "#94a3b8";
   ctx.font = "11px sans-serif";
   ctx.textAlign = "left";

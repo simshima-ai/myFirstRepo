@@ -1,4 +1,4 @@
-﻿<!doctype html>
+<!doctype html>
 <html lang="ja">
 
 <head>
@@ -20,7 +20,12 @@
       --app-vw: 100vw;
       --app-vh: 100vh;
       --ad-slot-h: 200px;
+      --ad-slot-w: 340px;
       --ad-slot-gap: 8px;
+      --bottom-ad-safe-h: 0px;
+      --bottom-ad-gap: 12px;
+      --left-bottom-ad-safe-h: 0px;
+      --right-panel-w: 250px;
       --group-panel-right-gap: -6px;
     }
 
@@ -61,8 +66,9 @@
       padding: 0;
       display: flex;
       flex-direction: column;
+      justify-content: flex-end;
       gap: 1px;
-      max-height: calc(var(--app-vh) - 20px);
+      max-height: calc(var(--app-vh) - 20px - var(--left-bottom-ad-safe-h));
       overflow-y: hidden;
       overflow-x: hidden;
       scrollbar-gutter: stable;
@@ -97,6 +103,59 @@
     .cad-home-link:hover .cad-home-logo {
       background: #f0f9ff;
       border-color: #9fd8f0;
+    }
+
+    .cad-home-menu {
+      position: fixed;
+      top: 0;
+      left: 0;
+      z-index: 1400;
+      min-width: 196px;
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      padding: 8px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.98);
+      box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+      max-height: calc(var(--app-vh) - 16px);
+      overflow-y: auto;
+    }
+
+    .cad-home-menu.is-open {
+      display: flex;
+    }
+
+    .cad-home-menu-title {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .cad-home-menu button,
+    .cad-home-menu a {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      width: 100%;
+      min-height: 30px;
+      padding: 6px 10px;
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 8px;
+      background: #f8fafc;
+      color: #0f172a;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .cad-home-menu button.is-active {
+      background: #e0f2fe;
+      border-color: #7dd3fc;
+      color: #075985;
+      font-weight: 700;
     }
 
     .section {
@@ -336,7 +395,7 @@
 
     .bottom-left-overlay {
       position: absolute;
-      bottom: 14px;
+      bottom: calc(var(--bottom-ad-safe-h) + 14px);
       left: 50%;
       transform: translateX(-50%);
       z-index: 100;
@@ -351,7 +410,7 @@
       position: absolute;
       left: 50%;
       transform: translateX(-50%);
-      bottom: 44px;
+      bottom: calc(var(--bottom-ad-safe-h) + 44px);
       z-index: 110;
       pointer-events: none;
       display: flex;
@@ -362,11 +421,10 @@
 
     .debug-console {
       position: absolute;
-      left: 50%;
-      transform: translateX(-50%);
-      bottom: 90px;
+      right: calc(var(--right-panel-w) + 10px);
+      bottom: 10px;
       z-index: 120;
-      width: min(720px, calc(100vw - 20px));
+      width: min(560px, calc(100% - 260px - var(--right-panel-w)));
       border: 1px solid var(--line);
       border-radius: 10px;
       background: rgba(255, 255, 255, 0.94);
@@ -708,6 +766,7 @@
       width: min(250px, calc(100% - 230px));
       display: flex;
       flex-direction: column;
+      justify-content: flex-end;
       gap: 1px;
       padding-top: calc(var(--ad-slot-h) + var(--ad-slot-gap));
       pointer-events: auto;
@@ -716,18 +775,14 @@
       overflow: hidden;
     }
 
-    #rightAdSlot {
+    .ad-zone {
       position: absolute;
-      right: 10px;
-      top: 10px;
       z-index: 25;
-      width: min(340px, calc(100% - 230px));
-      height: var(--ad-slot-h);
-      display: flex;
+      display: none;
       align-items: center;
       justify-content: center;
       border: 1px dashed rgba(148, 163, 184, 0.55);
-      border-radius: 10px 10px 0 0;
+      border-radius: 10px;
       background: rgba(255, 255, 255, 0.86);
       color: #64748b;
       font-size: 12px;
@@ -736,6 +791,56 @@
       text-align: center;
       padding: 10px;
       box-shadow: var(--shadow-soft);
+      overflow: hidden;
+    }
+
+    .ad-zone.is-visible {
+      display: flex;
+    }
+
+    .ad-zone .ad-zone-label {
+      opacity: 0.9;
+    }
+
+    #rightAdSlot {
+      position: absolute;
+      right: 10px;
+      top: 10px;
+      width: min(var(--ad-slot-w), calc(100% - 230px));
+      height: var(--ad-slot-h);
+      border-radius: 10px 10px 0 0;
+    }
+
+    #leftBottomAdSlot {
+      left: 10px;
+      bottom: 10px;
+    }
+
+    #bottomCenterAdSlot {
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+    }
+
+    #bottomCenterAdSlot {
+      gap: 8px;
+      align-items: stretch;
+      justify-content: center;
+      padding: 8px;
+    }
+
+    #bottomCenterAdSlot .ad-zone-card {
+      flex: 1 1 0;
+      min-width: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 1px dashed rgba(148, 163, 184, 0.55);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.78);
+      color: #64748b;
+      padding: 8px 10px;
+      text-align: center;
     }
 
     .right-stack .section:first-child {
@@ -859,7 +964,7 @@
     }
 
     .left-aux-stack .panel-toggle.section-title::after {
-      content: "▾";
+      content: "\25BE";
       position: absolute;
       right: 8px;
       top: 50%;
@@ -870,7 +975,7 @@
     }
 
     .left-aux-stack .section.collapsed .panel-toggle.section-title::after {
-      content: "▸";
+      content: "\25B8";
     }
 
     .left-aux-stack .section.collapsed> :not(.panel-toggle) {
@@ -967,7 +1072,7 @@
     .touch-select-back-overlay {
       position: fixed;
       left: 14px;
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 14px);
+      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--bottom-ad-safe-h) + 14px);
       z-index: 2200;
       pointer-events: auto;
       display: none;
@@ -993,6 +1098,12 @@
       font-size: 12px;
       font-weight: 700;
       box-shadow: 0 4px 10px rgba(15, 23, 42, 0.16);
+    }
+
+    #topContext .section[data-context="settings"] .settings-subtitle {
+      font-size: 12px;
+      color: var(--muted);
+      font-weight: 700;
     }
 
     .touch-multiselect-btn.is-active {
@@ -1089,7 +1200,7 @@
     }
 
     .sidebar .panel-toggle.section-title::after {
-      content: "▾";
+      content: "\25BE";
       position: absolute;
       right: 8px;
       top: 50%;
@@ -1100,7 +1211,7 @@
     }
 
     .sidebar .section.collapsed .panel-toggle.section-title::after {
-      content: "▸";
+      content: "\25B8";
     }
 
     .sidebar .section.collapsed> :not(.panel-toggle) {
@@ -1162,7 +1273,7 @@
     }
 
     .right-stack .panel-toggle.section-title::after {
-      content: "▾";
+      content: "\25BE";
       position: absolute;
       right: 8px;
       top: 50%;
@@ -1173,7 +1284,7 @@
     }
 
     .right-stack .section.collapsed .panel-toggle.section-title::after {
-      content: "▸";
+      content: "\25B8";
     }
 
     .right-stack .section.collapsed> :not(.panel-toggle) {
@@ -1296,7 +1407,7 @@
     .right-stack .section[data-panel-id="groups"] {
       display: flex;
       flex-direction: column;
-      max-height: calc(var(--app-vh) - 20px);
+      max-height: calc(var(--app-vh) - 20px - var(--left-bottom-ad-safe-h));
       min-height: 0;
       position: relative;
       overflow: hidden;
@@ -1420,9 +1531,8 @@
 
     .right-stack button[data-layer-inner-toggle] .inner-arrow {
       display: inline-block;
-      width: 16px;
-      margin-right: 6px;
-      font-size: 22px;
+      width: 12px;
+      font-size: 11px;
       font-weight: 700;
       line-height: 1;
       vertical-align: middle;
@@ -1472,46 +1582,53 @@
 <body>
   <div id="app">
     <aside class="sidebar">
-      <a id="cadHomeLink" class="cad-home-link" href="./index.html" title="S-CAD トップへ">
+      <a id="cadHomeLink" class="cad-home-link" href="./index.html" title="S-CAD Menu">
         <div class="cad-home-logo"><span class="logo-s">S-</span>CAD</div>
       </a>
+      <div id="cadHomeMenu" class="cad-home-menu">
+        <div class="cad-home-menu-title">Mode</div>
+        <button id="cadHomeModeViewer" type="button">Viewer Mode</button>
+        <button id="cadHomeModeEasy" type="button">Easy Mode</button>
+        <button id="cadHomeModeCad" type="button">CAD Mode</button>
+        <a id="cadHomeMenuWebtop" href="./index.html">Web Top</a>
+      </div>
       <div class="left-aux-stack">
         <div class="section" data-panel-id="snap">
-          <button class="section-title panel-toggle" type="button">スナップ</button>
+          <button class="section-title panel-toggle" type="button">Snap</button>
           <div class="snap-grid">
-            <label><input id="gridSnapToggle" type="checkbox" checked><span>グリッド</span></label>
-            <label><input id="objSnapToggle" type="checkbox" checked><span>線上</span></label>
-            <label><input id="objSnapEndpointToggle" type="checkbox" checked><span>端点</span></label>
-            <label><input id="objSnapMidpointToggle" type="checkbox"><span>中点</span></label>
-            <label><input id="objSnapCenterToggle" type="checkbox" checked><span>中心</span></label>
-            <label><input id="objSnapIntersectionToggle" type="checkbox" checked><span>交点</span></label>
-            <label><input id="objSnapTangentToggle" type="checkbox"><span>接線</span></label>
-            <label><input id="objSnapVectorToggle" type="checkbox"><span>ベクトル</span></label>
-            <label class="snap-span-2"><input id="objSnapTangentKeepToggle" type="checkbox"><span>属性を保持</span></label>
+            <label><input id="gridSnapToggle" type="checkbox" checked><span>Grid</span></label>
+            <label><input id="objSnapToggle" type="checkbox" checked><span>On Curve</span></label>
+            <label><input id="objSnapEndpointToggle" type="checkbox" checked><span>Endpoint</span></label>
+            <label><input id="objSnapMidpointToggle" type="checkbox"><span>Midpoint</span></label>
+            <label><input id="objSnapCenterToggle" type="checkbox" checked><span>Center</span></label>
+            <label><input id="objSnapIntersectionToggle" type="checkbox" checked><span>Intersection</span></label>
+            <label><input id="objSnapTangentToggle" type="checkbox"><span>Tangent</span></label>
+            <label><input id="objSnapVectorToggle" type="checkbox"><span>Vector</span></label>
+            <label class="snap-span-2"><input id="objSnapTangentKeepToggle" type="checkbox"><span>Keep Attributes</span></label>
           </div>
         </div>
         <div class="section" data-panel-id="attrs" id="attrPanel">
-          <button class="section-title panel-toggle" type="button">属性</button>
+          <button class="section-title panel-toggle" type="button">Attributes</button>
           <div id="attrList"></div>
           <div class="attr-row">
             <input id="attrNameInput" type="text" placeholder="name">
             <input id="attrValueInput" type="text" placeholder="value">
-            <button id="attrAddBtn" type="button">追加</button>
+            <button id="attrAddBtn" type="button">Add</button>
           </div>
         </div>
       </div>
       <div class="section" data-panel-id="tools">
-        <button class="section-title panel-toggle" type="button">作成</button>
+        <button class="section-title panel-toggle" type="button">Create</button>
         <div id="toolButtons" class="tool-buttons"></div>
       </div>
       <div class="section" data-panel-id="editTools">
-        <button class="section-title panel-toggle" type="button">編集</button>
+        <button class="section-title panel-toggle" type="button">Edit</button>
         <div id="editToolButtons" class="tool-buttons"></div>
       </div>
       <div class="section" data-panel-id="fileTools">
-        <button class="section-title panel-toggle" type="button">ファイル</button>
+        <button class="section-title panel-toggle" type="button">File</button>
         <div id="fileToolButtons" class="tool-buttons"></div>
-        <a id="openManualBtn" class="menu-link-btn" href="./manual.html">使い方ガイド</a>
+        <a id="openManualBtn" class="menu-link-btn" href="./manual.html">Manual</a>
       </div>
       <div class="section utilities" style="display:none;">
         <div class="section-title">View</div>
@@ -1536,55 +1653,55 @@
         <div class="top-context-panels" id="topContextPanels">
           <div class="section" data-context="select">
             <div style="display:flex; align-items:center; gap:6px;">
-              <div class="section-title" style="margin:0; white-space:nowrap;">選択モード</div>
-              <button id="selectPickObjectBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;">オブジェクト</button>
-              <button id="selectPickGroupBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;">グループ</button>
+              <div class="section-title" style="margin:0; white-space:nowrap;">Selection Mode</div>
+              <button id="selectPickObjectBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;">Object</button>
+              <button id="selectPickGroupBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;">Groups</button>
             </div>
           </div>
           <div class="section" data-context="vertex">
-            <div class="section-title">頂点編集</div>
+            <div class="section-title">Vertex Edit</div>
             <div style="display:grid; grid-template-columns:auto auto auto auto 68px auto 68px auto; gap:4px; align-items:center; justify-content:start;">
-              <span>モード</span>
+              <span>Mode</span>
               <select id="vertexModeSelect" style="min-width:92px;">
-                <option value="move" selected>頂点移動</option>
-                <option value="insert">頂点挿入</option>
+                <option value="move" selected>Move Vertex</option>
+                <option value="insert">Insert Vertex</option>
               </select>
               <label style="display:inline-flex; align-items:center; gap:2px; justify-content:flex-start; white-space:nowrap;">
-                複数選択 <input id="vertexLinkCoincidentToggle" type="checkbox" checked style="margin-left:0;">
+                Keep Vertex Links<input id="vertexLinkCoincidentToggle" type="checkbox" checked style="margin-left:0;">
               </label>
               <span>dX</span><input id="vertexMoveDxInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
               <span>dY</span><input id="vertexMoveDyInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
-              <button id="moveVertexBtn" type="button">移動</button>
-              <button id="deleteVertexBtn" type="button">頂点削除</button>
+              <button id="moveVertexBtn" type="button">Move</button>
+              <button id="deleteVertexBtn" type="button">Delete Vertex</button>
             </div>
           </div>
           <div class="section" data-context="line" style="font-size:12px;">
             <div class="section-title">Line</div>
-            <label style="display:inline-flex; align-items:center; gap:4px;">モード
+            <label style="display:inline-flex; align-items:center; gap:4px;"><span>Mode</span>
               <select id="lineModeSelect" style="width:auto; min-width:84px;">
-                <option value="segment" selected>線分</option>
-                <option value="continuous">連続線</option>
-                <option value="freehand">Bスプライン</option>
+                <option value="segment" selected>Segment</option>
+                <option value="continuous">Continuous</option>
+                <option value="freehand">B-Spline</option>
               </select>
             </label>
             <div style="display:grid; grid-template-columns:auto 78px auto 78px auto auto auto; gap:4px; align-items:center; justify-content:start;">
-              <span>長さ</span><input id="lineLengthInput" type="number" value="100" min="0" step="1"
+              <span>Length</span><input id="lineLengthInput" type="number" value="100" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>角度</span><input id="lineAngleInput" type="number" value="0" step="1"
+              <span>Angle</span><input id="lineAngleInput" type="number" value="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>基準</span>
+              <span>Anchor</span>
               <select id="lineAnchorSelect" style="width:auto; min-width:64px;">
-                <option value="endpoint_a" selected>端点A</option>
-                <option value="endpoint_b">端点B</option>
-                <option value="center">中央</option>
+                <option value="endpoint_a" selected>EndpointA</option>
+                <option value="endpoint_b">EndpointB</option>
+                <option value="center">Center</option>
               </select>
-              <button id="applyLineInputBtn" type="button">サイズ固定</button>
+              <button id="applyLineInputBtn" type="button">Create</button>
             </div>
             <div style="display:flex; justify-content:flex-end;">
-              <button id="lineTouchFinalizeBtn" type="button" style="display:none;">確定</button>
+              <button id="lineTouchFinalizeBtn" type="button" style="display:none;">Confirm</button>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
-              <span>線幅(mm)</span>
+              <span>Line Width (mm)</span>
               <select id="lineToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -1594,45 +1711,45 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>線種</span>
+              <span>Line Type</span>
               <select id="lineToolLineTypeInput">
-                <option value="solid" selected>実線</option>
-                <option value="dashed">破線</option>
-                <option value="dotted">点線</option>
-                <option value="dashdot">一点鎖線</option>
-                <option value="longdash">長破線</option>
-                <option value="center">中心線</option>
-                <option value="hidden">隠れ線</option>
+                <option value="solid" selected>Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="dashdot">Dash-dot</option>
+                <option value="longdash">Long Dash</option>
+                <option value="center">Center</option>
+                <option value="hidden">Hidden</option>
               </select>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-              <span>色</span>
+              <span>Color</span>
               <input id="lineToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
           <div class="section" data-context="rect" style="font-size:12px;">
-            <div class="section-title">四角 作成</div>
+            <div class="section-title">Rectangle</div>
             <div style="display:grid; grid-template-columns:auto 84px auto 84px auto auto auto; gap:4px; align-items:center;">
-              <span>幅</span><input id="rectWidthInput" type="number" value="100" min="0" step="1"
+              <span>Width</span><input id="rectWidthInput" type="number" value="100" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>高さ</span><input id="rectHeightInput" type="number" value="100" min="0" step="1"
+              <span>Height</span><input id="rectHeightInput" type="number" value="100" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>基準点</span>
+              <span>Base Point</span>
               <select id="rectAnchorSelect" style="width:auto; min-width:84px;">
-                <option value="c" selected>中央</option>
-                <option value="tl">上左</option>
-                <option value="tc">上中央</option>
-                <option value="tr">上右</option>
-                <option value="cl">中央左</option>
-                <option value="cr">中央右</option>
-                <option value="bl">下左</option>
-                <option value="bc">下中央</option>
-                <option value="br">下右</option>
+                <option value="c" selected>Center</option>
+                <option value="tl">Top Left</option>
+                <option value="tc">Top Center</option>
+                <option value="tr">Top Right</option>
+                <option value="cl">Center Left</option>
+                <option value="cr">Center Right</option>
+                <option value="bl">Bottom Left</option>
+                <option value="bc">Bottom Center</option>
+                <option value="br">Bottom Right</option>
               </select>
-              <button id="applyRectInputBtn" type="button">サイズ固定</button>
+              <button id="applyRectInputBtn" type="button">Create</button>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
-              <span>線幅(mm)</span>
+              <span>Line Width (mm)</span>
               <select id="rectToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -1642,45 +1759,45 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>線種</span>
+              <span>Line Type</span>
               <select id="rectToolLineTypeInput">
-                <option value="solid" selected>実線</option>
-                <option value="dashed">破線</option>
-                <option value="dotted">点線</option>
-                <option value="dashdot">一点鎖線</option>
-                <option value="longdash">長破線</option>
-                <option value="center">中心線</option>
-                <option value="hidden">隠れ線</option>
+                <option value="solid" selected>Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="dashdot">Dash-dot</option>
+                <option value="longdash">Long Dash</option>
+                <option value="center">Center</option>
+                <option value="hidden">Hidden</option>
               </select>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-              <span>色</span>
+              <span>Color</span>
               <input id="rectToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
           <div class="section" data-context="circle" style="font-size:12px;">
-            <div class="section-title">円 作成</div>
+            <div class="section-title">Circle</div>
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-              <span>モード</span>
+              <span>Mode</span>
               <select id="circleModeSelect">
-                <option value="drag" selected>マウスドラッグ</option>
-                <option value="fixed">半径固定</option>
-                <option value="threepoint">三点指示</option>
+                <option value="drag" selected>2-Point Click</option>
+                <option value="fixed">Fixed Radius</option>
+                <option value="threepoint">3-Point</option>
               </select>
             </div>
             <div id="circleRadiusRow" style="display:grid; grid-template-columns:auto 1fr auto; gap:6px; align-items:center;">
-              <span>半径</span><input id="circleRadiusInput" type="number" value="50" min="0" step="1"
+              <span>Radius</span><input id="circleRadiusInput" type="number" value="50" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <button id="applyCircleInputBtn" type="button">半径固定</button>
+              <button id="applyCircleInputBtn" type="button">Create</button>
             </div>
-            <div id="circleThreePointHint" style="display:none; font-size:11px; color:#475569;">中心座標を持つオブジェクトを3つ選択</div>
+            <div id="circleThreePointHint" style="display:none; font-size:11px; color:#475569;">Select 3 objects with center coordinates</div>
             <div id="circleThreePointOps" style="display:none;">
-              <button id="circleThreePointAddBtn" type="button">ターゲットとして登録</button>
-              <button id="circleThreePointRunBtn" type="button">実行</button>
+              <button id="circleThreePointAddBtn" type="button">Add Target</button>
+              <button id="circleThreePointRunBtn" type="button">Run</button>
             </div>
-            <label style="display:inline-flex; align-items:center; gap:4px; justify-content:flex-start;">中心マーカーを表示 <input id="circleCenterMarkToggle" type="checkbox" style="margin-left:0;"></label>
+            <label style="display:inline-flex; align-items:center; gap:4px; justify-content:flex-start;">Show Center Mark <input id="circleCenterMarkToggle" type="checkbox" style="margin-left:0;"></label>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
-              <span>線幅(mm)</span>
+              <span>Line Width (mm)</span>
               <select id="circleToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -1690,19 +1807,19 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>線種</span>
+              <span>Line Type</span>
               <select id="circleToolLineTypeInput">
-                <option value="solid" selected>実線</option>
-                <option value="dashed">破線</option>
-                <option value="dotted">点線</option>
-                <option value="dashdot">一点鎖線</option>
-                <option value="longdash">長破線</option>
-                <option value="center">中心線</option>
-                <option value="hidden">隠れ線</option>
+                <option value="solid" selected>Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="dashdot">Dash-dot</option>
+                <option value="longdash">Long Dash</option>
+                <option value="center">Center</option>
+                <option value="hidden">Hidden</option>
               </select>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-              <span>色</span>
+              <span>Color</span>
               <input id="circleToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
@@ -1710,28 +1827,28 @@
             <div class="section-title">Fillet</div>
             <div style="display:grid; grid-template-columns:auto auto auto auto auto auto auto; gap:6px; align-items:center; justify-content:start;">
               <label for="filletRadiusInput" style="display:inline-flex; align-items:center; gap:2px; margin:0;">
-                <span id="filletRadiusLabel">半径</span>
+                <span id="filletRadiusLabel">Radius</span>
                 <input id="filletRadiusInput" type="number" value="20" min="0.1" step="1" style="width:56px; min-width:0;">
               </label>
-              <span id="filletModeLabel">動作モード</span>
+              <span id="filletModeLabel">Mode</span>
               <select id="filletLineModeSelect" style="width:auto; min-width:74px;">
-                <option value="trim" selected>トリムも行う</option>
-                <option value="split">トリムしない</option>
+                <option value="trim" selected>Trim</option>
+                <option value="split">Split Only</option>
               </select>
-              <button id="applyFilletBtn" type="button" style="display:none;">実行</button>
+              <button id="applyFilletBtn" type="button" style="display:none;">Run</button>
             </div>
           </div>
           <div class="section" data-context="trim">
             <div class="section-title">Trim</div>
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label>削除しない(分割のみ) <input id="trimNoDeleteToggle" type="checkbox"></label>
+              <label>Do Not Delete (Split Only) <input id="trimNoDeleteToggle" type="checkbox"></label>
             </div>
           </div>
           <div class="section" data-context="group" style="font-size:12px;">
-            <div class="section-title" id="groupCtxTitle">グループ</div>
+            <div class="section-title" id="groupCtxTitle">Groups</div>
             <div id="groupCtxObjectOps" style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
               <div id="mergeGroupsRow" style="display:none; flex-wrap:wrap; gap:6px; align-items:center;">
-                <button id="mergeGroupsBtn" type="button">選択した図形をグループ化</button>
+                <button id="mergeGroupsBtn" type="button">Group Selected Shapes</button>
               </div>
               <div id="lineCircleMoveOps"
                 style="display:none; grid-template-columns:auto 72px auto 72px auto auto; gap:6px; align-items:center; justify-content:start;">
@@ -1744,7 +1861,7 @@
               </div>
               <div id="selectionStyleOps"
                 style="display:none; grid-template-columns:auto 92px auto 110px; gap:6px; align-items:center; justify-content:start;">
-                <span>線幅(mm)</span>
+                <span>Line Width (mm)</span>
                 <select id="selectionLineWidthInput" style="width:100%; min-width:0;">
                   <option value="0.1">0.1</option>
                   <option value="0.25" selected>0.25</option>
@@ -1754,20 +1871,20 @@
                   <option value="1.5">1.5</option>
                   <option value="2">2</option>
                 </select>
-                <span>線種</span>
+                <span>Line Type</span>
                 <select id="selectionLineTypeInput" style="width:100%; min-width:0;">
-                  <option value="solid">実線</option>
-                  <option value="dashed">破線</option>
-                  <option value="dotted">点線</option>
-                  <option value="dashdot">一点鎖線</option>
-                  <option value="longdash">長破線</option>
-                  <option value="center">中心線</option>
-                  <option value="hidden">隠れ線</option>
+                  <option value="solid">Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                  <option value="dashdot">Dash-dot</option>
+                  <option value="longdash">Long Dash</option>
+                  <option value="center">Center</option>
+                  <option value="hidden">Hidden</option>
                 </select>
               </div>
               <div id="selectionColorOps"
                 style="display:none; grid-template-columns:auto 92px; gap:6px; align-items:center; justify-content:start;">
-                <span>色</span>
+                <span>Color</span>
                 <input id="selectionColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
               </div>
               <div id="selectionPositionOps"
@@ -1779,39 +1896,39 @@
               <div id="selectionImageOps"
                 style="display:none; flex-direction:column; gap:6px; align-items:flex-start; justify-content:start;">
                 <div style="display:grid; grid-template-columns:auto 92px auto 92px; gap:6px; align-items:center; justify-content:start;">
-                  <span>幅</span>
+                  <span>Width</span>
                   <input id="selectionImageWidthInput" type="number" min="1" step="1" value="200"
                     style="width:100%; min-width:0;">
-                  <span>高さ</span>
+                  <span>Height</span>
                   <input id="selectionImageHeightInput" type="number" min="1" step="1" value="150"
                     style="width:100%; min-width:0;">
                 </div>
                 <div style="display:grid; grid-template-columns:auto auto auto auto; gap:10px; align-items:center; justify-content:start;">
-                  <span>縦横比ロック</span>
+                  <span>Size Locked</span>
                   <input id="selectionImageLockAspectToggle" type="checkbox" checked>
-                  <span>位置とスケールをロック</span>
+                  <span>Transform Locked</span>
                   <input id="selectionImageLockTransformToggle" type="checkbox">
                 </div>
               </div>
               <div id="selectionCircleOps"
                 style="display:none; flex-direction:column; align-items:flex-start; justify-content:start; gap:6px;">
                 <div style="display:grid; grid-template-columns:auto 92px auto; gap:6px; align-items:center; justify-content:start;">
-                  <span>半径</span>
+                  <span>Radius</span>
                   <input id="selectionCircleRadiusInput" type="number" min="0" step="1" value="50"
                     style="width:100%; min-width:0;">
-                  <button id="selectionApplyCircleRadiusBtn" type="button">適用</button>
+                  <button id="selectionApplyCircleRadiusBtn" type="button">Apply</button>
                 </div>
                 <label style="display:inline-flex; align-items:center; gap:6px;">
-                  中心マーカー表示
+                  Show Center Mark
                   <input id="selectionCircleCenterMarkToggle" type="checkbox">
                 </label>
               </div>
               <div id="selectionTextEdit"
                 style="display:none; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:6px;">
-                <span class="section-title">選択中のテキスト編集</span>
-                <input id="selectionTextContentInput" type="text" placeholder="内容を変更" style="width:100%;">
+                <span class="section-title">Edit Selected Text</span>
+                <input id="selectionTextContentInput" type="text" placeholder="Enter text" style="width:100%;">
                 <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-                  <span>Size(pt)</span><input id="selectionTextSizePtInput" type="number" min="1" step="1">
+                  <span>Text Size (pt)</span><input id="selectionTextSizePtInput" type="number" min="1" step="1">
                   <span>Rotate</span><input id="selectionTextRotateInput" type="number" step="1">
                 </div>
                 <select id="selectionTextFontFamilyInput">
@@ -1831,8 +1948,8 @@
             </div>
             <div id="groupCtxGroupOps" style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
               <div class="compact-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                <button id="moveGroupOriginOnlyBtn" type="button">基準点を移動</button>
-                <button id="unparentGroupBtn" type="button">親から外す</button>
+                <button id="moveGroupOriginOnlyBtn" type="button">Move Origin Only</button>
+                <button id="unparentGroupBtn" type="button">Unparent</button>
               </div>
               <div id="groupRelativeMoveOps" style="display:grid; grid-template-columns:auto 1fr auto 1fr auto auto; gap:6px; align-items:center;">
                 <span>dX</span><input id="groupMoveDxInput" type="number" value="0" step="1">
@@ -1841,19 +1958,19 @@
                 <button id="copyGroupBtn" type="button">Copy</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:6px; align-items:center;">
-                <label>回転角スナップ
+                <label>Rotate Snap
                   <input id="groupRotateSnapInput" type="number" value="5" min="0.1" step="0.1">
                 </label>
-                <button id="deleteGroupBtn" type="button">このグループを削除</button>
+                <button id="deleteGroupBtn" type="button">Delete This Group</button>
               </div>
               <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span>グループにスケールを許可</span>
+                <span>Allow Group Scale</span>
                 <input id="groupScaleEnableToggle" type="checkbox">
               </label>
               <div style="display:grid; grid-template-columns:auto 1fr auto; gap:6px; align-items:center;">
-                <span>スケール値</span>
+                <span>Scale Factor</span>
                 <input id="groupScaleFactorInput" type="number" min="0.000001" step="0.01" value="1">
-                <button id="groupScaleApplyBtn" type="button">適用</button>
+                <button id="groupScaleApplyBtn" type="button">Apply</button>
               </div>
               <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:6px;">
                 <label style="justify-content:flex-start; gap:8px;">
@@ -1861,20 +1978,20 @@
                   <span>Aim Constraint</span>
                 </label>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                  <button id="groupAimPickBtn" type="button">注視先を指定</button>
-                  <button id="groupAimClearBtn" type="button">解除</button>
+                  <button id="groupAimPickBtn" type="button">Pick Target</button>
+                  <button id="groupAimClearBtn" type="button">Clear</button>
                 </div>
-                <div id="groupAimStatus" style="font-size:11px; color:var(--muted); min-height:1.2em;">Target: none</div>
+                <div id="groupAimStatus" style="font-size:11px; color:var(--muted); min-height:1.2em;">Target: None</div>
               </div>
             </div>
           </div>
           <div class="section" data-context="position" style="font-size:12px;">
-            <div class="section-title">位置マーカー</div>
+            <div class="section-title">Position Marker</div>
             <label>Size
               <input id="positionSizeInput" type="number" value="20" min="1" step="1" style="width:100%; min-width:0;">
             </label>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
-              <span>線幅(mm)</span>
+              <span>Line Width (mm)</span>
               <select id="positionToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -1884,19 +2001,19 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>線種</span>
+              <span>Line Type</span>
               <select id="positionToolLineTypeInput">
-                <option value="solid" selected>実線</option>
-                <option value="dashed">破線</option>
-                <option value="dotted">点線</option>
-                <option value="dashdot">一点鎖線</option>
-                <option value="longdash">長破線</option>
-                <option value="center">中心線</option>
-                <option value="hidden">隠れ線</option>
+                <option value="solid" selected>Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="dashdot">Dash-dot</option>
+                <option value="longdash">Long Dash</option>
+                <option value="center">Center</option>
+                <option value="hidden">Hidden</option>
               </select>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-              <span>色</span>
+              <span>Color</span>
               <input id="positionToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
@@ -1905,7 +2022,7 @@
             <div style="display:flex; flex-direction:column; gap:6px;">
               <input id="textContentInput" type="text" placeholder="Text content" style="width:100%;">
               <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-                <span>Size(pt)</span><input id="textSizePtInput" type="number" value="12" min="1" step="1">
+                <span>Text Size (pt)</span><input id="textSizePtInput" type="number" value="12" min="1" step="1">
                 <span>Rotate</span><input id="textRotateInput" type="number" value="0" step="1">
               </div>
               <select id="textFontFamilyInput">
@@ -1920,7 +2037,7 @@
                 <input id="textColorInput" type="color" value="#0f172a">
               </div>
               <label style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-                <span>線幅(mm)</span>
+                <span>Line Width (mm)</span>
                 <select id="textToolLineWidthInput">
                   <option value="0.1">0.1</option>
                   <option value="0.25" selected>0.25</option>
@@ -1932,15 +2049,15 @@
                 </select>
               </label>
               <label style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-                <span>線種</span>
+                <span>Line Type</span>
                 <select id="textToolLineTypeInput">
-                  <option value="solid" selected>実線</option>
-                  <option value="dashed">破線</option>
-                  <option value="dotted">点線</option>
-                  <option value="dashdot">一点鎖線</option>
-                  <option value="longdash">長破線</option>
-                  <option value="center">中心線</option>
-                  <option value="hidden">隠れ線</option>
+                  <option value="solid" selected>Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                  <option value="dashdot">Dash-dot</option>
+                  <option value="longdash">Long Dash</option>
+                  <option value="center">Center</option>
+                  <option value="hidden">Hidden</option>
                 </select>
               </label>
             </div>
@@ -1957,7 +2074,7 @@
             </div>
             <div style="display:flex; align-items:center; gap:8px; justify-content:flex-start;">
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
-                <span id="importSourceUnitLabel">入力単位</span>
+                <span id="importSourceUnitLabel">Source Unit</span>
                 <select id="importSourceUnitSelect" style="width:100px;">
                   <option value="auto">Auto</option>
                   <option value="unitless">Unitless</option>
@@ -1970,7 +2087,7 @@
                 </select>
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
-                Flip X
+                <span id="importAsPolylineLabel">As Polyline</span>
                 <input id="importAdjustFlipXToggle" type="checkbox" style="margin-left:0;">
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
@@ -1978,7 +2095,7 @@
                 <input id="importAdjustFlipYToggle" type="checkbox" style="margin-left:0;">
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
-                <span id="importAsPolylineLabel">ポリライン化</span>
+                <span id="importAsPolylineLabel">As Polyline</span>
                 <input id="importAsPolylineToggle" type="checkbox" style="margin-left:0;">
               </label>
               <button id="importAdjustApplyBtn" type="button">Apply</button>
@@ -1986,75 +2103,75 @@
             </div>
           </div>
           <div class="section" data-context="trace" style="font-size:12px;">
-            <div class="section-title" id="tracePanelTitle">画像トレース(実験)</div>
+            <div class="section-title" id="tracePanelTitle">Image Trace (Experimental)</div>
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <div id="traceTargetInfo" style="font-size:11px; color:#475569;">画像を選択してください</div>
+              <div id="traceTargetInfo" style="font-size:11px; color:#475569;">Select an imported image</div>
               <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
-                <span id="traceMaxDimLabel">解像度上限</span>
+                <span id="traceMaxDimLabel">Max Resolution</span>
                 <input id="traceMaxDimInput" type="number" min="64" max="2048" step="1" value="420">
-                <span id="traceEdgePercentLabel">エッジ量</span>
+                <span id="traceEdgePercentLabel">Edge Amount</span>
                 <input id="traceEdgePercentInput" type="number" min="1" max="99" step="1" value="72">
-                <span id="traceSimplifyLabel">簡略化</span>
+                <span id="traceSimplifyLabel">Simplify</span>
                 <input id="traceSimplifyInput" type="number" min="0" max="12" step="0.05" value="1.25">
-                <span id="traceMinSegLabel">最小線分</span>
+                <span id="traceMinSegLabel">Min Segment</span>
                 <input id="traceMinSegInput" type="number" min="0" max="40" step="0.1" value="1.2">
-                <span id="traceMaxSegLabel">最大線分数</span>
+                <span id="traceMaxSegLabel">Max Segments</span>
                 <input id="traceMaxSegmentsInput" type="number" min="100" max="50000" step="100" value="12000">
-                <span id="traceOffsetXLabel">オフセットX</span>
+                <span id="traceOffsetXLabel">Offset X</span>
                 <input id="traceOffsetXInput" type="number" step="1" value="0">
-                <span id="traceOffsetYLabel">オフセットY</span>
+                <span id="traceOffsetYLabel">Offset Y</span>
                 <input id="traceOffsetYInput" type="number" step="1" value="0">
-                <span id="traceLineWidthLabel">線幅(mm)</span>
+                <span id="traceLineWidthLabel">Line Width (mm)</span>
                 <input id="traceLineWidthInput" type="number" min="0.01" max="10" step="0.01" value="0.1">
-                <span id="traceLineTypeLabel">線種</span>
+                <span id="traceLineTypeLabel">Line Type</span>
                 <select id="traceLineTypeInput">
-                  <option value="solid" selected>実線</option>
-                  <option value="dashed">破線</option>
-                  <option value="dotted">点線</option>
-                  <option value="dashdot">一点鎖線</option>
-                  <option value="longdash">長破線</option>
-                  <option value="center">中心線</option>
-                  <option value="hidden">隠れ線</option>
+                  <option value="solid" selected>Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                  <option value="dashdot">Dash-dot</option>
+                  <option value="longdash">Long Dash</option>
+                  <option value="center">Center</option>
+                  <option value="hidden">Hidden</option>
                 </select>
               </div>
               <label style="display:inline-flex; align-items:center; justify-content:flex-start; gap:6px;">
-                <span id="traceInvertLabel">反転</span>
+                <span id="traceInvertLabel">Invert</span>
                 <input id="traceInvertToggle" type="checkbox" style="margin-left:0;">
               </label>
               <div style="display:flex; gap:6px; justify-content:flex-end;">
-                <button id="traceRegenerateBtn" type="button">再生成</button>
-                <button id="traceClosePanelBtn" type="button">閉じる</button>
+                <button id="traceRegenerateBtn" type="button">Regenerate</button>
+                <button id="traceClosePanelBtn" type="button">Close</button>
               </div>
             </div>
           </div>
           <div class="section" data-context="dim" style="font-size:12px;">
-            <div class="section-title">寸法設定</div>
+            <div class="section-title">Dimension Settings</div>
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;">
               <div id="dimModeOptions" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;">
-                <label style="display:inline-flex; align-items:center; gap:4px;">モード
+                <label style="display:inline-flex; align-items:center; gap:4px;">Linear
                   <select id="dimLinearMode" style="width:70px; font-size:12px; padding:2px;">
-                    <option value="single" selected>単一</option>
-                    <option value="chain">直列</option>
-                    <option value="angle">角度</option>
+                    <option value="single" selected>Single</option>
+                    <option value="chain">Chain</option>
+                    <option value="angle">Angle</option>
                   </select>
                 </label>
-                <label style="display:inline-flex; align-items:center; gap:4px;">円/弧
+                <label style="display:inline-flex; align-items:center; gap:4px;">Circle/Arc
                   <select id="dimCircleMode" style="width:70px; font-size:12px; padding:2px;">
-                    <option value="radius" selected>半径</option>
-                    <option value="diameter">直径</option>
+                    <option value="radius" selected>Radius</option>
+                    <option value="diameter">Diameter</option>
                   </select>
                 </label>
-                <label style="display:inline-flex; align-items:center; gap:4px;">矢印
+                <label style="display:inline-flex; align-items:center; gap:4px;">Arrow
                   <select id="dimCircleArrowSide" style="width:70px; font-size:12px; padding:2px;">
-                    <option value="outside" selected>外側</option>
-                    <option value="inside">内側</option>
+                    <option value="outside" selected>Outside</option>
+                    <option value="inside">Inside</option>
                   </select>
                 </label>
               </div>
-              <label style="display:inline-flex; align-items:center; gap:4px;">グリッド無視
+              <label style="display:inline-flex; align-items:center; gap:4px;">Ignore Grid
                 <input id="dimIgnoreGridSnapToggle" type="checkbox">
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">精度
+              <label style="display:inline-flex; align-items:center; gap:4px;">Precision
                 <select id="dimPrecisionSelect" style="width:60px; font-size:12px; padding:2px;">
                   <option value="0">0</option>
                   <option value="1" selected>0.1</option>
@@ -2062,50 +2179,50 @@
                   <option value="3">0.001</option>
                 </select>
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">矢印形状
+              <label style="display:inline-flex; align-items:center; gap:4px;">Arrow Shape
                 <select id="dimArrowTypeSelect" style="width:90px; font-size:12px; padding:2px;">
-                  <option value="open" selected>開き</option>
-                  <option value="closed">塗り三角</option>
-                  <option value="hollow">中抜き三角</option>
-                  <option value="circle">抜き丸</option>
-                  <option value="circle_filled">塗り丸</option>
+                  <option value="open" selected>Open</option>
+                  <option value="closed">Filled Triangle</option>
+                  <option value="hollow">Hollow Triangle</option>
+                  <option value="circle">Open Circle</option>
+                  <option value="circle_filled">Filled Circle</option>
                 </select>
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">矢印サイズ(pt)
+              <label style="display:inline-flex; align-items:center; gap:4px;">ArrowSize(pt)
                 <input id="dimArrowSizeInput" type="number" value="10" step="0.5" min="1"
                   style="width:52px; font-size:12px; padding:2px;">
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">矢印向き
+              <label style="display:inline-flex; align-items:center; gap:4px;">ArrowOrientation
                 <select id="dimArrowDirectionSelect" style="width:78px; font-size:12px; padding:2px;">
-                  <option value="normal" selected>通常</option>
-                  <option value="reverse">反転</option>
+                  <option value="normal" selected>Normal</option>
+                  <option value="reverse">Invert</option>
                 </select>
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">文字サイズ(pt)
+              <label style="display:inline-flex; align-items:center; gap:4px;">Text Size (pt)
                 <input id="dimFontSizeInput" type="number" value="12" step="0.5" min="1"
                   style="width:52px; font-size:12px; padding:2px;">
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">文字回転
+              <label style="display:inline-flex; align-items:center; gap:4px;">Text Rotate
                 <select id="dimTextRotateInput" style="width:60px; font-size:12px; padding:2px;">
-                  <option value="auto" selected>自動</option>
-                  <option value="0">水平</option>
-                  <option value="90">90°</option>
-                  <option value="-90">-90°</option>
+                  <option value="auto" selected>Auto</option>
+                  <option value="0">Horizontal</option>
+                  <option value="90">90 deg</option>
+                  <option value="-90">-90 deg</option>
                 </select>
               </label>
-              <label id="dimExtOffsetWrap" style="display:inline-flex; align-items:center; gap:4px;">補助線オフセット
+              <label id="dimExtOffsetWrap" style="display:inline-flex; align-items:center; gap:4px;">Ext Offset
                 <input id="dimExtOffsetInput" type="number" value="2" step="1" min="0"
                   style="width:40px; font-size:12px; padding:2px;">
               </label>
-              <label id="dimExtOverWrap" style="display:inline-flex; align-items:center; gap:4px;">補助線突き出し
+              <label id="dimExtOverWrap" style="display:inline-flex; align-items:center; gap:4px;">Ext Over
                 <input id="dimExtOverInput" type="number" value="2" step="1" min="0"
                   style="width:40px; font-size:12px; padding:2px;">
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">寸法突き出し
+              <label style="display:inline-flex; align-items:center; gap:4px;">Dim Overshoot
                 <input id="dimROvershootInput" type="number" value="5" step="1" min="0"
                   style="width:40px; font-size:12px; padding:2px;">
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">線幅(mm)
+              <label style="display:inline-flex; align-items:center; gap:4px;">Line Width (mm)
                 <select id="dimToolLineWidthInput" style="width:64px; font-size:12px; padding:2px;">
                   <option value="0.1">0.1</option>
                   <option value="0.25" selected>0.25</option>
@@ -2116,42 +2233,42 @@
                   <option value="2">2</option>
                 </select>
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">線種
+              <label style="display:inline-flex; align-items:center; gap:4px;">Line Type
                 <select id="dimToolLineTypeInput" style="width:84px; font-size:12px; padding:2px;">
-                  <option value="solid" selected>実線</option>
-                  <option value="dashed">破線</option>
-                  <option value="dotted">点線</option>
-                  <option value="dashdot">一点鎖線</option>
-                  <option value="longdash">長破線</option>
-                  <option value="center">中心線</option>
-                  <option value="hidden">隠れ線</option>
+                  <option value="solid" selected>Solid</option>
+                  <option value="dashed">Dashed</option>
+                  <option value="dotted">Dotted</option>
+                  <option value="dashdot">Dash-dot</option>
+                  <option value="longdash">Long Dash</option>
+                  <option value="center">Center</option>
+                  <option value="hidden">Hidden</option>
                 </select>
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">色
+              <label style="display:inline-flex; align-items:center; gap:4px;">Color
                 <input id="dimToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
               </label>
-              <label id="dimSelectionColorWrap" style="display:inline-flex; align-items:center; gap:4px;">色
+              <label id="dimSelectionColorWrap" style="display:inline-flex; align-items:center; gap:4px;">Color
                 <input id="dimSelectionColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
               </label>
               <div id="dimChainOps" style="display:none; align-items:center;">
                 <button id="dimChainPopBtn" type="button" class="btn secondary small"
-                  style="padding:2px 8px; font-size:12px;">点を取り消し</button>
+                  style="padding:2px 8px; font-size:12px;">Undo Point</button>
                 <button id="dimChainPrepareBtn" type="button" class="btn secondary small"
-                  style="display:none; padding:2px 8px; font-size:12px;">配置位置を指定</button>
+                  style="display:none; padding:2px 8px; font-size:12px;">Set Placement</button>
                 <button id="dimChainFinalizeBtn" type="button" class="btn secondary small"
-                  style="display:none; padding:2px 8px; font-size:12px;">寸法確定</button>
+                  style="display:none; padding:2px 8px; font-size:12px;">Finalize Dim</button>
               </div>
               <div id="dimMergeGroupsRow" style="display:none; align-items:center;">
-                <button id="dimMergeGroupsBtn" type="button">選択した図形をグループ化</button>
+                <button id="dimMergeGroupsBtn" type="button">Group Selected Shapes</button>
               </div>
             </div>
           </div>
           <div class="section" data-context="hatch" style="font-size:12px;">
-            <div class="section-title">Hatch</div>
+            <div class="section-title">Hatching</div>
             <div style="display:grid; grid-template-columns:auto 74px auto 74px auto 74px; gap:6px; align-items:center;">
               <span>Pitch(mm)</span><input id="hatchPitchInput" type="number" value="5" min="0.1" step="1"
                 style="width:100%; min-width:0;">
-              <span>Angle(°)</span><input id="hatchAngleInput" type="number" value="45" step="1"
+              <span>Angle (deg)</span><input id="hatchAngleInput" type="number" value="45" step="1"
                 style="width:100%; min-width:0;">
               <span>Padding(mm)</span><input id="hatchPaddingInput" type="number" value="2" min="0" step="1"
                 style="width:100%; min-width:0;">
@@ -2162,7 +2279,7 @@
                 <input id="hatchDashMmInput" type="number" value="5" min="0.1" step="1" style="width:60px; min-width:0;">
                 <input id="hatchGapMmInput" type="number" value="2" min="0.1" step="1" style="width:60px; min-width:0;">
               </div>
-              <span>線幅(mm)</span>
+              <span>Line Width (mm)</span>
               <select id="hatchToolLineWidthInput" style="width:100%; min-width:0;">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -2182,19 +2299,19 @@
                 style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
             <div style="display:flex; gap:6px;">
-              <button id="hatchValidateBtn" type="button" style="flex:1 1 0;">端点一致チェック</button>
-              <button id="applyHatchBtn" type="button" style="flex:1 1 0;">Hatch Selected</button>
+              <button id="hatchValidateBtn" type="button" style="flex:1 1 0;">Endpoint Check</button>
+              <button id="applyHatchBtn" type="button" style="flex:1 1 0;">Create Hatch from Selection</button>
             </div>
             <div id="hatchValidateResult" style="margin-top:4px; font-size:11px; color:#64748b;"></div>
           </div>
 
           <div class="section" data-context="patterncopy">
-            <div class="section-title">パターンコピー</div>
+            <div class="section-title">Pattern Copy</div>
             <div style="display:flex; flex-direction:column; gap:8px;">
               <select id="patternCopyModeSelect" style="width:100%;">
-                <option value="array">配列状 (Array)</option>
-                <option value="rotate">回転 (Rotate)</option>
-                <option value="mirror">反転 (Mirror)</option>
+                <option value="array">Array</option>
+                <option value="rotate">Rotate</option>
+                <option value="mirror">Invert</option>
               </select>
 
               <div id="patternCopyArrayOptions" style="display:flex; flex-direction:column; gap:4px;">
@@ -2221,31 +2338,31 @@
                   <span>Count</span><input id="patternCopyRotateCountInput" type="number" value="3" min="1" step="1"
                     style="width:100%; min-width:0;">
                 </div>
-                <button id="patternCopySetCenterBtn" type="button" class="btn secondary small">中心として設定</button>
+                <button id="patternCopySetCenterBtn" type="button" class="btn secondary small">Set Center</button>
                 <div id="patternCopyCenterStatus" style="font-size:12px; color:#64748b; margin-top:2px;"></div>
               </div>
 
               <div id="patternCopyMirrorOptions" style="display:none; flex-direction:column; gap:4px;">
-                <button id="patternCopySetAxisBtn" type="button" class="btn secondary small">軸として設定</button>
+                <button id="patternCopySetAxisBtn" type="button" class="btn secondary small">Set Axis</button>
                 <div id="patternCopyAxisStatus" style="font-size:12px; color:#64748b; margin-top:2px;"></div>
               </div>
 
-              <button id="patternCopyApplyBtn" type="button">コピー実行</button>
+              <button id="patternCopyApplyBtn" type="button">Apply</button>
             </div>
           </div>
 
           <div class="section" data-context="doubleline">
-            <div class="section-title">二重線</div>
+            <div class="section-title">Double Line</div>
             <div style="display:grid; grid-template-columns:auto 78px auto 66px auto auto 64px auto 84px auto 118px auto 124px; gap:6px; align-items:center; justify-content:start;">
               <span>Mode</span>
               <select id="dlineModeSelect" style="width:auto; min-width:68px;">
-                <option value="both" selected>両側</option>
-                <option value="single">片側</option>
+                <option value="both" selected>Both Sides</option>
+                <option value="single">One Side</option>
               </select>
               <span>Offset</span><input id="dlineOffsetInput" type="number" value="5" min="0.1" step="1"
                 style="width:100%; min-width:0;">
               <span id="dlineOffsetUnitLabel">(mm)</span>
-              <span>線幅(mm)</span>
+              <span>Line Width (mm)</span>
               <select id="dlineToolLineWidthInput" style="width:auto; min-width:58px;">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -2255,18 +2372,18 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>線種</span>
+              <span>Line Type</span>
               <select id="dlineToolLineTypeInput" style="width:auto; min-width:74px;">
-                <option value="solid" selected>実線</option>
-                <option value="dashed">破線</option>
-                <option value="dotted">点線</option>
-                <option value="dashdot">一点鎖線</option>
-                <option value="longdash">長破線</option>
-                <option value="center">中心線</option>
-                <option value="hidden">隠れ線</option>
+                <option value="solid" selected>Solid</option>
+                <option value="dashed">Dashed</option>
+                <option value="dotted">Dotted</option>
+                <option value="dashdot">Dash-dot</option>
+                <option value="longdash">Long Dash</option>
+                <option value="center">Center</option>
+                <option value="hidden">Hidden</option>
               </select>
               <label for="dlineAsPolylineToggle" id="dlineAsPolylineLabel" style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
-                <input id="dlineAsPolylineToggle" type="checkbox"><span>Polylineで生成</span>
+                <input id="dlineAsPolylineToggle" type="checkbox"><span>Create as Polyline</span>
               </label>
               <button id="applyDLineBtn" type="button">Apply</button>
             </div>
@@ -2284,11 +2401,11 @@
             </label>
           </div>
           <div class="section" data-context="settings">
-            <div class="section-title">設定</div>
+            <div class="section-title">Settings</div>
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <div style="font-size:12px; color:var(--muted); font-weight:700;">用紙設定</div>
+              <div style="font-size:12px; color:var(--muted); font-weight:700;">Page Settings</div>
               <div class="settings-grid">
-                <label class="settings-item">用紙サイズ
+                <label class="settings-item">Page Size
                   <select id="pageSizeSelect">
                     <option value="A4">A4</option>
                     <option value="A3">A3</option>
@@ -2303,28 +2420,28 @@
                 <div class="settings-wide" style="display:flex; flex-direction:column; align-items:flex-start; gap:4px; width:100%;">
                   <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px; align-self:flex-start;">
                     <input id="customPageSizeToggle" type="checkbox">
-                    <span id="customPageSizeToggleLabel">カスタム用紙サイズ</span>
+                    <span id="customPageSizeToggleLabel">Custom Page Size</span>
                   </label>
                   <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
                     <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-                      <span id="customPageWidthLabel">幅</span>
+                      <span id="customPageWidthLabel">Width</span>
                       <input id="customPageWidthInput" type="number" min="1" step="1" value="297" style="width:92px;">
                       <span id="customPageWidthUnitLabel">(mm)</span>
                     </label>
                     <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-                      <span id="customPageHeightLabel">高さ</span>
+                      <span id="customPageHeightLabel">Height</span>
                       <input id="customPageHeightInput" type="number" min="1" step="1" value="210" style="width:92px;">
                       <span id="customPageHeightUnitLabel">(mm)</span>
                     </label>
                   </div>
                 </div>
-                <label class="settings-item">向き
+                <label class="settings-item">Orientation
                   <select id="pageOrientationSelect">
-                    <option value="landscape">横</option>
-                    <option value="portrait">縦</option>
+                    <option value="landscape">Landscape</option>
+                    <option value="portrait">Portrait</option>
                   </select>
                 </label>
-                <label class="settings-item">縮尺 (1:)
+                <label class="settings-item">Scale (1:)
                   <select id="pageScaleInput">
                     <option value="1" selected>1</option>
                     <option value="5">5</option>
@@ -2338,12 +2455,12 @@
                 <div class="settings-wide" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
                   <label style="display:flex; align-items:center; gap:6px;">
                     <input id="customScaleToggle" type="checkbox">
-                    <span id="customScaleToggleLabel">カスタム縮尺</span>
+                    <span id="customScaleToggleLabel">Custom Scale</span>
                   </label>
                   <span>1:</span>
                   <input id="customScaleInput" type="number" min="0.0001" step="0.1" value="1" style="width:98px;">
                 </div>
-                <label class="settings-item">単位
+                <label class="settings-item">Unit
                   <select id="pageUnitSelect">
                     <option value="mm">mm</option>
                     <option value="cm">cm</option>
@@ -2351,19 +2468,19 @@
                     <option value="inch">inch</option>
                   </select>
                 </label>
-                <label class="settings-item"><input id="pageShowFrameToggle" type="checkbox" checked> 用紙枠</label>
+                <label class="settings-item"><input id="pageShowFrameToggle" type="checkbox" checked> Paper Frame</label>
                 <label class="settings-item" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-                  <span id="pageInnerMarginLabel">内側余白</span>
+                  <span id="pageInnerMarginLabel">Inner Margin</span>
                   <input id="pageInnerMarginInput" type="number" min="0" step="1" value="10" style="width:92px;">
                   <span id="pageInnerMarginUnitLabel">(mm)</span>
                 </label>
               </div>
             </div>
             <hr style="margin: 10px 0; opacity: 0.1;">
-            <div class="section-title" style="margin-top: 5px;">グリッド設定</div>
+            <div class="section-title" style="margin-top: 5px;">GridSettings</div>
             <div class="settings-grid">
               <label class="settings-item" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-                <span id="baseGridLabel">基本グリッド</span>
+                <span id="baseGridLabel">Base Grid</span>
                 <select id="gridSizeContextInput">
                   <option value="1">1</option>
                   <option value="5">5</option>
@@ -2378,36 +2495,36 @@
               <div class="settings-wide" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
                 <label style="display:flex; align-items:center; gap:6px;">
                   <input id="customGridToggle" type="checkbox">
-                  <span id="customGridToggleLabel">カスタムグリッド</span>
+                  <span id="customGridToggleLabel">Custom Grid</span>
                 </label>
                 <input id="customGridInput" type="number" min="1" step="1" value="10" style="width:98px;">
                 <span id="customGridUnitLabel">(mm)</span>
               </div>
               <label class="settings-item">
-                <input id="gridShowContextToggle" type="checkbox" checked> <span id="gridShowContextLabel">表示</span>
+                <input id="gridShowContextToggle" type="checkbox" checked> <span id="gridShowContextLabel">Show</span>
               </label>
               <label class="settings-item">
-                <input id="gridAutoContextToggle" type="checkbox" checked> <span id="gridAutoContextLabel">可変グリッド</span>
+                <input id="gridAutoContextToggle" type="checkbox" checked> <span id="gridAutoContextLabel">Auto Grid</span>
               </label>
               <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
                 <label style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px; font-size:12px;">
-                  <span>可変グリッド切替タイミング</span>
+                  <span id="gridAutoTimingTitle">Auto Grid Timing</span>
                   <input id="gridAutoTimingSlider" type="range" min="0" max="100" step="1" value="35">
-                  <span id="gridAutoTimingLabel">早い</span>
+                  <span id="gridAutoTimingLabel">Preview</span>
                 </label>
-                <div id="gridAutoTimingHint" style="font-size:10px; color:var(--muted);">目標 1grid 表示幅: 22.4 px</div>
+                <div id="gridAutoTimingHint" style="font-size:10px; color:var(--muted);">Grid interval switches automatically based on zoom.</div>
               </div>
             </div>
             <hr style="margin: 10px 0; opacity: 0.1;">
             <div class="settings-grid">
-                <div id="settingsInterfaceLabel" class="settings-wide" style="font-size:12px; color:var(--muted); font-weight:700;">インターフェース</div>
-                <label class="settings-item"><span id="uiLanguageLabel">言語</span>
+                <div id="settingsInterfaceLabel" class="settings-wide" style="font-size:12px; color:var(--muted); font-weight:700;">Interface</div>
+                <label class="settings-item"><span id="uiLanguageLabel">Language</span>
                   <select id="uiLanguageSelect">
-                    <option value="ja" selected>日本語</option>
+                    <option value="ja" selected">Japanese</option>
                     <option value="en">English</option>
                   </select>
                 </label>
-                <label class="settings-item">メニュー倍率
+                <label class="settings-item">Menu Scale
                   <select id="menuScaleSelect">
                     <option value="50">50%</option>
                     <option value="55">55%</option>
@@ -2442,26 +2559,34 @@
                     <option value="200">200%</option>
                   </select>
                 </label>
-                <label class="settings-item">タッチモード
+                <label class="settings-item">Touch Mode
                   <input id="touchModeToggle" type="checkbox">
                 </label>
                 <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
                   <hr style="margin: 2px 0 3px; opacity: 0.1;">
-                  <div id="leftMenuVisibilityLabel" style="font-size:12px; color:var(--muted); font-weight:700;">左メニュー表示項目</div>
+                  <div id="leftMenuVisibilityLabel" style="font-size:12px; color:var(--muted); font-weight:700;">Left Menu Visibility</div>
                   <div id="leftMenuVisibilityList" style="display:grid; grid-template-columns:repeat(3,minmax(110px,1fr)); gap:4px 8px;"></div>
+                </div>
+                <div class="settings-wide" style="display:flex; flex-direction:column; gap:6px;">
+                  <div id="adSettingsLabel" class="settings-subtitle">Ad Visibility</div>
+                  <div style="display:grid; grid-template-columns:repeat(3,minmax(140px,1fr)); gap:4px 8px;">
+                    <label class="settings-item"><input id="topRightAdZoneToggle" type="checkbox" checked> Top Right</label>
+                    <label class="settings-item"><input id="bottomLeftAdZoneToggle" type="checkbox" checked> Bottom Left</label>
+                    <label class="settings-item"><input id="bottomCenterAdZoneToggle" type="checkbox" checked> Bottom Center</label>
+                  </div>
                 </div>
                 <div class="settings-wide">
                   <hr style="margin: 4px 0 2px; opacity: 0.1;">
                 </div>
                 <div class="settings-wide" style="display:flex; flex-direction:column; gap:6px;">
-                  <div id="shortcutSettingsLabel" style="font-size:12px; color:var(--muted);">キーボードショートカット</div>
-                  <div id="shortcutSettingsHint" style="font-size:11px; color:#64748b;">主要ツールの切替キー（英字1文字）</div>
+                  <div id="shortcutSettingsLabel" style="font-size:12px; color:var(--muted);">Keyboard Shortcuts</div>
+                  <div id="shortcutSettingsHint" style="font-size:11px; color:#64748b;">Shortcut settings for major tools and delete</div>
                   <div id="toolShortcutList" style="display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)); gap:4px 8px;"></div>
                   <div>
-                    <button id="resetToolShortcutsBtn" type="button">初期値に戻す</button>
+                    <button id="resetToolShortcutsBtn" type="button">Reset to Defaults</button>
                   </div>
                 </div>
-                <label class="settings-item">最大ズーム
+                <label class="settings-item">Max Zoom
                   <select id="maxZoomInput">
                     <option value="1">100%</option>
                     <option value="10">1000%</option>
@@ -2469,21 +2594,21 @@
                     <option value="1000">100000%</option>
                   </select>
                 </label>
-                <label class="settings-item">フレームレート表示
+                <label class="settings-item">Show Frame Rate
                   <input id="fpsDisplayToggle" type="checkbox">
                 </label>
-                <label class="settings-item">オブジェクト数表示
+                <label class="settings-item">Show Object Count
                   <input id="objectCountDisplayToggle" type="checkbox">
                 </label>
-                <label class="settings-item">自動バックアップ
+                <label class="settings-item">Auto Backup
                   <input id="autoBackupToggle" type="checkbox" checked>
                 </label>
-                <label class="settings-item">バックアップ間隔
+                <label class="settings-item">Backup Interval
                   <select id="autoBackupIntervalSelect">
-                    <option value="60" selected>1分</option>
-                    <option value="180">3分</option>
-                    <option value="300">5分</option>
-                    <option value="600">10分</option>
+                    <option value="60" selected>1 min</option>
+                    <option value="180">3 min</option>
+                    <option value="300">5 min</option>
+                    <option value="600">10 min</option>
                   </select>
                 </label>
             </div>
@@ -2491,75 +2616,77 @@
       </div>
       <div id="topContextHelp" class="top-context-help"></div>
       </div>
-      <div class="ad-slot" id="rightAdSlot">Ad Space</div>
+      <div class="ad-zone" id="rightAdSlot"><div class="ad-zone-label">Ad Space<br>Top Right</div></div>
+      <div class="ad-zone" id="leftBottomAdSlot"><div class="ad-zone-label">Ad Space<br>Bottom Left</div></div>
+      <div class="ad-zone" id="bottomCenterAdSlot"><div class="ad-zone-label">Ad Space<br>Bottom Center</div></div>
       <div class="right-stack">
         <div class="section" data-panel-id="groups">
-          <div id="groupPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="高さを変更"></div>
-          <div id="groupPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="幅を変更"></div>
-          <button class="section-title panel-toggle" type="button">グループ</button>
+          <div id="groupPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="Resize group panel height"></div>
+          <div id="groupPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="Resize group panel width"></div>
+          <button class="section-title panel-toggle" type="button">Groups</button>
           <div id="groupList" style="display:flex; flex-direction:column; gap:3px;"></div>
           <div class="section inner-collapsible" data-inner-owner="groups">
-            <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="groupOps">グループ操作</button>
+            <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="groupOps">Group Ops</button>
             <div data-layer-inner-panel="groupOps" style="display:flex; flex-direction:column; gap:4px;">
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <input id="newGroupNameInput" type="text" placeholder="グループ名">
-                <button id="createGroupBtn" type="button">新規グループ作成</button>
+                <input id="newGroupNameInput" type="text" placeholder="Group name">
+                <button id="createGroupBtn" type="button">Create Group</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <input id="renameGroupNameInput" type="text" placeholder="グループ名">
-                <button id="renameGroupBtn" type="button">リネーム</button>
+                <input id="renameGroupNameInput" type="text" placeholder="Group name">
+                <button id="renameGroupBtn" type="button">Rename</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-                <button id="moveGroupUpBtn" type="button">↑</button>
-                <button id="moveGroupDownBtn" type="button">↓</button>
+                <button id="moveGroupUpBtn" type="button">Up</button>
+                <button id="moveGroupDownBtn" type="button">Down</button>
               </div>
               <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span id="groupRotationLabel">回転角</span>
+                <span id="groupRotationLabel">Rotate</span>
                 <span id="groupRotationValue">-</span>
               </label>
               <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span>カラー分け表示</span>
+                <span>Colorize</span>
                 <input id="groupColorizeToggle" type="checkbox">
               </label>
               <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span>現在レイヤー所属のみ表示</span>
+                <span>Current Layer Only</span>
                 <input id="groupCurrentLayerOnlyToggle" type="checkbox">
               </label>
             </div>
           </div>
         </div>
         <div class="section" data-panel-id="layers">
-          <div id="layerPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="高さを変更"></div>
-          <div id="layerPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="幅を変更"></div>
-          <button class="section-title panel-toggle" type="button">レイヤー</button>
+          <div id="layerPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="Resize layer panel height"></div>
+          <div id="layerPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="Resize layer panel width"></div>
+          <button class="section-title panel-toggle" type="button">Layers</button>
           <div id="layerList" style="display:flex; flex-direction:column; gap:3px;"></div>
           <div class="section inner-collapsible" data-inner-owner="layers">
-            <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="ops">レイヤー操作</button>
+            <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="ops">Layer Ops</button>
             <div data-layer-inner-panel="ops" style="display:flex; flex-direction:column; gap:4px;">
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <input id="newLayerNameInput" type="text" placeholder="新規レイヤー名">
-                <button id="addLayerBtn" type="button">新規作成</button>
+                <input id="newLayerNameInput" type="text" placeholder="New layer name">
+                <button id="addLayerBtn" type="button">Create New</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <input id="renameLayerNameInput" type="text" placeholder="レイヤー名">
-                <button id="renameLayerBtn" type="button">リネーム</button>
+                <input id="renameLayerNameInput" type="text" placeholder="Layer name">
+                <button id="renameLayerBtn" type="button">Rename</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <button id="moveSelectionLayerBtn" type="button" style="grid-column:1 / -1;">オブジェクトを移動</button>
+                <button id="moveSelectionLayerBtn" type="button" style="grid-column:1 / -1;">Move Objects</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <button id="deleteLayerBtn" type="button" style="grid-column:1 / -1;">レイヤー削除</button>
+                <button id="deleteLayerBtn" type="button" style="grid-column:1 / -1;">Delete Layer</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
-                <button id="moveLayerUpBtn" type="button">↑</button>
-                <button id="moveLayerDownBtn" type="button">↓</button>
+                <button id="moveLayerUpBtn" type="button">Up</button>
+                <button id="moveLayerDownBtn" type="button">Down</button>
               </div>
               <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span>カラー分け表示</span>
+                <span>Colorize</span>
                 <input id="layerColorizeToggle" type="checkbox">
               </label>
               <label style="display:flex; align-items:center; justify-content:space-between;">
-                <span>選択レイヤーのみ編集</span>
+                <span>Edit Selected Layer Only</span>
                 <input id="editOnlyActiveLayerToggle" type="checkbox">
               </label>
             </div>
@@ -2576,14 +2703,14 @@
         <div id="statusText" class="status"></div>
       </div>
       <div id="touchConfirmOverlay" class="touch-confirm-overlay">
-        <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">決定</button>
-        <button id="touchCancelBtn" class="touch-cancel-btn" type="button">キャンセル</button>
+        <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">Confirm</button>
+        <button id="touchCancelBtn" class="touch-cancel-btn" type="button">Cancel</button>
       </div>
       <div id="touchMultiSelectOverlay" class="touch-multiselect-overlay">
-        <button id="touchMultiSelectBtn" class="touch-multiselect-btn" type="button">複数選択 OFF</button>
+        <button id="touchMultiSelectBtn" class="touch-multiselect-btn" type="button">Multi-Select OFF</button>
       </div>
       <div id="touchSelectBackOverlay" class="touch-select-back-overlay">
-        <button id="touchSelectBackBtn" class="touch-select-back-btn" type="button">選択に戻る</button>
+        <button id="touchSelectBackBtn" class="touch-select-back-btn" type="button">Back to Select</button>
       </div>
       <div class="bottom-scale-overlay">
         <div id="gridScaleIndicator" class="grid-scale-indicator">
@@ -2592,7 +2719,7 @@
         </div>
         <div id="gridAutoDebugText" class="grid-auto-debug" style="display:none;">auto-grid debug</div>
       </div>
-      <div id="debugConsolePanel" class="debug-console">
+      <div id="debugConsolePanel" class="debug-console" style="display:none;">
         <div class="debug-console-head">
           <div class="debug-console-title">Debug Console</div>
           <div class="debug-console-actions">
@@ -2689,3 +2816,11 @@
 </body>
 
 </html>
+
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-﻿import { bindDimSettingsEvents, bindLayerAndGroupBasicEvents, bindPageAndPatternEvents } from "./ui_bindings.js";
+import { bindDimSettingsEvents, bindLayerAndGroupBasicEvents, bindPageAndPatternEvents } from "./ui_bindings.js";
 import { setupColorPaletteUi } from "./ui_color_palette.js";
 import { bindToolParameterEvents } from "./ui_tool_param_events.js";
 import { createHtmlLikeLeftMenuRegistry, leftMenuItemKey, getViewportSizeForUi, isLeftMenuItemVisible, bindSnapItemsToLeftMenuVisibility } from "./ui_left_menu_core.js";
@@ -73,9 +73,52 @@ export function initUiMain(state, dom, actions, deps = {}) {
       requestAnimationFrame(() => requestAnimationFrame(() => refreshUi(state, dom)));
     }
   };
+  const closeCadHomeMenu = () => {
+    if (dom.cadHomeMenu) dom.cadHomeMenu.classList.remove("is-open");
+    if (dom.cadHomeLink) dom.cadHomeLink.setAttribute("aria-expanded", "false");
+  };
+  const positionCadHomeMenu = () => {
+    if (!dom.cadHomeMenu || !dom.cadHomeLink) return;
+    const gap = 6;
+    const pad = 8;
+    const linkRect = dom.cadHomeLink.getBoundingClientRect();
+    const vp = getViewportSizeForUi();
+    const menuW = Math.max(188, Number(dom.cadHomeMenu.offsetWidth || dom.cadHomeMenu.scrollWidth || 188));
+    const menuH = Math.max(0, Math.min(vp.height - pad * 2, Number(dom.cadHomeMenu.offsetHeight || dom.cadHomeMenu.scrollHeight || 0)));
+    let x = Math.round(linkRect.right + gap);
+    let y = Math.round(linkRect.top);
+    if ((x + menuW + pad) > vp.width) x = Math.max(pad, Math.round(linkRect.left - gap - menuW));
+    if ((y + menuH + pad) > vp.height) y = Math.max(pad, Math.round(vp.height - menuH - pad));
+    y = Math.max(pad, y);
+    dom.cadHomeMenu.style.left = `${x}px`;
+    dom.cadHomeMenu.style.top = `${y}px`;
+  };
+  const openCadHomeMenu = () => {
+    if (dom.cadHomeMenu) {
+      dom.cadHomeMenu.classList.add("is-open");
+      dom.cadHomeMenu.style.visibility = "hidden";
+      positionCadHomeMenu();
+      dom.cadHomeMenu.style.visibility = "";
+    }
+    if (dom.cadHomeLink) dom.cadHomeLink.setAttribute("aria-expanded", "true");
+  };
+  const toggleCadHomeMenu = () => {
+    const isOpen = !!dom.cadHomeMenu?.classList.contains("is-open");
+    if (isOpen) closeCadHomeMenu();
+    else openCadHomeMenu();
+  };
+  const bindDisplayModeButton = (el, mode) => {
+    if (!el) return;
+    el.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      actions.setDisplayMode?.(mode);
+      closeCadHomeMenu();
+    });
+  };
   const { bindColorInputPalette } = setupColorPaletteUi({
-    state,
     dom,
+    state,
     getUiLanguage,
     getViewportSizeForUi,
     selectSameColorByCurrent: (hex) => actions.selectShapesByColor?.(hex),
@@ -94,11 +137,14 @@ export function initUiMain(state, dom, actions, deps = {}) {
     }
     if (groupPanelResizeDrag.mode === "height" || groupPanelResizeDrag.mode === "both") {
       state.ui.panelLayout.groupPanelHeight = Math.max(180, Math.min(2000, Math.round(groupPanelResizeDrag.startHeight - dy)));
+      state.ui.panelLayout.groupPanelHeightUserSet = true;
     }
     if (groupPanelResizeDrag.mode === "layerHeight") {
       const maxListH = 8000;
       const nextListH = Math.max(40, Math.min(maxListH, Math.round((groupPanelResizeDrag.startListHeight ?? 120) - dy)));
       state.ui.panelLayout.layerPanelListHeight = nextListH;
+      state.ui.panelLayout.layerPanelListHeightUserSet = true;
+      state.ui.panelLayout.layerPanelListHeightUserSet = true;
     }
     refreshUi(state, dom);
   };
@@ -240,6 +286,9 @@ export function initUiMain(state, dom, actions, deps = {}) {
   if (!state.ui._leftFlyoutGlobalCloseBound) {
     document.addEventListener("click", (e) => {
       const t = e.target;
+      if (t?.closest?.("#cadHomeLink")) return;
+      if (t?.closest?.("#cadHomeMenu")) return;
+      closeCadHomeMenu();
       if (t?.closest?.(".tool-buttons .left-flyout")) return;
       if (t?.closest?.(".left-action-popover")) return;
       if (t?.closest?.("[data-action-popover-trigger='1']")) return;
@@ -249,20 +298,24 @@ export function initUiMain(state, dom, actions, deps = {}) {
     window.addEventListener("resize", () => {
       positionOpenedLeftFlyouts();
       if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+      if (dom.cadHomeMenu?.classList.contains("is-open")) positionCadHomeMenu();
     });
     if (window.visualViewport) {
       window.visualViewport.addEventListener("resize", () => {
         positionOpenedLeftFlyouts();
         if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+        if (dom.cadHomeMenu?.classList.contains("is-open")) positionCadHomeMenu();
       });
       window.visualViewport.addEventListener("scroll", () => {
         positionOpenedLeftFlyouts();
         if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+        if (dom.cadHomeMenu?.classList.contains("is-open")) positionCadHomeMenu();
       });
     }
     window.addEventListener("scroll", () => {
       positionOpenedLeftFlyouts();
       if (actionPopoverOwner) positionActionPopover(actionPopoverOwner);
+      if (dom.cadHomeMenu?.classList.contains("is-open")) positionCadHomeMenu();
     }, true);
     window.addEventListener("keydown", (e) => {
       if (e.key === "Escape") {
@@ -272,6 +325,18 @@ export function initUiMain(state, dom, actions, deps = {}) {
     });
     state.ui._leftFlyoutGlobalCloseBound = true;
   }
+  if (dom.cadHomeLink) {
+    dom.cadHomeLink.setAttribute("aria-expanded", "false");
+    dom.cadHomeLink.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      toggleCadHomeMenu();
+    });
+  }
+  if (dom.cadHomeMenu) dom.cadHomeMenu.addEventListener("click", (e) => e.stopPropagation());
+  bindDisplayModeButton(dom.cadHomeModeViewer, "viewer");
+  bindDisplayModeButton(dom.cadHomeModeEasy, "easy");
+  bindDisplayModeButton(dom.cadHomeModeCad, "cad");
   for (const el of [toolTargets.tools, toolTargets.edit, toolTargets.files]) {
     if (el) el.innerHTML = "";
   }
@@ -619,7 +684,7 @@ export function initUiMain(state, dom, actions, deps = {}) {
       const th = gridThresholdsFromTiming(timing);
       actions.setGridAutoThresholds?.(th.th50, th.th10, th.th5, th.th1, timing);
       if (dom.gridAutoTimingLabel) dom.gridAutoTimingLabel.textContent = gridAutoTimingLabelText(timing);
-      if (dom.gridAutoTimingHint) dom.gridAutoTimingHint.textContent = `蜈･髢ｾ蛟､: 50=${th.th50}% / 10=${th.th10}% / 5=${th.th5}% / 1=${th.th1}%`;
+      if (dom.gridAutoTimingHint) dom.gridAutoTimingHint.textContent = `Thresholds: 50=${th.th50}% / 10=${th.th10}% / 5=${th.th5}% / 1=${th.th1}%`;
     };
     dom.gridAutoTimingSlider.addEventListener("input", onGridAutoTimingChange);
     onGridAutoTimingChange();
@@ -844,4 +909,6 @@ export function initUiMain(state, dom, actions, deps = {}) {
     normalizeMenuScalePreset,
   });
 }
+
+
 

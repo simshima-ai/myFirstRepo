@@ -1,4 +1,6 @@
-﻿export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
+import { ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
+
+export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
   const {
     syncInputValue,
     normalizePageScalePreset,
@@ -10,6 +12,8 @@
     normalizeLineWidthPreset,
     normalizeLineTypePreset,
   } = helpers;
+
+  ensurePanelVisibilityState(state);
 
   if (dom.dimLinearMode) dom.dimLinearMode.value = state.dimSettings.linearMode || "single";
   if (dom.dimIgnoreGridSnapToggle) dom.dimIgnoreGridSnapToggle.checked = !!state.dimSettings.ignoreGridSnap;
@@ -134,6 +138,9 @@
   if (dom.touchModeToggle) {
     dom.touchModeToggle.checked = !!state.ui?.touchMode;
   }
+  if (dom.topRightAdZoneToggle) dom.topRightAdZoneToggle.checked = state.ui?.adZones?.topRight !== false;
+  if (dom.bottomLeftAdZoneToggle) dom.bottomLeftAdZoneToggle.checked = state.ui?.adZones?.bottomLeft !== false;
+  if (dom.bottomCenterAdZoneToggle) dom.bottomCenterAdZoneToggle.checked = state.ui?.adZones?.bottomCenter !== false;
   if (dom.touchConfirmOverlay && dom.touchConfirmBtn) {
     const touchMode = !!state.ui?.touchMode;
     const tool = String(state.tool || "");
@@ -173,43 +180,43 @@
     ));
     const show = touchMode && (hasLinearDraft || canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy" || tool === "rect");
     let enabled = false;
-    let label = panelLang === "en" ? "Confirm" : "確定";
+    let label = "Confirm";
     if (hasLinearDraft) {
       enabled = true;
-      label = panelLang === "en" ? "Finish Continuous Line" : "連続線を確定";
+      label = "Finish Continuous Line";
     } else if (canLineFinalize) {
       enabled = !!(state.polylineDraft && (state.polylineDraft.points || []).length >= 2);
       label = (lineMode === "freehand")
-        ? (panelLang === "en" ? "Finalize B-Spline" : "Bスプライン確定")
-        : (panelLang === "en" ? "Finish Continuous Line" : "連続線を確定");
+        ? "Finalize B-Spline"
+        : "Finish Continuous Line";
     } else if (isChainDim) {
       enabled = canPrepareDim || canFinalizeDim;
       label = canFinalizeDim
-        ? (panelLang === "en" ? "Finalize Dim" : "寸法確定")
-        : (panelLang === "en" ? "Set Placement" : "配置位置を指定");
+        ? "Finalize Dim"
+        : "Set Placement";
     } else if (tool === "circle" && circleMode === "threepoint") {
       enabled = canCircleThreePoint;
-      label = panelLang === "en" ? "Create 3-Point Circle" : "三点円を作成";
+      label = "Create 3-Point Circle";
     } else if (tool === "fillet") {
       enabled = canFillet;
-      label = panelLang === "en" ? "Apply Fillet" : "フィレット適用";
+      label = "Apply Fillet";
     } else if (tool === "doubleline") {
       enabled = canDline;
-      label = panelLang === "en" ? "Apply Double Line" : "二重線を適用";
+      label = "Apply Double Line";
     } else if (tool === "hatch") {
       enabled = canHatch;
-      label = panelLang === "en" ? "Apply Hatch" : "ハッチング適用";
+      label = "Apply Hatch";
     } else if (tool === "patterncopy") {
       enabled = canPatternCopy;
-      label = panelLang === "en" ? "Run Pattern Copy" : "パターンコピー実行";
+      label = "Run Pattern Copy";
     }
     if (tool === "rect") {
       enabled = canRectConfirm;
       label = (Number(rectDraft.stage) === 1)
-        ? (panelLang === "en" ? "Create Rectangle" : "四角を作成")
-        : (panelLang === "en" ? "Confirm 1st Point" : "1点目を確定");
+        ? "Create Rectangle"
+        : "Confirm 1st Point";
     }
-    dom.touchConfirmOverlay.style.display = show ? "flex" : "none";
+    dom.touchConfirmOverlay.style.display = (isPanelVisible(state, "touchConfirmOverlay") && show) ? "flex" : "none";
     if (show) {
       // Keep top-fixed placement and avoid overlap by shifting horizontally to the right of sidebar.
       const sidebar = document.querySelector(".sidebar");
@@ -240,7 +247,7 @@
   if (dom.touchSelectBackOverlay && dom.touchSelectBackBtn) {
     const touchMode = !!state.ui?.touchMode;
     const isSelect = String(state.tool || "") === "select";
-    dom.touchSelectBackOverlay.style.display = (touchMode && !isSelect) ? "block" : "none";
+    dom.touchSelectBackOverlay.style.display = (isPanelVisible(state, "touchSelectBackOverlay") && touchMode && !isSelect) ? "block" : "none";
   }
   if (dom.touchMultiSelectOverlay && dom.touchMultiSelectBtn) {
     const touchMode = !!state.ui?.touchMode;
@@ -251,7 +258,7 @@
       : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
     const needsMultiSelect = (tool === "select" || tool === "hatch" || tool === "doubleline" || tool === "patterncopy" || (tool === "circle" && circleMode === "threepoint"));
     const on = !!state.ui?.touchMultiSelect;
-    dom.touchMultiSelectOverlay.style.display = (touchMode && needsMultiSelect) ? "block" : "none";
+    dom.touchMultiSelectOverlay.style.display = (isPanelVisible(state, "touchMultiSelectOverlay") && touchMode && needsMultiSelect) ? "block" : "none";
     if (touchMode && needsMultiSelect) {
       const sidebar = document.querySelector(".sidebar");
       let left = 14;
@@ -272,8 +279,8 @@
     }
     dom.touchMultiSelectBtn.classList.toggle("is-active", on);
     dom.touchMultiSelectBtn.textContent = on
-      ? (panelLang === "en" ? "Multi-Select ON" : "複数選択 ON")
-      : (panelLang === "en" ? "Multi-Select OFF" : "複数選択 OFF");
+      ? "Multi-Select ON"
+      : "Multi-Select OFF";
   }
   if (dom.fpsDisplayToggle) {
     dom.fpsDisplayToggle.checked = !!state.ui?.showFps;
@@ -281,12 +288,15 @@
   if (dom.objectCountDisplayToggle) {
     dom.objectCountDisplayToggle.checked = !!state.ui?.showObjectCount;
   }
+  const autoBackupAvailable = String(state.ui?.displayMode || "cad").toLowerCase() !== "viewer";
   if (dom.autoBackupToggle) {
-    dom.autoBackupToggle.checked = state.ui?.autoBackupEnabled !== false;
+    dom.autoBackupToggle.checked = autoBackupAvailable && state.ui?.autoBackupEnabled !== false;
+    dom.autoBackupToggle.disabled = !autoBackupAvailable;
   }
   if (dom.autoBackupIntervalSelect) {
     const sec = Math.max(60, Math.min(600, Math.round(Number(state.ui?.autoBackupIntervalSec ?? 60) || 60)));
     syncInputValue(dom.autoBackupIntervalSelect, sec);
+    dom.autoBackupIntervalSelect.disabled = !autoBackupAvailable;
   }
   if (dom.pageUnitSelect) {
     const v = String(state.pageSetup?.unit || "mm");
@@ -330,3 +340,6 @@
     syncInputValue(dom.pageInnerMarginInput, v);
   }
 }
+
+
+

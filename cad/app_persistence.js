@@ -27,6 +27,7 @@ export function createPersistenceRuntime(config) {
       },
       ui: {
         language: String(state.ui?.language || "ja"),
+        displayMode: String(state.ui?.displayMode || "cad"),
         menuScalePct: Number(state.ui?.menuScalePct ?? 100),
         touchMode: !!state.ui?.touchMode,
         touchMultiSelect: !!state.ui?.touchMultiSelect,
@@ -38,6 +39,14 @@ export function createPersistenceRuntime(config) {
           : {},
         showFps: !!state.ui?.showFps,
         showObjectCount: !!state.ui?.showObjectCount,
+        panelVisibility: (state.ui?.panelVisibility && typeof state.ui.panelVisibility === "object")
+          ? { ...state.ui.panelVisibility }
+          : {},
+        adZones: {
+          topRight: state.ui?.adZones?.topRight !== false,
+          bottomLeft: state.ui?.adZones?.bottomLeft !== false,
+          bottomCenter: state.ui?.adZones?.bottomCenter !== false,
+        },
         autoBackupEnabled: state.ui?.autoBackupEnabled !== false,
         autoBackupIntervalSec: Number(state.ui?.autoBackupIntervalSec ?? 60),
         toolShortcuts: sanitizeToolShortcuts(state.ui?.toolShortcuts),
@@ -101,6 +110,7 @@ export function createPersistenceRuntime(config) {
         if (!state.ui) state.ui = {};
         if (!state.ui.groupView || typeof state.ui.groupView !== "object") state.ui.groupView = {};
         state.ui.language = String(data.ui.language || state.ui.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
+        state.ui.displayMode = String(data.ui.displayMode || state.ui.displayMode || "cad");
         state.ui.groupView.currentLayerOnly = !!(data.ui.groupCurrentLayerOnly ?? state.ui.groupView.currentLayerOnly);
         state.ui.menuScalePct = Math.max(50, Math.min(200, Math.round(Number(data.ui.menuScalePct ?? state.ui.menuScalePct ?? 100) / 5) * 5));
         state.ui.touchMode = !!(data.ui.touchMode ?? state.ui.touchMode);
@@ -113,6 +123,14 @@ export function createPersistenceRuntime(config) {
           : (state.ui.leftMenuVisibility || {});
         state.ui.showFps = !!data.ui.showFps;
         state.ui.showObjectCount = !!data.ui.showObjectCount;
+        state.ui.panelVisibility = (data.ui.panelVisibility && typeof data.ui.panelVisibility === "object")
+          ? { ...(state.ui.panelVisibility || {}), ...data.ui.panelVisibility }
+          : (state.ui.panelVisibility || {});
+        state.ui.adZones = {
+          topRight: data.ui?.adZones?.topRight !== false,
+          bottomLeft: data.ui?.adZones?.bottomLeft !== false,
+          bottomCenter: data.ui?.adZones?.bottomCenter !== false,
+        };
         state.ui.autoBackupEnabled = data.ui.autoBackupEnabled !== false;
         state.ui.autoBackupIntervalSec = Math.max(60, Math.min(600, Math.round(Number(data.ui.autoBackupIntervalSec ?? state.ui.autoBackupIntervalSec ?? 60) || 60)));
         state.ui.toolShortcuts = sanitizeToolShortcuts(data.ui.toolShortcuts ?? state.ui.toolShortcuts);
@@ -150,6 +168,7 @@ export function createPersistenceRuntime(config) {
   function saveAutoBackup(exportJsonObject, helpers) {
     try {
       if (typeof localStorage === "undefined") return false;
+      if (String(state.ui?.displayMode || "cad").toLowerCase() === "viewer") return false;
       if (state.ui?.autoBackupEnabled === false) return false;
       const data = exportJsonObject(state, helpers);
       const payload = {
@@ -160,8 +179,7 @@ export function createPersistenceRuntime(config) {
       if (!state.ui) state.ui = {};
       state.ui.lastAutoBackupAt = payload.savedAt;
       if (dom.autoBackupBadge) {
-        const lang = String(state.ui?.language || "ja").toLowerCase();
-        dom.autoBackupBadge.textContent = (lang === "en") ? "Auto backup saved" : "自動バックアップ保存";
+        dom.autoBackupBadge.textContent = "Auto backup saved";
         dom.autoBackupBadge.style.display = "";
         if (autoBackupBadgeTimer) clearTimeout(autoBackupBadgeTimer);
         autoBackupBadgeTimer = setTimeout(() => {
@@ -188,6 +206,7 @@ export function createPersistenceRuntime(config) {
       clearInterval(autoBackupTimer);
       autoBackupTimer = null;
     }
+    if (String(state.ui?.displayMode || "cad").toLowerCase() === "viewer") return;
     if (state.ui?.autoBackupEnabled === false) return;
     autoBackupTimer = setInterval(() => {
       try { saveAutoBackupFn(); } catch (_) { /* noop */ }
@@ -205,17 +224,14 @@ export function createPersistenceRuntime(config) {
       importJsonObject(state, data, { ...helpers, setStatus: null, draw: null });
       if (!state.ui) state.ui = {};
       state.ui.lastAutoBackupAt = Number(payload?.savedAt) || null;
-      const lang = String(state.ui?.language || "ja").toLowerCase();
       if (Number.isFinite(state.ui.lastAutoBackupAt)) {
         const dt = new Date(state.ui.lastAutoBackupAt);
         const hh = String(dt.getHours()).padStart(2, "0");
         const mm = String(dt.getMinutes()).padStart(2, "0");
         const ss = String(dt.getSeconds()).padStart(2, "0");
-        setStatus(lang === "en"
-          ? `Auto backup restored (${hh}:${mm}:${ss})`
-          : `自動バックアップを復元しました (${hh}:${mm}:${ss})`);
+        setStatus(`Auto backup restored (${hh}:${mm}:${ss})`);
       } else {
-        setStatus(lang === "en" ? "Auto backup restored" : "自動バックアップを復元しました");
+        setStatus("Auto backup restored");
       }
       return true;
     } catch (_) {
@@ -234,3 +250,10 @@ export function createPersistenceRuntime(config) {
     restoreAutoBackupAtStartup
   };
 }
+
+
+
+
+
+
+

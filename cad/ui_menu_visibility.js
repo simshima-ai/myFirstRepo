@@ -1,4 +1,4 @@
-export function refreshLeftMenuVisibilitySettings(state, dom, helpers) {
+﻿export function refreshLeftMenuVisibilitySettings(state, dom, helpers) {
   const { getUiLanguage, isLeftMenuItemVisible, onToggle } = helpers;
   const host = dom.leftMenuVisibilityList;
   if (!host) return;
@@ -14,11 +14,11 @@ export function refreshLeftMenuVisibilitySettings(state, dom, helpers) {
       if (g === "file") return "File";
       return "Other";
     }
-    if (g === "snap") return "スナップ";
-    if (g === "create") return "作成";
-    if (g === "edit") return "編集";
-    if (g === "file") return "ファイル";
-    return "その他";
+    if (g === "snap") return "Snap";
+    if (g === "create") return "Create";
+    if (g === "edit") return "Edit";
+    if (g === "file") return "File";
+    return "Other";
   };
   const byGroup = new Map();
   for (const g of groupOrder) byGroup.set(g, []);

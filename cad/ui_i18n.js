@@ -1,4 +1,4 @@
-﻿function clampGridAutoTiming(v) {
+function clampGridAutoTiming(v) {
   return Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 }
 
@@ -156,7 +156,70 @@ export function applyLanguageUi(state, dom) {
       close: "閉じる",
       export: "出力",
       settings: "設定",
-      manualGuide: "使い方ガイド",
+      manualGuide: "\u4f7f\u3044\u65b9\u30ac\u30a4\u30c9",
+      modeMenuTitle: "\u30e2\u30fc\u30c9",
+      viewerMode: "\u30d3\u30e5\u30fc\u30ef\u30fc\u30e2\u30fc\u30c9",
+      easyMode: "\u30a4\u30fc\u30b8\u30fc\u30e2\u30fc\u30c9",
+      cadMode: "CAD\u30e2\u30fc\u30c9",
+      webTop: "Web Top",
+      view: "\u8868\u793a",
+      attrNamePlaceholder: "\u540d\u524d",
+      attrValuePlaceholder: "\u5024",
+      scadMenu: "S-CAD \u30e1\u30cb\u30e5\u30fc",
+      cancel: "\u30ad\u30e3\u30f3\u30bb\u30eb",
+      textPlaceholder: "\u30c6\u30ad\u30b9\u30c8\u3092\u5165\u529b",
+      textContentPlaceholder: "\u30c6\u30ad\u30b9\u30c8\u5185\u5bb9",
+      groupPanelHeightTitle: "\u30b0\u30eb\u30fc\u30d7\u30d1\u30cd\u30eb\u306e\u9ad8\u3055\u3092\u5909\u66f4",
+      groupPanelWidthTitle: "\u30b0\u30eb\u30fc\u30d7\u30d1\u30cd\u30eb\u306e\u5e45\u3092\u5909\u66f4",
+      layerPanelHeightTitle: "\u30ec\u30a4\u30e4\u30fc\u30d1\u30cd\u30eb\u306e\u9ad8\u3055\u3092\u5909\u66f4",
+      layerPanelWidthTitle: "\u30ec\u30a4\u30e4\u30fc\u30d1\u30cd\u30eb\u306e\u5e45\u3092\u5909\u66f4",
+      gridAutoTimingHint: "\u30ba\u30fc\u30e0\u306b\u5fdc\u3058\u3066\u30b0\u30ea\u30c3\u30c9\u9593\u9694\u3092\u81ea\u52d5\u5207\u66ff\u3057\u307e\u3059",
+      adSpace: "\u5e83\u544a\u30b9\u30da\u30fc\u30b9",
+      clear: "\u30af\u30ea\u30a2",
+      rotateSnap: "\u56de\u8ee2\u89d2\u30b9\u30ca\u30c3\u30d7",
+      filename: "\u30d5\u30a1\u30a4\u30eb\u540d",
+      range: "\u7bc4\u56f2",
+      page: "\u30da\u30fc\u30b8",
+      viewRange: "\u8868\u793a\u7bc4\u56f2",
+      selectionRange: "\u9078\u629e\u7bc4\u56f2",
+      custom: "\u30ab\u30b9\u30bf\u30e0",
+      centerX: "\u4e2d\u5fc3X",
+      centerY: "\u4e2d\u5fc3Y",
+      sizeMode: "\u30b5\u30a4\u30ba\u30e2\u30fc\u30c9",
+      pixels: "\u30d4\u30af\u30bb\u30eb",
+      dpiLabel: "DPI",
+      widthPx: "\u5e45(px)",
+      heightPx: "\u9ad8\u3055(px)",
+      scaleMultiplier: "\u500d\u7387",
+      marginPx: "\u4f59\u767d(px)",
+      background: "\u80cc\u666f",
+      white: "\u767d",
+      transparent: "\u900f\u660e",
+      backgroundColor: "\u80cc\u666f\u8272",
+      colorMode: "\u8272\u30e2\u30fc\u30c9",
+      layerColorMode: "\u30ec\u30a4\u30e4\u30fc\u8272\u5206\u3051",
+      groupColorMode: "\u30b0\u30eb\u30fc\u30d7\u8272\u5206\u3051",
+      includeGrid: "\u30b0\u30ea\u30c3\u30c9\u3092\u542b\u3081\u308b",
+      includeAxes: "\u8ef8\u3092\u542b\u3081\u308b",
+      includePageFrame: "\u7528\u7d19\u30d5\u30ec\u30fc\u30e0\u3092\u542b\u3081\u308b",
+      includeSelectionHighlight: "\u9078\u629e\u30cf\u30a4\u30e9\u30a4\u30c8\u3092\u542b\u3081\u308b",
+      antialias: "\u30a2\u30f3\u30c1\u30a8\u30a4\u30ea\u30a2\u30b9",
+      debugConsole: "\u30c7\u30d0\u30c3\u30b0\u30b3\u30f3\u30bd\u30fc\u30eb",
+      exportPng: "PNG\u51fa\u529b",
+      lineWidthScale: "\u7dda\u5e45\u500d\u7387",
+      minLineWidthPx: "\u6700\u5c0f\u7dda\u5e45(px)",
+      moveOriginOnly: "\u539f\u70b9\u306e\u307f\u79fb\u52d5",
+      sizeLocked: "\u30b5\u30a4\u30ba\u56fa\u5b9a",
+      transformLocked: "\u5909\u5f62\u56fa\u5b9a",
+      autoGridDebug: "\u81ea\u52d5\u30b0\u30ea\u30c3\u30c9\u30c7\u30d0\u30c3\u30b0",
+      add: "\u8ffd\u52a0",
+      up: "\u4e0a\u3078",
+      down: "\u4e0b\u3078",
+      lineApply: "\u4f5c\u6210",
+      rectApply: "\u4f5c\u6210",
+      circleApply: "\u4f5c\u6210",
+      vertexMoveApply: "\u79fb\u52d5",
+      groupRotation: "\u56de\u8ee2",
       selectMode: "選択モード",
       objectPick: "オブジェクト",
       groupPick: "グループ",
@@ -168,7 +231,11 @@ export function applyLanguageUi(state, dom) {
       language: "言語",
       menuScale: "メニュー倍率",
       touchMode: "タッチモード",
-      leftMenuVisibleItems: "左メニュー表示項目",
+      leftMenuVisibleItems: "\u5de6\u30e1\u30cb\u30e5\u30fc\u8868\u793a\u9805\u76ee",
+      adDisplay: "\u5e83\u544a\u8868\u793a",
+      adTopRight: "\u53f3\u4e0a",
+      adBottomLeft: "\u5de6\u4e0b",
+      adBottomCenter: "\u4e2d\u592e\u4e0b",
       touchConfirmCommon: "決定",
       touchCancelCommon: "キャンセル",
       touchBackToSelect: "選択に戻る",
@@ -406,6 +473,69 @@ export function applyLanguageUi(state, dom) {
       export: "Export",
       settings: "Settings",
       manualGuide: "User Guide",
+      modeMenuTitle: "Mode",
+      viewerMode: "Viewer Mode",
+      easyMode: "Easy Mode",
+      cadMode: "CAD Mode",
+      webTop: "Web Top",
+      view: "View",
+      attrNamePlaceholder: "Name",
+      attrValuePlaceholder: "Value",
+      scadMenu: "S-CAD Menu",
+      cancel: "Cancel",
+      textPlaceholder: "Enter text",
+      textContentPlaceholder: "Text content",
+      groupPanelHeightTitle: "Resize group panel height",
+      groupPanelWidthTitle: "Resize group panel width",
+      layerPanelHeightTitle: "Resize layer panel height",
+      layerPanelWidthTitle: "Resize layer panel width",
+      gridAutoTimingHint: "Grid interval switches automatically based on zoom.",
+      adSpace: "Ad Space",
+      clear: "Clear",
+      rotateSnap: "Rotate Snap",
+      filename: "Filename",
+      range: "Range",
+      page: "Page",
+      viewRange: "View",
+      selectionRange: "Selection",
+      custom: "Custom",
+      centerX: "Center X",
+      centerY: "Center Y",
+      sizeMode: "Size Mode",
+      pixels: "Pixels",
+      dpiLabel: "DPI",
+      widthPx: "Width (px)",
+      heightPx: "Height (px)",
+      scaleMultiplier: "Scale Multiplier",
+      marginPx: "Margin (px)",
+      background: "Background",
+      white: "White",
+      transparent: "Transparent",
+      backgroundColor: "BG Color",
+      colorMode: "Color Mode",
+      layerColorMode: "Layer Colorize",
+      groupColorMode: "Group Colorize",
+      includeGrid: "Include Grid",
+      includeAxes: "Include Axes",
+      includePageFrame: "Include Page Frame",
+      includeSelectionHighlight: "Include Selection Highlight",
+      antialias: "Antialias",
+      debugConsole: "Debug Console",
+      exportPng: "Export PNG",
+      lineWidthScale: "Line Width Scale",
+      minLineWidthPx: "Min Line Width (px)",
+      moveOriginOnly: "Move Origin Only",
+      sizeLocked: "Lock Size",
+      transformLocked: "Lock Transform",
+      autoGridDebug: "auto-grid debug",
+      add: "Add",
+      up: "Up",
+      down: "Down",
+      lineApply: "Create",
+      rectApply: "Create",
+      circleApply: "Create",
+      vertexMoveApply: "Move",
+      groupRotation: "Rotation",
       selectMode: "Selection Mode",
       objectPick: "Object",
       groupPick: "Group",
@@ -418,6 +548,10 @@ export function applyLanguageUi(state, dom) {
       menuScale: "Menu Scale",
       touchMode: "Touch Mode",
       leftMenuVisibleItems: "Left Menu Items",
+      adDisplay: "Ad Display",
+      adTopRight: "Top Right",
+      adBottomLeft: "Bottom Left",
+      adBottomCenter: "Bottom Center",
       touchConfirmCommon: "Confirm",
       touchCancelCommon: "Cancel",
       touchBackToSelect: "Back to Select",
@@ -620,8 +754,50 @@ export function applyLanguageUi(state, dom) {
   setText(".sidebar .section[data-panel-id='editTools'] > .panel-toggle", t.edit);
   setText(".sidebar .section[data-panel-id='fileTools'] > .panel-toggle", t.file);
   setText("#openManualBtn", t.manualGuide);
+  if (dom.cadHomeLink) dom.cadHomeLink.title = t.scadMenu;
+  const homeLogo = dom.cadHomeLink?.querySelector?.(".cad-home-logo");
+  if (homeLogo) {
+    const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
+    if (displayMode === "viewer") {
+      homeLogo.textContent = (lang === "ja") ? "\u7de8\u96c6\u3059\u308b\uff1f" : "Edit?";
+    } else if (displayMode === "easy") {
+      homeLogo.textContent = "Easy";
+    } else if (displayMode === "cad") {
+      homeLogo.textContent = "CAD";
+    } else {
+      homeLogo.innerHTML = '<span class="logo-s">S-</span>CAD';
+    }
+  }
+  if (dom.selectionTextContentInput) dom.selectionTextContentInput.placeholder = t.textPlaceholder;
+  if (dom.textContentInput) dom.textContentInput.placeholder = t.textContentPlaceholder;
+  const groupResizeTop = document.getElementById("groupPanelResizeHandleTop");
+  const groupResizeLeft = document.getElementById("groupPanelResizeHandleLeft");
+  const layerResizeTop = document.getElementById("layerPanelResizeHandleTop");
+  const layerResizeLeft = document.getElementById("layerPanelResizeHandleLeft");
+  if (groupResizeTop) groupResizeTop.title = t.groupPanelHeightTitle;
+  if (groupResizeLeft) groupResizeLeft.title = t.groupPanelWidthTitle;
+  if (layerResizeTop) layerResizeTop.title = t.layerPanelHeightTitle;
+  if (layerResizeLeft) layerResizeLeft.title = t.layerPanelWidthTitle;
+  if (dom.attrAddBtn) dom.attrAddBtn.textContent = t.add;
+  if (dom.moveVertexBtn) dom.moveVertexBtn.textContent = t.vertexMoveApply;
+  if (dom.applyLineInputBtn) dom.applyLineInputBtn.textContent = t.lineApply;
+  if (dom.applyRectInputBtn) dom.applyRectInputBtn.textContent = t.rectApply;
+  if (dom.applyCircleInputBtn) dom.applyCircleInputBtn.textContent = t.circleApply;
+  if (dom.moveGroupUpBtn) dom.moveGroupUpBtn.textContent = t.up;
+  if (dom.moveGroupDownBtn) dom.moveGroupDownBtn.textContent = t.down;
+  if (dom.moveLayerUpBtn) dom.moveLayerUpBtn.textContent = t.up;
+  if (dom.moveLayerDownBtn) dom.moveLayerDownBtn.textContent = t.down;
+  if (dom.groupRotationLabel) dom.groupRotationLabel.textContent = t.groupRotation;
   const manualBtn = document.getElementById("openManualBtn");
   if (manualBtn) manualBtn.setAttribute("href", lang === "en" ? "/manual_en.html" : "/manual.html");
+  const cadHomeMenuTitle = document.querySelector(".cad-home-menu-title");
+  if (cadHomeMenuTitle) cadHomeMenuTitle.textContent = t.modeMenuTitle;
+  if (dom.cadHomeModeViewer) dom.cadHomeModeViewer.textContent = t.viewerMode;
+  if (dom.cadHomeModeEasy) dom.cadHomeModeEasy.textContent = t.easyMode;
+  if (dom.cadHomeModeCad) dom.cadHomeModeCad.textContent = t.cadMode;
+  if (dom.cadHomeMenuWebtop) dom.cadHomeMenuWebtop.textContent = t.webTop;
+  if (dom.attrNameInput) dom.attrNameInput.placeholder = t.attrNamePlaceholder;
+  if (dom.attrValueInput) dom.attrValueInput.placeholder = t.attrValuePlaceholder;
   setText(".left-aux-stack .section[data-panel-id='snap'] > .panel-toggle", t.snap);
   setText(".left-aux-stack .section[data-panel-id='attrs'] > .panel-toggle", t.attrs);
 
@@ -680,6 +856,7 @@ export function applyLanguageUi(state, dom) {
   setText(".section[data-context='doubleline'] .section-title", t.doubleline);
   setText(".section[data-context='text'] .section-title", t.text);
   setText(".section[data-context='trace'] .section-title", t.tracePanelTitle);
+  setText("#traceTargetInfo", t.traceTargetNone);
   setText("#traceMaxDimLabel", t.traceMaxDim);
   setText("#traceEdgePercentLabel", t.traceEdgePercent);
   setText("#traceSimplifyLabel", t.traceSimplify);
@@ -708,6 +885,9 @@ export function applyLanguageUi(state, dom) {
   setText("#filletModeLabel", t.filletMode);
   if (dom.applyFilletBtn) dom.applyFilletBtn.textContent = t.filletApply;
   setText("#uiLanguageLabel", t.language);
+  setText(".section[data-panel-id='view'] > .section-title", t.view);
+  setLabelByControl("gridShowToggle", t.show);
+  setLabelByControl("gridAutoToggle", t.autoGrid);
   setLabelByControl("menuScaleSelect", t.menuScale);
   setLabelByControl("touchModeToggle", t.touchMode);
   setText("#leftMenuVisibilityLabel", t.leftMenuVisibleItems);
@@ -786,7 +966,7 @@ export function applyLanguageUi(state, dom) {
   setButtonById("groupAimPickBtn", t.aimPickTarget);
   setButtonById("groupAimClearBtn", t.aimClear);
   setButtonById("dimChainPopBtn", t.undoPoint);
-  setLabelByControl("groupRotateSnapInput", (lang === "en" ? "Rotate Snap" : "回転角スナップ"));
+  setLabelByControl("groupRotateSnapInput", t.rotateSnap);
   setLabelByControl("dimLinearMode", t.mode);
   setLabelByControl("dimCircleMode", t.dimCircleArc);
   setLabelByControl("dimCircleArrowSide", t.arrow);
@@ -886,12 +1066,15 @@ export function applyLanguageUi(state, dom) {
   if (dom.copySelectedShapesBtn) dom.copySelectedShapesBtn.textContent = t.copy;
   if (dom.moveGroupBtn) dom.moveGroupBtn.textContent = t.move;
   if (dom.copyGroupBtn) dom.copyGroupBtn.textContent = t.copy;
+  if (dom.moveGroupOriginOnlyBtn) dom.moveGroupOriginOnlyBtn.textContent = t.moveOriginOnly;
   if (dom.selectionApplyCircleRadiusBtn) dom.selectionApplyCircleRadiusBtn.textContent = t.apply;
   if (dom.applyDLineBtn) dom.applyDLineBtn.textContent = t.dlineApply;
   if (dom.applyHatchBtn) dom.applyHatchBtn.textContent = t.hatchApply;
   if (dom.hatchValidateBtn) dom.hatchValidateBtn.textContent = t.hatchValidate;
   if (dom.selectSameColorBtn) dom.selectSameColorBtn.textContent = t.selectSameColor;
   if (dom.patternCopyApplyBtn) dom.patternCopyApplyBtn.textContent = t.patternCopyRun;
+  if (dom.importAdjustApplyBtn) dom.importAdjustApplyBtn.textContent = t.apply;
+  if (dom.importAdjustCancelBtn) dom.importAdjustCancelBtn.textContent = t.cancel;
   if (dom.patternCopySetCenterBtn) dom.patternCopySetCenterBtn.textContent = t.setAsCenter;
   if (dom.patternCopySetAxisBtn) dom.patternCopySetAxisBtn.textContent = t.setAsAxis;
   setLabelByControl("trimNoDeleteToggle", t.trimNoDelete);
@@ -903,6 +1086,15 @@ export function applyLanguageUi(state, dom) {
   setPrevSpanByControl("textRotateInput", t.rotate);
   setPrevSpanByControl("selectionTextSizePtInput", t.textSizePt);
   setPrevSpanByControl("selectionTextRotateInput", t.rotate);
+  setLabelByControl("selectionImageLockAspectToggle", t.sizeLocked);
+  setLabelByControl("selectionImageLockTransformToggle", t.transformLocked);
+  setLabelByControl("selectionTextBoldInput", t.bold);
+  setLabelByControl("selectionTextItalicInput", t.italic);
+  setLabelByControl("textBoldInput", t.bold);
+  setLabelByControl("textItalicInput", t.italic);
+  if (dom.groupAimStatus && String(dom.groupAimStatus.textContent || "").trim() === "Target: None") {
+    dom.groupAimStatus.textContent = t.aimTargetNone;
+  }
 
   // Settings labels
   setLabelByControl("pageSizeSelect", t.pageSize);
@@ -918,6 +1110,16 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("autoBackupToggle", t.autoBackup);
   setLabelByControl("autoBackupIntervalSelect", t.backupInterval);
   setLabelByControl("pageUnitSelect", t.unit);
+  setText("#adSettingsLabel", t.adDisplay);
+  const rightAdLabel = document.querySelector("#rightAdSlot .ad-zone-label");
+  const leftAdLabel = document.querySelector("#leftBottomAdSlot .ad-zone-label");
+  const bottomAdLabel = document.querySelector("#bottomCenterAdSlot .ad-zone-label");
+  if (rightAdLabel) rightAdLabel.innerHTML = `${t.adSpace}<br>${t.adTopRight}`;
+  if (leftAdLabel) leftAdLabel.innerHTML = `${t.adSpace}<br>${t.adBottomLeft}`;
+  if (bottomAdLabel) bottomAdLabel.innerHTML = `${t.adSpace}<br>${t.adBottomCenter}`;
+  setLabelByControl("topRightAdZoneToggle", t.adTopRight);
+  setLabelByControl("bottomLeftAdZoneToggle", t.adBottomLeft);
+  setLabelByControl("bottomCenterAdZoneToggle", t.adBottomCenter);
   refreshCustomPageSizeUnitLabels(state);
   setLabelByControl("pageShowFrameToggle", t.paperFrame);
   setLabelByControl("pageInnerMarginInput", t.innerMargin);
@@ -934,7 +1136,54 @@ export function applyLanguageUi(state, dom) {
   const autoTimingLabel = document.querySelector("#gridAutoTimingSlider")?.closest("label")?.querySelector("span");
   if (autoTimingLabel) autoTimingLabel.textContent = t.autoGridTiming;
   const gridHint = document.getElementById("gridAutoTimingHint");
-  if (gridHint && lang === "en") gridHint.textContent = String(gridHint.textContent || "").replace("目標", "Target").replace("表示幅", "display width");
+  if (gridHint) gridHint.textContent = t.gridAutoTimingHint;
+  setText("#gridAutoTimingTitle", t.autoGridTiming);
+  const debugTitle = document.querySelector(".debug-console-title");
+  if (debugTitle) debugTitle.textContent = t.debugConsole;
+  const debugCopyBtn = document.getElementById("debugConsoleCopyBtn");
+  const debugClearBtn = document.getElementById("debugConsoleClearBtn");
+  if (debugCopyBtn) debugCopyBtn.textContent = t.copy;
+  if (debugClearBtn) debugClearBtn.textContent = t.clear;
+  if (dom.gridAutoDebugText) dom.gridAutoDebugText.textContent = t.autoGridDebug;
+  setText("#pngExportTitle", t.exportPng);
+  setButtonById("pngExportCloseBtn", t.close);
+  setButtonById("pngExportCancelBtn", t.cancel);
+  setButtonById("pngExportApplyBtn", t.exportPng);
+  setLabelByControl("pngFilenameInput", t.filename);
+  setLabelByControl("pngRangeModeSelect", t.range);
+  setOptionText("pngRangeModeSelect", "page", t.page);
+  setOptionText("pngRangeModeSelect", "view", t.viewRange);
+  setOptionText("pngRangeModeSelect", "selection", t.selectionRange);
+  setOptionText("pngRangeModeSelect", "custom", t.custom);
+  setLabelByControl("pngCustomXInput", t.centerX);
+  setLabelByControl("pngCustomYInput", t.centerY);
+  setLabelByControl("pngCustomWInput", t.width);
+  setLabelByControl("pngCustomHInput", t.height);
+  setLabelByControl("pngSizeModeSelect", t.sizeMode);
+  setOptionText("pngSizeModeSelect", "pixels", t.pixels);
+  setOptionText("pngSizeModeSelect", "dpi", t.dpiLabel);
+  setLabelByControl("pngDpiInput", t.dpiLabel);
+  setLabelByControl("pngWidthInput", t.widthPx);
+  setLabelByControl("pngHeightInput", t.heightPx);
+  setLabelByControl("pngScaleMulInput", t.scaleMultiplier);
+  setLabelByControl("pngMarginInput", t.marginPx);
+  setLabelByControl("pngBackgroundModeSelect", t.background);
+  setOptionText("pngBackgroundModeSelect", "white", t.white);
+  setOptionText("pngBackgroundModeSelect", "transparent", t.transparent);
+  setOptionText("pngBackgroundModeSelect", "color", t.color);
+  setLabelByControl("pngBackgroundColorInput", t.backgroundColor);
+  setLabelByControl("pngColorModeSelect", t.colorMode);
+  setOptionText("pngColorModeSelect", "normal", t.normal);
+  setOptionText("pngColorModeSelect", "layer", t.layerColorMode);
+  setOptionText("pngColorModeSelect", "group", t.groupColorMode);
+  setLabelByControl("pngIncludeGridToggle", t.includeGrid);
+  setLabelByControl("pngIncludeAxesToggle", t.includeAxes);
+  setLabelByControl("pngIncludePageFrameToggle", t.includePageFrame);
+  setLabelByControl("pngIncludeSelectionToggle", t.includeSelectionHighlight);
+  setLabelByControl("pngAntialiasToggle", t.antialias);
+  setLabelByControl("pngSrgbToggle", "sRGB");
+  setLabelByControl("pngLineScaleInput", t.lineWidthScale);
+  setLabelByControl("pngMinLinePxInput", t.minLineWidthPx);
 
   if (dom.pageOrientationSelect) {
     const oL = dom.pageOrientationSelect.querySelector("option[value='landscape']");
@@ -969,6 +1218,17 @@ export function applyLanguageUi(state, dom) {
     if (o2) o2.textContent = t.reverse;
   }
 }
+
+
+
+
+
+
+
+
+
+
+
 
 
 

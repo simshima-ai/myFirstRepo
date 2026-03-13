@@ -1,4 +1,4 @@
-export function bindKeyboardInput(state, helpers, deps) {
+﻿export function bindKeyboardInput(state, helpers, deps) {
     const {
         draw,
         setStatus,
@@ -6,6 +6,7 @@ export function bindKeyboardInput(state, helpers, deps) {
         clearSelection,
         toggleDebugConsole,
         getLineCreateMode,
+        toggleAdsVisible,
         finalizeBsplineDraft,
         commitFilletFromHover,
         isTypingTarget,
@@ -35,6 +36,11 @@ export function bindKeyboardInput(state, helpers, deps) {
     const onKeyDown = (e) => {
         if (e?.key === "F9") {
             if (typeof toggleDebugConsole === "function") toggleDebugConsole();
+            e.preventDefault();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && String(e.key).toLowerCase() === "a") {
+            if (typeof toggleAdsVisible === "function") toggleAdsVisible();
             e.preventDefault();
             return;
         }
@@ -139,7 +145,7 @@ export function bindKeyboardInput(state, helpers, deps) {
         }
         if (isEnterKey(e) && state.tool === "line" && getLineCreateMode() === "freehand") {
             const ok = finalizeBsplineDraft();
-            if (ok && setStatus) setStatus("Bスプライン作成完了");
+            if (ok && setStatus) setStatus("B-spline finished");
             if (draw) draw();
             e.preventDefault();
             return;
@@ -193,7 +199,7 @@ export function bindKeyboardInput(state, helpers, deps) {
         if (isEnterKey(e) && state.tool === "doubleline") {
             const ok = !!helpers.executeDoubleLine?.();
             if (!ok && setStatus) {
-                setStatus("二重線: 先に対象を選択してください");
+                setStatus("Double line: select source lines first");
             }
             if (draw) draw();
             e.preventDefault();
@@ -216,9 +222,16 @@ export function bindKeyboardInput(state, helpers, deps) {
             }
             if ((state.selection.ids.length === 0) && state.activeGroupId == null) {
                 if (!state.ui) state.ui = {};
+                const groupsPanelVisible = state.ui?.panelVisibility?.groupsPanel !== false;
+                if (!groupsPanelVisible) {
+                    state.ui.selectPickMode = "object";
+                    if (setStatus) setStatus("Selection mode: OBJECT");
+                    if (draw) draw();
+                    return;
+                }
                 const cur = String(state.ui.selectPickMode || "object");
                 state.ui.selectPickMode = (cur === "group") ? "object" : "group";
-                if (setStatus) setStatus(`選択モード: ${state.ui.selectPickMode === "group" ? "グループ選択" : "オブジェクト選択"}`);
+                if (setStatus) setStatus(state.ui.selectPickMode === "group" ? "Selection mode: GROUP" : "Selection mode: OBJECT");
                 if (draw) draw();
                 return;
             }
@@ -239,3 +252,5 @@ export function bindKeyboardInput(state, helpers, deps) {
     window.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("keyup", onKeyUp, true);
 }
+
+

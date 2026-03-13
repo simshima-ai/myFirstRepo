@@ -1,4 +1,4 @@
-﻿import { normalizeRad, isAngleOnArc, segmentIntersectionParamPoint, segmentCircleIntersectionPoints } from "./solvers.js";
+import { normalizeRad, isAngleOnArc, segmentIntersectionParamPoint, segmentCircleIntersectionPoints } from "./solvers.js";
 import { mmPerUnit } from "./geom.js";
 import { getGroup, isLayerVisible } from "./state.js";
 import { createDim, createLine } from "./app_tools_misc.js";
@@ -189,6 +189,75 @@ function bsplineShapeFromSample(base, points, id) {
     };
 }
 
+function normalizePolylinePoints(points) {
+    const pts = Array.isArray(points) ? points : [];
+    const out = [];
+    for (const p of pts) {
+        const x = Number(p?.x), y = Number(p?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const last = out[out.length - 1];
+        if (!last || Math.hypot(Number(last.x) - x, Number(last.y) - y) > 1e-8) out.push({ x, y });
+    }
+    return out;
+}
+
+function buildPolylineShape(base, points, id, closed = false) {
+    const pts = normalizePolylinePoints(points);
+    if (pts.length < 2) return null;
+    return {
+        ...base,
+        id: Number(id),
+        type: "polyline",
+        points: pts,
+        closed: !!closed,
+    };
+}
+
+function walkClosedPolylinePoints(pts, startIdx, endIdx, step) {
+    const n = Array.isArray(pts) ? pts.length : 0;
+    if (n < 2) return [];
+    const out = [];
+    let idx = ((Number(startIdx) % n) + n) % n;
+    const target = ((Number(endIdx) % n) + n) % n;
+    let guard = 0;
+    while (guard <= n) {
+        const p = pts[idx];
+        out.push({ x: Number(p?.x), y: Number(p?.y) });
+        if (idx === target) break;
+        idx = (idx + step + n) % n;
+        guard += 1;
+    }
+    return normalizePolylinePoints(out);
+}
+
+function buildOpenPolylineTrimPlan(poly, cand) {
+    const pts = normalizePolylinePoints(poly?.points);
+    const i1 = Number(cand?.i1), i2 = Number(cand?.i2);
+    if (!Number.isInteger(i1) || !Number.isInteger(i2) || i2 !== i1 + 1) return null;
+    const prefix = pts.slice(0, i1 + 1);
+    const suffix = pts.slice(i2);
+    if (cand.mode === "delete-line") return { primary: prefix, secondary: suffix, removed: null };
+    if (cand.mode === "p1") return { primary: [{ x: Number(cand.ip?.x), y: Number(cand.ip?.y) }, ...suffix], secondary: prefix, removed: [pts[i1], { x: Number(cand.ip?.x), y: Number(cand.ip?.y) }] };
+    if (cand.mode === "p2") return { primary: [...prefix, { x: Number(cand.ip?.x), y: Number(cand.ip?.y) }], secondary: suffix, removed: [{ x: Number(cand.ip?.x), y: Number(cand.ip?.y) }, pts[i2]] };
+    if (cand.mode === "middle") return { primary: [...prefix, { x: Number(cand.ip1?.x), y: Number(cand.ip1?.y) }], secondary: [{ x: Number(cand.ip2?.x), y: Number(cand.ip2?.y) }, ...suffix], removed: [{ x: Number(cand.ip1?.x), y: Number(cand.ip1?.y) }, { x: Number(cand.ip2?.x), y: Number(cand.ip2?.y) }] };
+    return null;
+}
+
+function buildClosedPolylineTrimPlan(poly, cand) {
+    const pts = normalizePolylinePoints(poly?.points);
+    const n = pts.length;
+    if (n < 2) return null;
+    const i1 = Number(cand?.i1), i2 = Number(cand?.i2);
+    if (!Number.isInteger(i1) || !Number.isInteger(i2)) return null;
+    const aroundFromA = walkClosedPolylinePoints(pts, i1, i2, -1);
+    const aroundFromB = walkClosedPolylinePoints(pts, i2, i1, +1);
+    if (cand.mode === "delete-line") return { primary: aroundFromA, secondary: null, removed: null };
+    if (cand.mode === "p1") return { primary: [{ x: Number(cand.ip?.x), y: Number(cand.ip?.y) }, ...aroundFromB], secondary: null, removed: [pts[i1], { x: Number(cand.ip?.x), y: Number(cand.ip?.y) }] };
+    if (cand.mode === "p2") return { primary: [{ x: Number(cand.ip?.x), y: Number(cand.ip?.y) }, ...aroundFromA], secondary: null, removed: [{ x: Number(cand.ip?.x), y: Number(cand.ip?.y) }, pts[i2]] };
+    if (cand.mode === "middle") return { primary: [{ x: Number(cand.ip1?.x), y: Number(cand.ip1?.y) }, ...aroundFromA, { x: Number(cand.ip2?.x), y: Number(cand.ip2?.y) }], secondary: null, removed: [{ x: Number(cand.ip1?.x), y: Number(cand.ip1?.y) }, { x: Number(cand.ip2?.x), y: Number(cand.ip2?.y) }] };
+    return null;
+}
+
 export function trimClickedLineAtNearestIntersection(state, worldRaw, helpers, options = null) {
     const { setStatus, pushHistory, nextShapeId, addShape, removeShapeById, clearSelection, setSelection, getTrimHoverCandidate, hitTestShapes } = helpers;
     // Note: helpers are already bound to state via closures in app.js.
@@ -269,6 +338,48 @@ export function trimClickedLineAtNearestIntersection(state, worldRaw, helpers, o
 
         if (keepIds.length) setSelection(keepIds);
         if (!silent && setStatus) setStatus(isNoDelete ? `Split ${a.type} #${a.id}` : `Trimmed ${a.type} #${a.id}`);
+        return true;
+    }
+
+    if (cand.targetType === "polyline") {
+        const poly = cand.polyline;
+        if (!poly || !Array.isArray(poly.points)) return false;
+        if (!skipHistory) pushHistory();
+        const inGroups = (state.groups || []).filter(g => (g.shapeIds || []).some(id => Number(id) === Number(poly.id)));
+        if (isNoDelete && cand.mode === "delete-line") {
+            setSelection([Number(poly.id)]);
+            if (!silent && setStatus) setStatus(`Split polyline #${poly.id}`);
+            return true;
+        }
+        const plan = poly.closed ? buildClosedPolylineTrimPlan(poly, cand) : buildOpenPolylineTrimPlan(poly, cand);
+        if (!plan) return false;
+        let primaryShape = buildPolylineShape(poly, plan.primary, poly.id, false);
+        let secondaryShape = buildPolylineShape(poly, plan.secondary, nextShapeId(), false);
+        if (!primaryShape && secondaryShape) {
+            primaryShape = { ...secondaryShape, id: Number(poly.id) };
+            secondaryShape = null;
+        }
+        const removedShape = isNoDelete ? buildPolylineShape(poly, plan.removed, nextShapeId(), false) : null;
+        const keepIds = [];
+        if (primaryShape) {
+            poly.points = primaryShape.points;
+            poly.closed = false;
+            keepIds.push(Number(poly.id));
+        } else if (!isNoDelete) {
+            removeShapeById(Number(poly.id));
+        }
+        if (secondaryShape) {
+            addShape(secondaryShape);
+            for (const g of inGroups) g.shapeIds.push(Number(secondaryShape.id));
+            keepIds.push(Number(secondaryShape.id));
+        }
+        if (removedShape) {
+            addShape(removedShape);
+            for (const g of inGroups) g.shapeIds.push(Number(removedShape.id));
+            keepIds.push(Number(removedShape.id));
+        }
+        setSelection(keepIds.filter((id, i, arr) => arr.indexOf(id) === i));
+        if (!silent && setStatus) setStatus(isNoDelete ? `Split polyline #${poly.id}` : `Trimmed polyline #${poly.id}`);
         return true;
     }
 
@@ -434,10 +545,10 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
                     line1Id: Number(hit.id),
                     pick1: { x: world.x, y: world.y }
                 };
-                if (setStatus) setStatus("角度寸法: 2本目のラインをクリック");
+                if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
                 return "p1";
             }
-            if (setStatus) setStatus("角度寸法: 1本目のラインをクリック");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "noop";
         }
         // Object mode: clicking a line/polyline segment creates a linear dimension from segment endpoints immediately.
@@ -494,11 +605,11 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
                 hoverPlace: { x: world.x, y: world.y },
                 awaitingPlacement: false
             };
-            if (setStatus) setStatus("逶ｴ蛻怜ｯｸ豕包ｼ・轤ｹ逶ｮ繧帝∈謚槭＠縺ｦ縺上□縺輔＞");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "p1";
         } else {
             state.dimDraft = { p1: { x: world.x, y: world.y }, hover: { x: world.x, y: world.y } };
-            if (setStatus) setStatus("蟇ｸ豕包ｼ・轤ｹ逶ｮ繧帝∈謚槭＠縺ｦ縺上□縺輔＞");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "p1";
         }
     }
@@ -510,7 +621,7 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
         }
         if (state.dimDraft.points.length === 1) {
             state.dimDraft.points.push({ x: world.x, y: world.y });
-            if (setStatus) setStatus("Chain dim: click more points, then press Enter to place.");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "p2";
         }
         state.dimDraft.points.push({ x: world.x, y: world.y });
@@ -520,24 +631,24 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
     if (state.dimDraft.type === "dimangle") {
         const hit = hitTestShapes(state, worldRaw);
         if (!hit || hit.type !== "line") {
-            if (setStatus) setStatus("角度寸法: 2本目のラインをクリック");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "noop";
         }
         const line1Id = Number(state.dimDraft.line1Id);
         const line2Id = Number(hit.id);
         if (line1Id === line2Id) {
-            if (setStatus) setStatus("角度寸法: 別のラインを選択してください");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "noop";
         }
         const line1 = (state.shapes || []).find(s => Number(s?.id) === line1Id && s.type === "line");
         const line2 = (state.shapes || []).find(s => Number(s?.id) === line2Id && s.type === "line");
         if (!line1 || !line2) {
-            if (setStatus) setStatus("角度寸法: ラインが見つかりません");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "noop";
         }
         const solved = solveDimAngleFromLines(state, line1, line2, state.dimDraft.pick1 || world, world);
         if (!solved) {
-            if (setStatus) setStatus("角度寸法: 平行ラインには作成できません");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return "noop";
         }
         state.dimDraft = {
@@ -567,7 +678,7 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
     if (!state.dimDraft.p2) {
         if (Math.hypot(world.x - state.dimDraft.p1.x, world.y - state.dimDraft.p1.y) < 1e-9) return "noop";
         state.dimDraft.p2 = { x: world.x, y: world.y };
-        if (setStatus) setStatus("蟇ｸ豕包ｼ夐・鄂ｮ菴咲ｽｮ繧呈欠螳壹＠縺ｦ縺上□縺輔＞");
+        if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
         return "p2";
     }
 
@@ -625,30 +736,30 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
         state.input.dimHoverPreview = null;
         if (hit && (hit.type === "circle" || hit.type === "arc")) {
             state.input.dimHoveredShapeId = Number(hit.id);
-            if (setStatus) setStatus("円/円弧をクリックして寸法を作成");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             return;
         }
 
         if (String(linearMode || "single") === "angle") {
             if (hit && hit.type === "line") {
                 state.input.dimHoveredShapeId = Number(hit.id);
-                if (setStatus) setStatus("角度寸法: 1本目/2本目のラインをクリック");
+                if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             } else {
                 state.input.dimHoveredShapeId = null;
-                if (setStatus) setStatus("角度寸法: ライン上にマウスオーバーしてクリック");
+                if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
             }
             state.input.dimHoveredSegmentIndex = null;
         } else if (hit && (hit.type === "line" || hit.type === "circle" || hit.type === "arc")) {
             state.input.dimHoveredShapeId = Number(hit.id);
             state.input.dimHoveredSegmentIndex = null;
-            if (setStatus) setStatus("寸法対象をクリック");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
         } else if (hit && hit.type === "polyline") {
             state.input.dimHoveredShapeId = Number(hit.id);
-            if (setStatus) setStatus("ポリライン辺をクリックして寸法を作成");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
         } else {
             state.input.dimHoveredShapeId = null;
             state.input.dimHoveredSegmentIndex = null;
-            if (setStatus) setStatus("寸法対象へマウスオーバーしてクリック");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
         }
         return;
     }
@@ -672,10 +783,10 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
             }
             state.input.objectSnapHover = p;
             state.input.dimHoveredShapeId = Number(hit.id);
-            if (setStatus) setStatus("角度寸法: 2本目のラインをクリック");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
         } else {
             state.input.objectSnapHover = null;
-            if (setStatus) setStatus("角度寸法: 2本目のラインをクリック");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
         }
         return;
     }
@@ -869,54 +980,39 @@ export function cancelPolylineDraft(state) {
 }
 
 export function finalizePolylineDraft(state, helpers) {
-    const { pushHistory, addShapesAsGroup, setSelection, nextShapeId } = helpers;
+    const { pushHistory, addShape, setSelection, nextShapeId } = helpers;
     const d = state.polylineDraft;
     if (!d || !Array.isArray(d.points) || d.points.length < 2) {
         state.polylineDraft = null;
         return false;
     }
-    const lines = [];
-    const createdIds = [];
-    if (pushHistory) pushHistory();
-    for (let i = 0; i < d.points.length - 1; i++) {
-        const a = d.points[i], b = d.points[i + 1];
-        if (Math.hypot(b.x - a.x, b.y - a.y) < 1e-9) continue;
-        const line = createLine(a, b);
-        line.layerId = state.activeLayerId;
-        line.id = nextShapeId();
-        line.lineWidthMm = Math.max(0.01, Number(state.lineSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
-        line.lineType = String(state.lineSettings?.lineType || "solid");
-        line.color = String(state.lineSettings?.color || "#0f172a");
-        lines.push(line);
-        createdIds.push(line.id);
+    const points = [];
+    for (const p of d.points) {
+        const x = Number(p?.x), y = Number(p?.y);
+        if (!Number.isFinite(x) || !Number.isFinite(y)) continue;
+        const last = points[points.length - 1];
+        if (!last || Math.hypot(Number(last.x) - x, Number(last.y) - y) > 1e-9) {
+            points.push({ x, y });
+        }
     }
     state.polylineDraft = null;
-    if (lines.length) {
-        if (typeof addShapesAsGroup === "function") {
-            addShapesAsGroup(lines);
-        } else {
-            // Fallback: add as one explicit group id
-            const gid = Number(state.nextGroupId) || 1;
-            state.nextGroupId = gid + 1;
-            state.groups.unshift({
-                id: gid,
-                name: state.tool === "line" ? "Line Group" : "Polyline",
-                shapeIds: createdIds.slice(),
-                parentId: null,
-                originX: 0,
-                originY: 0,
-                rotationDeg: 0,
-            });
-            for (const line of lines) {
-                line.groupId = gid;
-                state.shapes.push(line);
-            }
-        }
-        setSelection(createdIds);
-    }
-    return createdIds.length > 0;
+    if (points.length < 2) return false;
+    const polyline = {
+        type: "polyline",
+        points,
+        closed: false,
+        layerId: state.activeLayerId,
+        id: nextShapeId(),
+        lineWidthMm: Math.max(0.01, Number(state.lineSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25),
+        lineType: String(state.lineSettings?.lineType || "solid"),
+        color: String(state.lineSettings?.color || "#0f172a"),
+    };
+    if (pushHistory) pushHistory();
+    if (typeof addShape === "function") addShape(polyline);
+    else state.shapes.push(polyline);
+    setSelection([Number(polyline.id)]);
+    return true;
 }
-
 function lineInfiniteIntersection(l1, l2) {
     const x1 = Number(l1.x1), y1 = Number(l1.y1), x2 = Number(l1.x2), y2 = Number(l1.y2);
     const x3 = Number(l2.x1), y3 = Number(l2.y1), x4 = Number(l2.x2), y4 = Number(l2.y2);
@@ -995,7 +1091,7 @@ export function popDimChainPoint(state, helpers) {
         state.dimDraft.points.pop();
         if (state.dimDraft.points.length === 0) {
             state.dimDraft = null;
-            if (setStatus) setStatus("Dim chain canceled.");
+            if (setStatus) setStatus("Dimension: click second point, then place the dimension line.");
         } else {
             if (setStatus) setStatus(`Dim chain point removed (points: ${state.dimDraft.points.length})`);
         }

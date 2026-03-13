@@ -1,4 +1,4 @@
-import { isLayerVisible } from "./state.js";
+﻿import { isLayerVisible } from "./state.js";
 import { mmPerUnit, getHatchPitchWorld, getHatchLineShiftWorld, getHatchPaddingWorld, getHatchDashWorld, getHatchGapWorld } from "./geom.js";
 import { getDimGeometry, getDimChainGeometry, getDimAngleGeometry, getSpecialDimGeometry, getCircleDimGeometry } from "./dim_geom.js";
 import { buildHatchLoopsFromBoundaryIds } from "./hatch_geom.js";
@@ -520,7 +520,7 @@ export function exportSvg(state, helpers) {
             parts.push(arrowSvg({ x: cx + Math.cos(a1) * r, y: cy + Math.sin(a1) * r }, ad1, arrowSize, "#0f172a", arrowType));
             parts.push(arrowSvg({ x: cx + Math.cos(a2) * r, y: cy + Math.sin(a2) * r }, ad2, arrowSize, "#0f172a", arrowType));
             const angle = Number(g.angle) * 180 / Math.PI;
-            const label = angle.toFixed(Math.max(0, Number(s.precision ?? 1) || 0)) + "°";
+            const label = `${angle.toFixed(Math.max(0, Number(s.precision ?? 1) || 0))} deg`;
             const midA = a1 + da * 0.5;
             const tx = Number(g.tx);
             const ty = Number(g.ty);

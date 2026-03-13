@@ -1,15 +1,17 @@
-﻿export function createRenderDoubleLineOverlayOps(deps) {
+export function createRenderDoubleLineOverlayOps(deps) {
   const { worldToScreen } = deps;
 
-  function drawDoubleLinePreview(ctx, state) {
-    if (!state.dlinePreview || state.tool !== "doubleline") return;
-    if (state.dlineTrimPending) return;
+  function drawPreviewLineCollection(ctx, state, lines, color, dash, lineWidth) {
+    const arr = Array.isArray(lines) ? lines : [];
+    if (!arr.length) return;
     ctx.save();
-    ctx.strokeStyle = state.dlineTrimPending ? "#8b5cf6" : "#ef4444";
-    ctx.lineWidth = 1.0;
-    ctx.setLineDash([6, 4]);
-    for (const o of state.dlinePreview) {
-      if (o.type === "circle") {
+    ctx.strokeStyle = String(color || "#38bdf8");
+    ctx.lineWidth = Number.isFinite(Number(lineWidth)) ? Number(lineWidth) : 1.2;
+    ctx.setLineDash(Array.isArray(dash) ? dash : []);
+    for (const o of arr) {
+      if (!o) continue;
+      const t = String(o.type || "line");
+      if (t === "circle") {
         const c = worldToScreen(state.view, { x: Number(o.cx), y: Number(o.cy) });
         const rr = Math.max(0, Number(o.r) * state.view.scale);
         ctx.beginPath();
@@ -17,7 +19,7 @@
         ctx.stroke();
         continue;
       }
-      if (o.type === "arc") {
+      if (t === "arc") {
         const c = worldToScreen(state.view, { x: Number(o.cx), y: Number(o.cy) });
         const rr = Math.max(0, Number(o.r) * state.view.scale);
         const a1 = Number(o.a1) || 0;
@@ -39,6 +41,13 @@
       ctx.lineTo(p2.x, p2.y);
       ctx.stroke();
     }
+    ctx.restore();
+  }
+
+  function drawDoubleLinePreview(ctx, state) {
+    if (!state.dlinePreview || state.tool !== "doubleline") return;
+    if (state.dlineTrimPending) return;
+    drawPreviewLineCollection(ctx, state, state.dlinePreview, "#ef4444", [6, 4], 1.0);
     const dbg = Array.isArray(state?.dlineDebugMarkers) ? state.dlineDebugMarkers : [];
     if (dbg.length) {
       ctx.save();
@@ -69,7 +78,14 @@
       }
       ctx.restore();
     }
-    ctx.restore();
+  }
+
+  function drawDoubleLineConnectedPreviewDebug(ctx, state) {
+    if (state.tool !== "doubleline") return;
+    if (!state?.ui?.debugDoubleLineConnect) return;
+    const connected = Array.isArray(state?.dlineConnectedPreviewDebug) ? state.dlineConnectedPreviewDebug : [];
+    if (!connected.length) return;
+    drawPreviewLineCollection(ctx, state, connected, "#22c55e", [3, 3], 1.4);
   }
 
   function drawDoubleLineTrimCandidates(ctx, state) {
@@ -167,10 +183,9 @@
 
   return {
     drawDoubleLinePreview,
+    drawDoubleLineConnectedPreviewDebug,
     drawDoubleLineTrimCandidates,
     drawDoubleLineTrimIntersections,
     drawDoubleLineConnectDebug,
   };
 }
-
-

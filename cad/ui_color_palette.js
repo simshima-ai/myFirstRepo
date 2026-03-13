@@ -314,7 +314,7 @@
       }
     };
 
-    dom.colorPalettePopup.appendChild(mkSectionLabel((lang === "en") ? "Palette" : "基本色"));
+    dom.colorPalettePopup.appendChild(mkSectionLabel("Palette"));
     const fixedWrap = document.createElement("div");
     fixedWrap.style.display = "grid";
     fixedWrap.style.gridTemplateColumns = "repeat(6, 36px)";
@@ -323,7 +323,7 @@
     for (const c of FIXED_HUES) fixedWrap.appendChild(mkChip(c));
     dom.colorPalettePopup.appendChild(fixedWrap);
 
-    dom.colorPalettePopup.appendChild(mkSectionLabel((lang === "en") ? "Custom Palette" : "カスタムパレット"));
+    dom.colorPalettePopup.appendChild(mkSectionLabel("Custom Palette"));
     const customPaletteWrap = document.createElement("div");
     customPaletteWrap.style.display = "grid";
     customPaletteWrap.style.gridTemplateColumns = "repeat(6, 36px)";
@@ -358,7 +358,7 @@
     }
     dom.colorPalettePopup.appendChild(customPaletteWrap);
 
-    dom.colorPalettePopup.appendChild(mkSectionLabel((lang === "en") ? "Create Color" : "色を作る"));
+    dom.colorPalettePopup.appendChild(mkSectionLabel("Create Color"));
     const customWrap = document.createElement("div");
     customWrap.style.display = "grid";
     customWrap.style.gridTemplateColumns = "auto 1fr";
@@ -454,7 +454,7 @@
 
     const selectSameBtn = document.createElement("button");
     selectSameBtn.type = "button";
-    selectSameBtn.textContent = (lang === "en") ? "Select Same Color Objects" : "同じ色のオブジェクトを選択";
+    selectSameBtn.textContent = "Select Same Color Objects";
     selectSameBtn.style.minHeight = "30px";
     selectSameBtn.style.padding = "4px 10px";
     selectSameBtn.style.fontSize = "12px";
@@ -472,7 +472,7 @@
     cmdRow.style.gridTemplateColumns = "1fr 1fr";
     const applyBtn = document.createElement("button");
     applyBtn.type = "button";
-    applyBtn.textContent = (lang === "en") ? "Apply" : "適用";
+    applyBtn.textContent = "Apply";
     applyBtn.style.minHeight = "30px";
     applyBtn.style.padding = "4px 10px";
     applyBtn.style.fontSize = "12px";
@@ -484,7 +484,7 @@
     });
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
-    cancelBtn.textContent = (lang === "en") ? "Cancel" : "キャンセル";
+    cancelBtn.textContent = "Cancel";
     cancelBtn.style.minHeight = "30px";
     cancelBtn.style.padding = "4px 10px";
     cancelBtn.style.fontSize = "12px";

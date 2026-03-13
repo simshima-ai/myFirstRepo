@@ -1,3 +1,5 @@
+import { ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
+
 export function setupLayoutAndTopContext(state, tool, helpers) {
   const {
     getUiLanguage,
@@ -10,6 +12,10 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   const menuScalePct = normalizeMenuScalePreset(state.ui?.menuScalePct ?? 100);
   if (!state.ui) state.ui = {};
   state.ui.menuScalePct = menuScalePct;
+  if (!state.ui.adZones || typeof state.ui.adZones !== "object") {
+    state.ui.adZones = { topRight: true, bottomLeft: true, bottomCenter: true };
+  }
+  ensurePanelVisibilityState(state);
   const menuScale = menuScalePct / 100;
   document.documentElement.style.setProperty("--menu-scale", String(menuScale));
   const scaleRoots = [
@@ -20,9 +26,30 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     if (!el) continue;
     el.style.zoom = String(menuScale);
   }
+
   const sidebarEl = document.querySelector(".sidebar");
+  if (sidebarEl) {
+    sidebarEl.style.display = isPanelVisible(state, "sidebar") ? "" : "none";
+  }
+  const sidebarPanels = [
+    [".left-aux-stack .section[data-panel-id='snap']", "snapPanel"],
+    ["#attrPanel", "attrPanel"],
+    [".sidebar .section[data-panel-id='tools']", "createToolsPanel"],
+    [".sidebar .section[data-panel-id='editTools']", "editToolsPanel"],
+    [".sidebar .section[data-panel-id='fileTools']", "fileToolsPanel"],
+  ];
+  for (const [selector, key] of sidebarPanels) {
+    const el = document.querySelector(selector);
+    if (!el) continue;
+    el.style.display = isPanelVisible(state, key) ? "" : "none";
+  }
   const updateSidebarScaleAndScroll = () => {
     if (!sidebarEl) return;
+    if (!isPanelVisible(state, "sidebar")) {
+      sidebarEl.style.overflowY = "hidden";
+      sidebarEl.scrollTop = 0;
+      return;
+    }
     sidebarEl.style.zoom = "1";
     const baseWidthPx = (() => {
       const saved = Number(sidebarEl.dataset.baseWidthPx);
@@ -47,7 +74,6 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     }
     const viewH = Number(sidebarRect.height || sidebarEl.clientHeight || 0);
     const needScroll = (contentH - viewH) > 6;
-    // Keep sidebar content width stable regardless of scrollbar visibility.
     sidebarEl.style.overflowY = "auto";
     sidebarEl.style.scrollbarGutter = "stable";
     if (!needScroll) sidebarEl.scrollTop = 0;
@@ -55,17 +81,149 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   updateSidebarScaleAndScroll();
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(updateSidebarScaleAndScroll);
 
+  const vp = getViewportSizeForUi();
+  const lang = getUiLanguage(state);
+  const rootStyle = document.documentElement.style;
+  const rightAdEl = document.getElementById("rightAdSlot");
+  const leftBottomAdEl = document.getElementById("leftBottomAdSlot");
+  const bottomCenterAdEl = document.getElementById("bottomCenterAdSlot");
+  const rightPanelsVisible = isPanelVisible(state, "rightPanels");
   const rightStackEl = document.querySelector(".right-stack");
+  if (rightStackEl) {
+    rightStackEl.style.display = rightPanelsVisible ? "flex" : "none";
+  }
+  const groupsSectionEl = document.querySelector(".right-stack .section[data-panel-id='groups']");
+  if (groupsSectionEl) groupsSectionEl.style.display = isPanelVisible(state, "groupsPanel") ? "flex" : "none";
+  const layersSectionEl = document.querySelector(".right-stack .section[data-panel-id='layers']");
+  if (layersSectionEl) layersSectionEl.style.display = isPanelVisible(state, "layersPanel") ? "flex" : "none";
+  const setZoneLabel = (el, text) => {
+    const label = el?.querySelector?.(".ad-zone-label");
+    if (label) label.innerHTML = text;
+  };
+  setZoneLabel(rightAdEl, "Ad Space<br>Top Right");
+  setZoneLabel(leftBottomAdEl, "Ad Space<br>Bottom Left");
+  const setBottomCenterCards = (el, count) => {
+    if (!el) return;
+    const n = Math.max(1, Math.min(3, Math.round(Number(count) || 1)));
+    const labels = [];
+    for (let i = 0; i < n; i++) {
+      labels.push(lang === "en"
+        ? `<div class="ad-zone-card">Ad Space<br>Bottom Center ${i + 1}</div>`
+        : `<div class="ad-zone-card">Ad Space<br>Bottom Center ${i + 1}</div>`);
+    }
+    el.innerHTML = labels.join("");
+  };
+
+  const mode = (() => {
+    if (vp.width >= 1720 && vp.height >= 920) return "xlarge";
+    if (vp.width >= 1420 && vp.height >= 820) return "large";
+    if (vp.width >= 1100 && vp.height >= 700) return "medium";
+    return "small";
+  })();
+  const presets = {
+    small: {
+      topRight: { w: 220, h: 124 },
+      bottomLeft: null,
+      bottomCenter: null,
+    },
+    medium: {
+      topRight: { w: 280, h: 156 },
+      bottomLeft: null,
+      bottomCenter: null,
+    },
+    large: {
+      topRight: { w: 340, h: 200 },
+      bottomLeft: { w: 340, h: 200 },
+      bottomCenter: { w: 980, h: 108 },
+    },
+    xlarge: {
+      topRight: { w: 400, h: 236 },
+      bottomLeft: { w: 400, h: 236 },
+      bottomCenter: { w: 1320, h: 124 },
+    },
+  };
+  const preset = presets[mode] || presets.medium;
+  const adGapPx = 8;
+  const bottomGapPx = 12;
+  const fitBox = (box, maxW, maxH) => {
+    if (!box) return null;
+    const w = Math.max(160, Math.min(Number(box.w) || 160, Math.max(160, Math.floor(maxW))));
+    const h = Math.max(84, Math.min(Number(box.h) || 84, Math.max(84, Math.floor(maxH))));
+    return { w, h };
+  };
+  const topRightBox = fitBox(preset.topRight, Math.max(170, vp.width - 230), Math.max(100, vp.height - 40));
+  const bottomLeftBox = fitBox(preset.bottomLeft, Math.max(170, vp.width * 0.28), Math.max(100, vp.height * 0.32));
+  const estimatedRightPanelW = Math.max(180, Math.round(Number(state.ui?.panelLayout?.rightPanelWidth) || 250));
+  if (rightStackEl && rightPanelsVisible) {
+    const presetRightW = Number(state.ui?.panelLayout?.rightPanelWidth);
+    if (Number.isFinite(presetRightW) && presetRightW > 0) {
+      rightStackEl.style.width = `min(${presetRightW}px, calc(100% - 230px))`;
+    } else {
+      rightStackEl.style.removeProperty("width");
+    }
+  }
+  const leftBottomReservedX = bottomLeftBox ? (10 + Number(bottomLeftBox.w) + 12) : 10;
+  const actualRightPanelLeft = (rightPanelsVisible && rightStackEl)
+    ? Math.floor(rightStackEl.getBoundingClientRect().left || (vp.width - 10 - estimatedRightPanelW))
+    : Math.floor(vp.width - 10);
+  const rightPanelReservedX = Math.max(10, actualRightPanelLeft - 6);
+  const fullBottomMaxW = Math.max(260, Math.floor(rightPanelReservedX - leftBottomReservedX));
+  const bottomCenterBox = fitBox(preset.bottomCenter, fullBottomMaxW, Math.max(90, vp.height * 0.2));
+  const bottomCenterCount = bottomCenterBox
+    ? Math.max(1, Math.min(4, Math.floor((Number(bottomCenterBox.w) + 8) / 260)))
+    : 0;
+
+  const visible = {
+    topRight: !!topRightBox && state.ui.adZones.topRight !== false,
+    bottomLeft: !!bottomLeftBox && state.ui.adZones.bottomLeft !== false,
+    bottomCenter: !!bottomCenterBox && state.ui.adZones.bottomCenter !== false,
+  };
+  if (mode === "small" || mode === "medium") {
+    visible.bottomLeft = false;
+    visible.bottomCenter = false;
+  }
+
+  const applyZone = (el, box, on) => {
+    if (!el) return { w: 0, h: 0 };
+    if (!on || !box) {
+      el.classList.remove("is-visible");
+      el.style.width = "0px";
+      el.style.height = "0px";
+      return { w: 0, h: 0 };
+    }
+    el.classList.add("is-visible");
+    el.style.width = `${Math.round(box.w)}px`;
+    el.style.height = `${Math.round(box.h)}px`;
+    return { w: Math.round(box.w), h: Math.round(box.h) };
+  };
+
+  const rightApplied = applyZone(rightAdEl, topRightBox, visible.topRight);
+  const leftApplied = applyZone(leftBottomAdEl, bottomLeftBox, visible.bottomLeft);
+  setBottomCenterCards(bottomCenterAdEl, bottomCenterCount);
+  const bottomApplied = applyZone(bottomCenterAdEl, bottomCenterBox, visible.bottomCenter);
+  rootStyle.setProperty("--ad-slot-w", `${rightApplied.w}px`);
+  rootStyle.setProperty("--ad-slot-h", `${rightApplied.h}px`);
+  rootStyle.setProperty("--ad-slot-gap", visible.topRight ? `${adGapPx}px` : "0px");
+  rootStyle.setProperty("--bottom-ad-gap", `${bottomGapPx}px`);
+  rootStyle.setProperty("--bottom-ad-safe-h", visible.bottomCenter ? `${bottomApplied.h + bottomGapPx}px` : "0px");
+  rootStyle.setProperty("--left-bottom-ad-safe-h", visible.bottomLeft ? `${leftApplied.h + 10}px` : "0px");
+
+  if (leftBottomAdEl) {
+    leftBottomAdEl.style.bottom = "0px";
+  }
+  if (bottomCenterAdEl) {
+    bottomCenterAdEl.style.bottom = "10px";
+    bottomCenterAdEl.style.left = `${Math.round(leftBottomReservedX)}px`;
+    bottomCenterAdEl.style.transform = "none";
+  }
+
   const getMaxGroupPanelHeight = (groupsSectionEl) => {
     const stackEl = rightStackEl || groupsSectionEl?.closest?.(".right-stack");
-    const vp = getViewportSizeForUi();
     if (!stackEl || !groupsSectionEl) return Math.max(120, Math.floor(vp.height - 20));
     const stackRect = stackEl.getBoundingClientRect();
     const availableTotal = Math.max(
       120,
-      Math.floor(
-        (Number(stackRect.height) > 0 ? Number(stackRect.height) : Number(vp.height) - 20)
-      )
+      Math.floor((Number(stackRect.height) > 0 ? Number(stackRect.height) : Number(vp.height) - 20))
     );
     const gap = Math.max(0, parseFloat(window.getComputedStyle(stackEl).gap || "0") || 0);
     const sections = Array.from(stackEl.querySelectorAll(":scope > [data-panel-id]"))
@@ -105,18 +263,22 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     const gapsTotal = Math.max(0, (sections.length - 1) * gap);
     return Math.max(120, Math.floor(availableTotal - othersTotal - gapsTotal));
   };
-  if (rightStackEl) {
-    rightStackEl.style.removeProperty("top");
+  if (rightStackEl && rightPanelsVisible) {
     const w = Number(state.ui?.panelLayout?.rightPanelWidth);
     if (Number.isFinite(w) && w > 0) {
       rightStackEl.style.width = `min(${w}px, calc(100% - 230px))`;
     } else {
       rightStackEl.style.removeProperty("width");
     }
+    const appliedRightPanelW = Math.max(180, Math.round(rightStackEl.getBoundingClientRect().width || w || 250));
+    rootStyle.setProperty("--right-panel-w", `${appliedRightPanelW}px`);
+  } else {
+    rootStyle.setProperty("--right-panel-w", rightPanelsVisible ? "250px" : "0px");
   }
 
   const topContext = document.getElementById("topContext");
   const topContextHelp = document.getElementById("topContextHelp");
+  const isEasySelect = String(state.ui?.displayMode || "cad").toLowerCase() === "easy" && tool === "select";
   if (topContext) {
     const activeCtx = resolveTopActiveContext(state, tool);
     let visibleCount = 0;
@@ -126,24 +288,48 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
       el.style.display = on ? "flex" : "none";
       if (on) visibleCount++;
     }
-    const lang = getUiLanguage(state);
     const helpText = getTopContextHelpText(state, tool, lang);
     if (topContextHelp) {
       topContextHelp.textContent = helpText;
-      topContextHelp.style.display = (visibleCount > 0 && helpText) ? "flex" : "none";
+      const topContextVisible = isPanelVisible(state, "topContext") || !!state.ui?.importAdjust?.active;
+      topContextHelp.style.display = (topContextVisible && visibleCount > 0 && helpText) ? "flex" : "none";
     }
-    topContext.style.display = visibleCount > 0 ? "grid" : "none";
+    const topContextVisible = isPanelVisible(state, "topContext") || !!state.ui?.importAdjust?.active;
+    topContext.style.display = (topContextVisible && visibleCount > 0) ? "grid" : "none";
 
     const selectedCount = (state.selection?.ids || []).length;
-    if (selectedCount > 0 || state.activeGroupId != null) {
+    if (!isEasySelect && (selectedCount > 0 || state.activeGroupId != null)) {
       if (topContextHelp) {
         const baseTxt = getTopContextHelpText(state, tool, lang);
-        topContextHelp.textContent = (baseTxt ? baseTxt + " | " : "") + (lang === "en" ? "Space: Clear selection" : "Space: 選択解除");
-        topContextHelp.style.display = "flex";
+        topContextHelp.textContent = (baseTxt ? `${baseTxt} | ` : "") + "Space: Clear selection";
+        topContextHelp.style.display = topContextVisible ? "flex" : "none";
       }
-      topContext.style.display = "grid";
+      topContext.style.display = topContextVisible ? "grid" : "none";
     }
+  }
+
+  const topOverlayEl = document.querySelector(".overlay");
+  if (topOverlayEl) topOverlayEl.style.display = isPanelVisible(state, "topOverlay") ? "flex" : "none";
+  const statusOverlayEl = document.querySelector(".bottom-left-overlay");
+  if (statusOverlayEl) statusOverlayEl.style.display = isPanelVisible(state, "statusOverlay") ? "flex" : "none";
+  const scaleOverlayEl = document.querySelector(".bottom-scale-overlay");
+  if (scaleOverlayEl) scaleOverlayEl.style.display = isPanelVisible(state, "scaleOverlay") ? "flex" : "none";
+  const debugConsoleEl = document.getElementById("debugConsolePanel");
+  if (debugConsoleEl) {
+    debugConsoleEl.style.display = (isPanelVisible(state, "debugConsole") && state.ui?.debugDoubleLineConnect) ? "flex" : "none";
   }
 
   return { getMaxGroupPanelHeight };
 }
+
+
+
+
+
+
+
+
+
+
+
+

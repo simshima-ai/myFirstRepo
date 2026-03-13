@@ -1,4 +1,4 @@
-export function clampGridAutoTiming(v) {
+﻿export function clampGridAutoTiming(v) {
   return Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 }
 
@@ -54,11 +54,11 @@ export function gridAutoTimingFromThreshold50(th50) {
 
 export function gridAutoTimingLabelText(timing) {
   const t = clampGridAutoTiming(timing);
-  if (t <= 20) return "かなり早い";
-  if (t <= 40) return "やや早い";
-  if (t <= 60) return "標準";
-  if (t <= 80) return "やや遅い";
-  return "かなり遅い";
+  if (t <= 20) return "Very Fast";
+  if (t <= 40) return "Fast";
+  if (t <= 60) return "Normal";
+  if (t <= 80) return "Slow";
+  return "Very Slow";
 }
 
 export function normalizeGridPreset(v) {

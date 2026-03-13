@@ -1,4 +1,4 @@
-import { pushHistory, setSelection } from "./state.js";
+﻿import { pushHistory, setSelection } from "./state.js";
 import { solveLineLineFillet, solveLineCircleFillet, solveArcArcFillet, chooseTrimSideForIntersectionByT, chooseEndsForLineByKeepEnd, segmentCircleIntersectionPoints, isAngleOnArc } from "./solvers.js";
 import { getSelectedShapes, getTrimHoverCandidate } from "./app_selection.js";
 export function splitLineForFillet(line, p) {
@@ -17,6 +17,35 @@ export function splitLineForFillet(line, p) {
     if (distA < 1e-4) return [mk(p.x, p.y, bx, by)];
     if (distB < 1e-4) return [mk(ax, ay, p.x, p.y)];
     return [mk(ax, ay, p.x, p.y), mk(p.x, p.y, bx, by)];
+}
+
+function applyLineLikeFilletTrim(source, tangentPoint, keepEnd) {
+    if (!source || !tangentPoint) return false;
+    const tx = Number(tangentPoint.x), ty = Number(tangentPoint.y);
+    if (![tx, ty].every(Number.isFinite)) return false;
+    if (source.kind === "line") {
+        const line = source.shape;
+        if (!line || String(line.type || "") !== "line") return false;
+        const e = source.keepEnd || keepEnd;
+        if (e === "p1") {
+            line.x2 = tx; line.y2 = ty;
+        } else {
+            line.x1 = tx; line.y1 = ty;
+        }
+        return Math.hypot(Number(line.x2) - Number(line.x1), Number(line.y2) - Number(line.y1)) > 1e-6;
+    }
+    if (source.kind === "polyline") {
+        const poly = source.shape;
+        const pts = Array.isArray(poly?.points) ? poly.points : null;
+        if (!pts || pts.length < 2) return false;
+        const idx = (source.keepEnd || keepEnd) === "p1" ? Number(source.i2) : Number(source.i1);
+        if (!Number.isInteger(idx) || idx < 0 || idx >= pts.length) return false;
+        pts[idx] = { x: tx, y: ty };
+        const a = pts[Number(source.i1)];
+        const b = pts[Number(source.i2) % pts.length];
+        return Math.hypot(Number(b?.x) - Number(a?.x), Number(b?.y) - Number(a?.y)) > 1e-6;
+    }
+    return false;
 }
 
 function applyFilletSourceStyle(state, targetArc, sources) {
@@ -42,7 +71,7 @@ function applyFilletSourceStyle(state, targetArc, sources) {
 
 export function tryCreateLineLineFillet(state, helpers, radiusInput, worldHint = null) {
     const { setStatus, draw, addShape, nextShapeId } = helpers;
-    // addShape and nextShapeId from helpers are already bound to state 窶・call without state arg
+    // addShape and nextShapeId from helpers are already bound to state.
     const sel = getSelectedShapes(state).filter(s => s.type === "line");
     if (sel.length !== 2) return false;
     const line1 = state.shapes.find(s => Number(s.id) === Number(sel[0].id));
@@ -746,23 +775,35 @@ export function applyFillet(state, helpers, radius, worldHint = null) {
     return trimateFillet(state, helpers, radius, worldHint);
 }
 
+function restoreLineLikeShape(source, snapshotJson) {
+    if (!source || !snapshotJson) return false;
+    try {
+        const snap = JSON.parse(String(snapshotJson));
+        Object.assign(source.shape, snap);
+        return true;
+    } catch (_) {
+        return false;
+    }
+}
+
 export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
     const { setStatus, draw, addShape, nextShapeId } = helpers;
     const ff = state.input.filletFlow;
     if (!ff || !ff.sol) return;
     const sol = ff.sol;
-    const lineRef = state.shapes.find(s => Number(s.id) === Number(ff.line?.id));
+    const lineSource = ff.lineSource || null;
+    const lineShape = lineSource?.shape || state.shapes.find(s => Number(s.id) === Number(ff.line?.id));
     const circleRef = state.shapes.find(s => Number(s.id) === Number(ff.circle?.id));
-    if (!lineRef || !circleRef) {
+    if (!lineShape || !circleRef || !lineSource?.line) {
         if (setStatus) setStatus("Fillet failed: target object was not found");
         state.input.filletFlow = null;
         if (draw) draw();
         return;
     }
+    const lineRef = lineSource.line;
     const mode = state.filletSettings.lineMode || "trim";
     const doTrim = (mode === "trim");
     let trimWarning = false;
-    // Create fillet arc first (split-only state), then attempt trim.
     pushHistory(state);
     const arcSpan = (() => {
         const a1 = Number(sol.arc?.a1);
@@ -783,8 +824,7 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
     applyFilletSourceStyle(state, arc, [lineRef, circleRef]);
     addShape(arc);
     if (doTrim) {
-        // Keep sources unchanged when auto-trim cannot be resolved robustly.
-        const lineSnap = { x1: Number(lineRef.x1), y1: Number(lineRef.y1), x2: Number(lineRef.x2), y2: Number(lineRef.y2) };
+        const lineSnap = JSON.stringify(lineShape);
         const arcSnap = (circleRef.type === "arc")
             ? { a1: Number(circleRef.a1), a2: Number(circleRef.a2), ccw: circleRef.ccw !== false }
             : null;
@@ -794,20 +834,7 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
             : clickTowardPoint;
         const plan = computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, keepEnd, arc.id, trimTowardPoint);
         let okAll = !!plan?.okLine;
-        const lineCand = plan?.lineCandidate || null;
-        if (!lineCand) {
-            okAll = false;
-        } else {
-            if (lineCand.mode === "p1") {
-                lineRef.x1 = Number(lineCand.ip?.x);
-                lineRef.y1 = Number(lineCand.ip?.y);
-            } else {
-                lineRef.x2 = Number(lineCand.ip?.x);
-                lineRef.y2 = Number(lineCand.ip?.y);
-            }
-            const ll = Math.hypot(Number(lineRef.x2) - Number(lineRef.x1), Number(lineRef.y2) - Number(lineRef.y1));
-            if (!(ll > 1e-6)) okAll = false;
-        }
+        if (!applyLineLikeFilletTrim(lineSource, sol.tLine, keepEnd)) okAll = false;
         if (okAll && circleRef.type === "arc") {
             const B = { x: Number(sol?.tCircle?.x), y: Number(sol?.tCircle?.y) };
             const th = Math.atan2(Number(B.y) - Number(circleRef.cy), Number(B.x) - Number(circleRef.cx));
@@ -835,8 +862,7 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
             }
         }
         if (!okAll) {
-            lineRef.x1 = lineSnap.x1; lineRef.y1 = lineSnap.y1;
-            lineRef.x2 = lineSnap.x2; lineRef.y2 = lineSnap.y2;
+            restoreLineLikeShape(lineSource, lineSnap);
             if (arcSnap) {
                 circleRef.a1 = arcSnap.a1;
                 circleRef.a2 = arcSnap.a2;
@@ -849,7 +875,6 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
     if (setStatus) setStatus(trimWarning ? "Fillet created (trim skipped: source geometry kept)" : "Fillet created");
     if (draw) draw();
 }
-
 export function applyPendingArcArcFillet(state, helpers, keep1, keep2) {
     const { setStatus, draw, addShape, nextShapeId } = helpers;
     const ff = state.input.filletFlow;

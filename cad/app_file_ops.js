@@ -1328,9 +1328,11 @@ export function createFileOpsRuntime(config) {
       const files = extractFiles(e.dataTransfer);
       if (!files.length) return;
       try {
-        // DnD is additive by default to avoid accidental overwrite.
-        for (const file of files) {
-          await importAnyFile(file, "import");
+        const isViewerMode = String(state.ui?.displayMode || "cad").toLowerCase() === "viewer";
+        for (let i = 0; i < files.length; i++) {
+          const file = files[i];
+          const importMode = isViewerMode ? (i === 0 ? "replace" : "import") : "import";
+          await importAnyFile(file, importMode);
         }
         if (!state.ui) state.ui = {};
         state.ui._needsTangentResolve = true;

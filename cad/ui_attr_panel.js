@@ -1,4 +1,4 @@
-export function refreshAttrPanel(state, dom, selectedShapes) {
+﻿export function refreshAttrPanel(state, dom, selectedShapes) {
   if (!dom?.attrPanel) return;
   const selectedWithAttrs = (selectedShapes || []).find(s => {
     const explicit = Array.isArray(s?.attributes) && s.attributes.length > 0;
@@ -98,7 +98,7 @@ export function refreshAttrPanel(state, dom, selectedShapes) {
       }
       const delBtn = document.createElement("button");
       delBtn.type = "button";
-      delBtn.textContent = "削除";
+      delBtn.textContent = "Delete";
       if (!a?._implicit) delBtn.setAttribute("data-attr-remove", String(a?.id ?? ""));
       else delBtn.disabled = true;
       row.append(nameIn, valIn, delBtn);

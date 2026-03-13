@@ -258,6 +258,15 @@ export function bindInitTailEvents(params) {
       actions.setTouchMode?.(!!dom.touchModeToggle.checked);
     });
   }
+  const bindAdToggle = (el, zoneKey) => {
+    if (!el) return;
+    el.addEventListener("change", () => {
+      actions.setAdZoneEnabled?.(zoneKey, !!el.checked);
+    });
+  };
+  bindAdToggle(dom.topRightAdZoneToggle, "topRight");
+  bindAdToggle(dom.bottomLeftAdZoneToggle, "bottomLeft");
+  bindAdToggle(dom.bottomCenterAdZoneToggle, "bottomCenter");
   if (dom.pngExportCloseBtn) {
     dom.pngExportCloseBtn.addEventListener("click", () => actions.closePngExportDialog?.());
   }
@@ -413,4 +422,5 @@ export function bindInitTailEvents(params) {
     });
   }
 }
+
 

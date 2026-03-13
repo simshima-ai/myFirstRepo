@@ -1940,7 +1940,7 @@ export function executeDoubleLine(state, previewOverride = null, options = null)
         originX: Number(origin.x),
         originY: Number(origin.y),
         rotationDeg: 0,
-        parentId: state.activeGroupId,
+        parentId: null,
         layerId: state.activeLayerId,
     });
 

@@ -1,4 +1,4 @@
-import { addGroup, nextGroupId, getGroup, nextShapeId, pushHistory, setSelection } from "./state.js";
+﻿import { addGroup, nextGroupId, getGroup, nextShapeId, pushHistory, setSelection } from "./state.js";
 import { getSelectedShapes, ensureUngroupedShapesHaveGroups } from "./app_selection.js";
 import { isHatchBoundaryShape, validateHatchBoundaryEndpoints } from "./hatch_geom.js";
 export function executeHatch(state, helpers) {
@@ -244,9 +244,9 @@ export function saveJsonAsToFile(state, helpers) {
     const ts = new Date();
     const pad = (n) => String(n).padStart(2, "0");
     const fallback = `s-cad_${ts.getFullYear()}${pad(ts.getMonth() + 1)}${pad(ts.getDate())}_${pad(ts.getHours())}${pad(ts.getMinutes())}${pad(ts.getSeconds())}.json`;
-    let name = window.prompt("保存ファイル名", fallback);
+    let name = window.prompt("Save file name", fallback);
     if (name == null) {
-        if (setStatus) setStatus("別名保存をキャンセルしました");
+        if (setStatus) setStatus("Save As canceled");
         if (draw) draw();
         return;
     }
@@ -367,7 +367,7 @@ export function importJsonObjectAppend(state, data, helpers) {
     state.selection.ids = importedShapes.map((s) => Number(s.id));
     state.selection.groupIds = importedGroups.map((g) => Number(g.id));
     state.activeGroupId = state.selection.groupIds.length ? Number(state.selection.groupIds[state.selection.groupIds.length - 1]) : state.activeGroupId;
-    if (setStatus) setStatus(`インポート完了: ${importedShapes.length} 個のオブジェクト`);
+    if (setStatus) setStatus(`Import complete: ${importedShapes.length} object(s)`);
     if (draw) draw();
     return true;
 }

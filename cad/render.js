@@ -268,7 +268,7 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
   if (shape.type === "hatch") {
     drawHatchFill(ctx, state, shape);
     if (selectedVisual) {
-      // ハッチE��択時にバウンチE��ングボックスを描画
+      // ハッチE��択時にバウンチE��ングボックスを描画
       const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, shape.boundaryIds || [], state.view.scale);
       if (parsed.ok && parsed.bounds) {
         const b = parsed.bounds;
@@ -602,6 +602,10 @@ function drawDoubleLinePreview(ctx, state) {
   return doubleLineOverlayOps.drawDoubleLinePreview(ctx, state);
 }
 
+function drawDoubleLineConnectedPreviewDebug(ctx, state) {
+  return doubleLineOverlayOps.drawDoubleLineConnectedPreviewDebug(ctx, state);
+}
+
 function drawDoubleLineTrimCandidates(ctx, state) {
   return doubleLineOverlayOps.drawDoubleLineTrimCandidates(ctx, state);
 }
@@ -707,6 +711,7 @@ export function render(ctx, canvas, state) {
   }
   drawPreview(ctx, state, state.preview);
   drawDoubleLinePreview(ctx, state);
+  drawDoubleLineConnectedPreviewDebug(ctx, state);
   drawDoubleLineTrimCandidates(ctx, state);
   drawDoubleLineTrimIntersections(ctx, state);
   drawDoubleLineConnectDebug(ctx, state);

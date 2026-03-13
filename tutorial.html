@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チュートリアル | S-CAD</title>
+<meta name="description" content="S-CADの基本的な使い方を動画と解説でわかりやすく説明します。">
+<link rel="stylesheet" href="./site.css">
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="./index.html"><span>S-</span>CAD</a>
+  <ul class="nav-links">
+    <li><a href="./pricing.html">料金</a></li>
+    <li><a href="./tutorial.html" class="active">チュートリアル</a></li>
+    <li><a href="./about.html">About</a></li>
+    <li><a href="./contact.html">Contact</a></li>
+  </ul>
+  <a href="./cad.html" class="nav-cta">アプリを開く</a>
+</nav>
+
+<main>
+  <div class="page-hero">
+    <h1>チュートリアル</h1>
+    <p class="sub">S-CADの基本操作を動画と解説で学べます</p>
+  </div>
+
+  <div class="content">
+
+    <!-- はじめに -->
+    <div class="section">
+      <h2>はじめに</h2>
+      <p>
+        S-CADはブラウザだけで動作する2D CADツールです。インストール不要で、どのデバイスからでもすぐに図面を作成できます。
+        基本的な操作はシンプルで、マウスとキーボードショートカットを組み合わせることで効率的に作業できます。
+      </p>
+      <p>
+        このページでは、S-CADを初めて使う方に向けて、基本的な操作から図面の保存・出力まで順を追って説明します。
+        各セクションの動画を参考にしながら、実際にアプリを開いて操作してみてください。
+      </p>
+    </div>
+
+    <!-- 動画セクション 1 -->
+    <div class="section">
+      <h2>1. 画面構成と基本操作</h2>
+      <p>
+        S-CADを開くと、中央にキャンバス、左側にツールパネルが表示されます。
+        ズームはマウスホイール、パン（画面移動）はミドルクリックドラッグまたは Space + ドラッグで行います。
+      </p>
+
+      <div class="video-block">
+        <h3>動画：画面構成の説明</h3>
+        <p>キャンバス・ツールパネル・メニューバーの位置と役割を解説します。</p>
+        <div class="video-wrap">
+          <!-- TODO: YouTube動画URLを差し替えてください -->
+          <!-- <iframe src="https://www.youtube.com/embed/VIDEO_ID_1" allowfullscreen></iframe> -->
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px;">動画準備中</div>
+        </div>
+      </div>
+
+      <h3>主なキーボードショートカット</h3>
+      <table class="keytable">
+        <thead>
+          <tr><th>キー</th><th>操作</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Space + ドラッグ</td><td>画面のパン（移動）</td></tr>
+          <tr><td>ホイール</td><td>ズームイン / ズームアウト</td></tr>
+          <tr><td>Ctrl + Z</td><td>元に戻す</td></tr>
+          <tr><td>Ctrl + Y</td><td>やり直す</td></tr>
+          <tr><td>Delete / Backspace</td><td>選択中の要素を削除</td></tr>
+          <tr><td>Escape</td><td>操作をキャンセル</td></tr>
+          <tr><td>Ctrl + A</td><td>すべて選択</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 動画セクション 2 -->
+    <div class="section">
+      <h2>2. 図形の描画</h2>
+      <p>
+        ツールパネルから描きたい図形のツールを選び、キャンバス上でクリック・ドラッグして描画します。
+        線・円・矩形・ポリラインなど、基本的な図形をすべて作成できます。
+      </p>
+
+      <div class="video-block">
+        <h3>動画：線・円・矩形の描き方</h3>
+        <p>各描画ツールの基本的な使い方をデモンストレーションします。</p>
+        <div class="video-wrap">
+          <!-- TODO: YouTube動画URLを差し替えてください -->
+          <!-- <iframe src="https://www.youtube.com/embed/VIDEO_ID_2" allowfullscreen></iframe> -->
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px;">動画準備中</div>
+        </div>
+      </div>
+
+      <h3>描画ツール一覧</h3>
+      <table class="keytable">
+        <thead>
+          <tr><th>ツール</th><th>説明</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>L（Line）</td><td>2点間に直線を引く</td></tr>
+          <tr><td>C（Circle）</td><td>中心点と半径で円を描く</td></tr>
+          <tr><td>R（Rect）</td><td>矩形（四角形）を描く</td></tr>
+          <tr><td>P（Polyline）</td><td>連続した折れ線を描く</td></tr>
+          <tr><td>A（Arc）</td><td>円弧を描く</td></tr>
+          <tr><td>T（Text）</td><td>テキストを配置する</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 動画セクション 3 -->
+    <div class="section">
+      <h2>3. 編集・選択操作</h2>
+      <p>
+        作成した図形はクリックで選択し、ドラッグで移動できます。
+        複数選択はShiftクリックまたは範囲ドラッグで行います。
+        プロパティパネルから寸法・色・線種などを変更できます。
+      </p>
+
+      <div class="video-block">
+        <h3>動画：選択・移動・プロパティ変更</h3>
+        <p>図形の選択方法と各種プロパティの変更方法を解説します。</p>
+        <div class="video-wrap">
+          <!-- TODO: YouTube動画URLを差し替えてください -->
+          <!-- <iframe src="https://www.youtube.com/embed/VIDEO_ID_3" allowfullscreen></iframe> -->
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px;">動画準備中</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 動画セクション 4 -->
+    <div class="section">
+      <h2>4. 保存とエクスポート</h2>
+      <p>
+        作成した図面はブラウザ内に自動保存されます。
+        また、DXF形式・SVG形式でエクスポートして他のCADソフトや画像編集ソフトと連携できます。
+      </p>
+
+      <div class="video-block">
+        <h3>動画：ファイルの保存とエクスポート</h3>
+        <p>DXF・SVGへの出力手順を解説します。</p>
+        <div class="video-wrap">
+          <!-- TODO: YouTube動画URLを差し替えてください -->
+          <!-- <iframe src="https://www.youtube.com/embed/VIDEO_ID_4" allowfullscreen></iframe> -->
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#555;font-size:13px;">動画準備中</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 次のステップ -->
+    <div class="section">
+      <h2>次のステップ</h2>
+      <p>基本操作を習得したら、実際にアプリを開いて試してみましょう。</p>
+      <p style="margin-top:24px;">
+        <a href="./cad.html" class="nav-cta" style="display:inline-block;padding:12px 28px;">アプリを開く</a>
+      </p>
+      <p style="margin-top:20px;">
+        ご不明な点は<a href="./contact.html">お問い合わせ</a>からお気軽にご連絡ください。
+      </p>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="footer-copy">&copy; 2026 S-CAD</span>
+  <nav class="footer-links">
+    <a href="./privacy.html">プライバシーポリシー</a>
+    <a href="./contact.html">お問い合わせ</a>
+    <a href="./about.html">About</a>
+  </nav>
+</footer>
+
+</body>
+</html>

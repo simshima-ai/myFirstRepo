@@ -1,4 +1,4 @@
-export function refreshToolPanels(state, dom, panelLang, helpers) {
+﻿export function refreshToolPanels(state, dom, panelLang, helpers) {
   const {
     getUiLanguage,
     normalizeGridPreset,
@@ -41,7 +41,7 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
       const t10 = Math.max(100, Math.min(2000, Math.round(Number(state.grid.autoThreshold10 ?? 180))));
       const t5 = Math.max(100, Math.min(2000, Math.round(Number(state.grid.autoThreshold5 ?? 240))));
       const t1 = Math.max(100, Math.min(2000, Math.round(Number(state.grid.autoThreshold1 ?? 320))));
-      dom.gridAutoTimingHint.textContent = `入閾値: 50=${t50}% / 10=${t10}% / 5=${t5}% / 1=${t1}%`;
+      dom.gridAutoTimingHint.textContent = `Thresholds: 50=${t50}% / 10=${t10}% / 5=${t5}% / 1=${t1}%`;
     }
   }
   if (dom.objSnapToggle) dom.objSnapToggle.checked = state.objectSnap?.enabled !== false;
@@ -58,8 +58,8 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
       const show = !touchMode && state.tool === "line" && (mode === "continuous" || mode === "freehand");
       dom.lineTouchFinalizeBtn.style.display = show ? "" : "none";
       dom.lineTouchFinalizeBtn.textContent = mode === "freehand"
-        ? (panelLang === "en" ? "Finalize B-Spline" : "Bスプライン確定")
-        : (panelLang === "en" ? "Finish Continuous Line" : "連続線を確定");
+        ? "Finalize B-Spline"
+        : "Finish Continuous Line";
     }
   }
   if (dom.objSnapTangentToggle) dom.objSnapTangentToggle.checked = !!state.objectSnap?.tangent;
@@ -128,19 +128,19 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
       const nearCount = Number(v.nearMissPairs?.length || 0);
       const loopOk = (v.loopOk !== false);
       if (!loopOk) {
-        const err = String(v.loopError || (lang === "ja" ? "境界ループを構築できません" : "Boundary loop build failed"));
+        const err = String(v.loopError || "Boundary loop build failed");
         dom.hatchValidateResult.textContent = (lang === "ja")
-          ? `端点一致: NG (${err})`
+          ? `Endpoint check: NG (${err})`
           : `Endpoint match: NG (${err})`;
         dom.hatchValidateResult.style.color = "#b91c1c";
       } else if (openCount === 0) {
         dom.hatchValidateResult.textContent = (lang === "ja")
-          ? "端点一致: 問題ありません"
+          ? "Endpoint check: OK"
           : "Endpoint match: OK";
         dom.hatchValidateResult.style.color = "#15803d";
       } else {
         dom.hatchValidateResult.textContent = (lang === "ja")
-          ? `端点一致: 未接続 ${openCount} / 近接 ${nearCount}`
+          ? `Endpoint check: open ${openCount} / near ${nearCount}`
           : `Endpoint match: open ${openCount} / near ${nearCount}`;
         dom.hatchValidateResult.style.color = "#b91c1c";
       }
@@ -162,23 +162,23 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
   if (dom.patternCopyCenterStatus) {
     const cid = state.input.patternCopyFlow.centerPositionId;
     dom.patternCopyCenterStatus.textContent = cid
-      ? (panelLang === "en" ? `Set: Point #${cid}` : `設定済み: 点 #${cid}`)
-      : (panelLang === "en" ? "Not set (pick a point on canvas)" : "未設定 (キャンバスの点を選択)");
+      ? `Set: Point #${cid}`
+      : "Not set (pick a point on canvas)";
     if (dom.patternCopySetCenterBtn) {
       dom.patternCopySetCenterBtn.textContent = cid
-        ? (panelLang === "en" ? "Clear Center" : "中心解除")
-        : (panelLang === "en" ? "Set as Center" : "中心として設定");
+        ? "Clear Center"
+        : "Set as Center";
     }
   }
   if (dom.patternCopyAxisStatus) {
     const aid = state.input.patternCopyFlow.axisLineId;
     dom.patternCopyAxisStatus.textContent = aid
-      ? (panelLang === "en" ? `Set: Line #${aid}` : `設定済み: 線 #${aid}`)
-      : (panelLang === "en" ? "Not set (pick a line on canvas)" : "未設定 (キャンバスの線を選択)");
+      ? `Set: Line #${aid}`
+      : "Not set (pick a line on canvas)";
     if (dom.patternCopySetAxisBtn) {
       dom.patternCopySetAxisBtn.textContent = aid
-        ? (panelLang === "en" ? "Clear Axis" : "軸設定を解除")
-        : (panelLang === "en" ? "Set as Axis" : "軸として設定");
+        ? "Clear Axis"
+        : "Set as Axis";
     }
   }
 
@@ -230,11 +230,11 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
       }
       dom.traceTargetInfo.textContent = (panelLang === "en")
         ? `Target: image #${Number(selectedImage.id)} (${count} lines)`
-        : `対象: 画像 #${Number(selectedImage.id)} (${count} 本)`;
+        : `Target: Image #${Number(selectedImage.id)} (${count})`;
     } else {
       dom.traceTargetInfo.textContent = (panelLang === "en")
         ? "Select an imported image object"
-        : "インポート済み画像を選択してください";
+        : "Select an imported image";
     }
   }
   const setIfNotEditing = (el, v) => {

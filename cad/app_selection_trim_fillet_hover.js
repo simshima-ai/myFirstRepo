@@ -253,11 +253,85 @@ export function createTrimFilletHoverOps(config) {
     };
   }
 
+  function getTrimHoverCandidateForPolyline(state, worldRaw, poly) {
+    if (!poly || String(poly.type || "") !== "polyline" || !Array.isArray(poly.points)) return null;
+    const pts = poly.points;
+    if (pts.length < 2) return null;
+    let best = null;
+    const wx = Number(worldRaw?.x), wy = Number(worldRaw?.y);
+    if (!Number.isFinite(wx) || !Number.isFinite(wy)) return null;
+    const segCount = Math.max(0, pts.length - 1) + (poly.closed ? 1 : 0);
+    for (let si = 0; si < segCount; si++) {
+      const i1 = si;
+      const i2 = (si + 1) % pts.length;
+      const a1 = { x: Number(pts[i1]?.x), y: Number(pts[i1]?.y) };
+      const a2 = { x: Number(pts[i2]?.x), y: Number(pts[i2]?.y) };
+      if (![a1.x, a1.y, a2.x, a2.y].every(Number.isFinite)) continue;
+      const q = nearestPointOnSegment(worldRaw, a1, a2);
+      if (!q) continue;
+      const d2 = (wx - Number(q.x)) ** 2 + (wy - Number(q.y)) ** 2;
+      if (!best || d2 < best.d2) best = { segIndex: si, i1, i2, a1, a2, q, d2 };
+    }
+    if (!best) return null;
+
+    const intersections = [];
+    for (const s of state.shapes) {
+      if (!s || Number(s.id) === Number(poly.id)) continue;
+      if (!isLayerVisible(state, s.layerId)) continue;
+      for (const ip of collectLineSegmentIntersectionsWithShape(best.a1, best.a2, s)) intersections.push(ip);
+    }
+    const cuts = intersections.map(ip => Number(ip?.t)).filter(t => Number.isFinite(t) && t > 1e-7 && t < 1 - 1e-7).sort((a, b) => a - b);
+    const dedupCuts = [];
+    for (const t of cuts) {
+      if (!dedupCuts.length || Math.abs(Number(dedupCuts[dedupCuts.length - 1]) - Number(t)) > 1e-7) dedupCuts.push(t);
+    }
+    const breaks = [0, ...dedupCuts, 1];
+    const tClick = Math.max(0, Math.min(1, Number(best.q.t) || 0));
+    let k = -1;
+    for (let i = 0; i < breaks.length - 1; i++) {
+      if (tClick >= Number(breaks[i]) - 1e-7 && tClick <= Number(breaks[i + 1]) + 1e-7) {
+        k = i;
+        break;
+      }
+    }
+    if (k < 0) return null;
+
+    const t0 = Number(breaks[k]);
+    const t1 = Number(breaks[k + 1]);
+    if (t1 - t0 < 1e-5) return null;
+    const p0 = { x: best.a1.x + (best.a2.x - best.a1.x) * t0, y: best.a1.y + (best.a2.y - best.a1.y) * t0 };
+    const p1 = { x: best.a1.x + (best.a2.x - best.a1.x) * t1, y: best.a1.y + (best.a2.y - best.a1.y) * t1 };
+    let mode = "middle";
+    if (t0 <= 1e-7 && t1 >= 1 - 1e-7) mode = "delete-line";
+    else if (t0 <= 1e-7) mode = "p1";
+    else if (t1 >= 1 - 1e-7) mode = "p2";
+    return {
+      targetType: "polyline",
+      polyline: poly,
+      line: { x1: best.a1.x, y1: best.a1.y, x2: best.a2.x, y2: best.a2.y, layerId: poly.layerId },
+      segIndex: best.segIndex,
+      i1: best.i1,
+      i2: best.i2,
+      mode,
+      t0,
+      t1,
+      x1: p0.x,
+      y1: p0.y,
+      x2: p1.x,
+      y2: p1.y,
+      ip1: { x: p0.x, y: p0.y, t: t0 },
+      ip2: { x: p1.x, y: p1.y, t: t1 },
+      ip: (mode === "p1") ? { x: p1.x, y: p1.y, t: t1 } : { x: p0.x, y: p0.y, t: t0 },
+      trimEnd: (mode === "p1") ? "p1" : "p2"
+    };
+  }
+
   function getTrimHoverCandidate(state, worldRaw, dom, options = null) {
     const hit = hitTestShapes(state, worldRaw, dom);
     if (!hit) return null;
     if (hit.type === "circle") return getTrimHoverCandidateForCircle(state, worldRaw, hit);
     if (hit.type === "arc") return getTrimHoverCandidateForArc(state, worldRaw, hit);
+    if (hit.type === "polyline") return getTrimHoverCandidateForPolyline(state, worldRaw, hit);
     if (hit.type === "bspline") return getTrimHoverCandidateForBspline(state, worldRaw, hit, options);
     if (hit.type !== "line") return null;
 
@@ -489,32 +563,131 @@ export function createTrimFilletHoverOps(config) {
     return { line, mode: "delete-line" };
   }
 
+  function getFilletLineLikeRef(shape, worldRaw) {
+    if (!shape) return null;
+    const t = String(shape.type || "").toLowerCase();
+    if (t === "line") return { kind: "line", shape, line: shape };
+    if (t !== "polyline" || !Array.isArray(shape.points)) return null;
+    const pts = shape.points;
+    if (pts.length < 2) return null;
+    let best = null;
+    for (let si = 0; si < pts.length - 1 + (shape.closed ? 1 : 0); si++) {
+      const i1 = si;
+      const i2 = (si + 1) % pts.length;
+      const a = { x: Number(pts[i1]?.x), y: Number(pts[i1]?.y) };
+      const b = { x: Number(pts[i2]?.x), y: Number(pts[i2]?.y) };
+      if (![a.x, a.y, b.x, b.y].every(Number.isFinite)) continue;
+      const q = nearestPointOnSegment(worldRaw, a, b);
+      if (!q) continue;
+      const d2 = (Number(worldRaw?.x) - Number(q.x)) ** 2 + (Number(worldRaw?.y) - Number(q.y)) ** 2;
+      if (!best || d2 < best.d2) {
+        best = {
+          kind: "polyline",
+          shape,
+          i1,
+          i2,
+          segIndex: si,
+          line: {
+            id: Number(shape.id),
+            type: "line",
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            layerId: shape.layerId,
+            lineWidthMm: shape.lineWidthMm,
+            lineType: shape.lineType,
+            color: shape.color,
+          },
+          d2,
+        };
+      }
+    }
+    return best;
+  }
+
+  function materializeFilletTarget(state, ref, worldRaw) {
+    if (!ref || !Number.isFinite(Number(ref.shapeId))) return null;
+    const shape = (state.shapes || []).find((s) => Number(s?.id) === Number(ref.shapeId));
+    if (!shape) return null;
+    const t = String(ref.type || shape.type || "").toLowerCase();
+    if (t === "line") return { type: "line", shape, lineLike: { kind: "line", shape, line: shape } };
+    if (t === "polyline") {
+      const pts = Array.isArray(shape.points) ? shape.points : [];
+      const i1 = Number(ref.i1), i2 = Number(ref.i2);
+      if (!(Number.isInteger(i1) && Number.isInteger(i2)) || i1 < 0 || i2 < 0 || i1 >= pts.length || i2 >= pts.length) {
+        const fallback = getFilletLineLikeRef(shape, worldRaw);
+        return fallback ? { type: "polyline", shape, lineLike: fallback } : null;
+      }
+      const a = { x: Number(pts[i1]?.x), y: Number(pts[i1]?.y) };
+      const b = { x: Number(pts[i2]?.x), y: Number(pts[i2]?.y) };
+      if (![a.x, a.y, b.x, b.y].every(Number.isFinite)) return null;
+      return {
+        type: "polyline",
+        shape,
+        lineLike: {
+          kind: "polyline",
+          shape,
+          i1,
+          i2,
+          segIndex: Number(ref.segIndex),
+          line: {
+            id: Number(shape.id),
+            type: "line",
+            x1: a.x,
+            y1: a.y,
+            x2: b.x,
+            y2: b.y,
+            layerId: shape.layerId,
+            lineWidthMm: shape.lineWidthMm,
+            lineType: shape.lineType,
+            color: shape.color,
+          },
+        },
+      };
+    }
+    if (t === "circle" || t === "arc") return { type: t, shape };
+    return null;
+  }
+
   function getFilletHoverCandidate(state, worldRaw) {
     if (state.tool !== "fillet") return null;
     const r = Number(state.filletSettings?.radius) || 20;
-    const sel = getSelectedShapes(state);
-    if (sel.length !== 2) return null;
-    const t1 = sel[0].type, t2 = sel[1].type;
-    if (t1 === "line" && t2 === "line") {
-      const sol = solveLineLineFillet(sel[0], sel[1], r, worldRaw);
+    const targetRefs = Array.isArray(state.input?.filletTargets) ? state.input.filletTargets.filter(Boolean) : [];
+    const picked = targetRefs.length === 2
+      ? targetRefs.map((ref) => materializeFilletTarget(state, ref, worldRaw)).filter(Boolean)
+      : [];
+    const targets = picked.length === 2
+      ? picked
+      : getSelectedShapes(state)
+          .map((shape) => materializeFilletTarget(state, { shapeId: Number(shape.id), type: String(shape.type || "") }, worldRaw))
+          .filter(Boolean);
+    if (targets.length !== 2) return null;
+    const a = targets[0], b = targets[1];
+    const t1 = String(a.type || a.shape?.type || "").toLowerCase();
+    const t2 = String(b.type || b.shape?.type || "").toLowerCase();
+    const f1 = a.lineLike || null;
+    const f2 = b.lineLike || null;
+    if (f1 && f2) {
+      const sol = solveLineLineFillet(f1.line, f2.line, r, worldRaw);
       if (!sol.ok) return null;
-      return { mode: "line-line", arc: sol.arc, points: [sol.t1, sol.t2], sol };
+      return { mode: "line-line", arc: sol.arc, points: [sol.t1, sol.t2], sol, sources: [f1, f2] };
     }
-    if ((t1 === "line" && (t2 === "circle" || t2 === "arc")) || ((t1 === "circle" || t1 === "arc") && t2 === "line")) {
-      const line = (t1 === "line") ? sel[0] : sel[1];
-      const circ = (t1 !== "line") ? sel[0] : sel[1];
+    if ((f1 && (t2 === "circle" || t2 === "arc")) || ((t1 === "circle" || t1 === "arc") && f2)) {
+      const lineSource = f1 ? f1 : f2;
+      const line = lineSource.line;
+      const circ = f1 ? b.shape : a.shape;
       const sol = solveLineCircleFillet(line, circ, r, worldRaw);
       if (!sol.ok) return null;
-      return { mode: "line-circle", arc: sol.arc, points: [sol.tLine, sol.tCircle], sol };
+      return { mode: "line-circle", arc: sol.arc, points: [sol.tLine, sol.tCircle], sol, lineSource };
     }
     if (t1 === "arc" && t2 === "arc") {
-      const sol = solveArcArcFillet(sel[0], sel[1], r, worldRaw);
+      const sol = solveArcArcFillet(a.shape, b.shape, r, worldRaw);
       if (!sol.ok) return null;
       return { mode: "arc-arc", arc: sol.arc, points: [sol.t1, sol.t2], sol };
     }
     return null;
   }
-
   return {
     getTrimHoverCandidate,
     getTrimHoverCandidateForArc,

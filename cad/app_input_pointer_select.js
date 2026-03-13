@@ -1,4 +1,4 @@
-export function handlePointerDownSelectMode(state, dom, helpers, deps, ctx) {
+﻿export function handlePointerDownSelectMode(state, dom, helpers, deps, ctx) {
     const {
         e,
         screen,
@@ -38,7 +38,7 @@ export function handlePointerDownSelectMode(state, dom, helpers, deps, ctx) {
                 const base = isAppendSelect(e) ? (state.selection?.ids || []).map(Number) : [];
                 setSelection(Array.from(new Set([...base, ...chain])));
                 state.activeGroupId = null;
-                if (setStatus) setStatus("オブジェクトをダブルクリックで連続選択");
+                if (setStatus) setStatus("Connected objects selected");
                 if (draw) draw();
                 e.preventDefault();
                 return true;

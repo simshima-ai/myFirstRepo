@@ -4,6 +4,8 @@ export function refreshStatusBar(state, dom) {
   const zoomScale = Math.max(0, Number(state.view?.scale) || 0);
   const fps = Number(state.ui?.perfStats?.fps || 0);
   const objects = Array.isArray(state.shapes) ? state.shapes.length : 0;
+  const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
+  const lang = String(state.ui?.language || "en").toLowerCase();
   const baseGrid = Math.max(1e-9, Number(state.grid?.size) || 100);
   let effGrid = baseGrid;
   if (state.grid?.auto) {
@@ -48,7 +50,11 @@ export function refreshStatusBar(state, dom) {
   const unit = String(state.pageSetup?.unit || "mm").toLowerCase();
   const unitLabel = (unit === "in") ? "inch" : unit;
   const gridModelText = Number.isFinite(effGrid) ? Number(effGrid.toFixed(3)).toString() : "-";
-  dom.statusText.textContent = `${toolText} | FPS: ${fps.toFixed(1)} | Objects: ${objects} | Zoom: ${(zoomScale * 100).toFixed(0)}% | 1 grid = ${gridModelText} ${unitLabel}`;
+  if (displayMode === "viewer" && objects === 0) {
+    dom.statusText.textContent = "Viewer mode | Drop a DXF or SVG file here";
+  } else {
+    dom.statusText.textContent = `${toolText} | FPS: ${fps.toFixed(1)} | Objects: ${objects} | Zoom: ${(zoomScale * 100).toFixed(0)}% | 1 grid = ${gridModelText} ${unitLabel}`;
+  }
 
   if (dom.gridScaleIndicator && dom.gridScaleBar && dom.gridScaleText) {
     const unit = String(state.pageSetup?.unit || "mm").toLowerCase();

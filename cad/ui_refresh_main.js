@@ -1,4 +1,4 @@
-﻿import { TOOL_SHORTCUT_TOOL_ORDER, sanitizeToolShortcuts } from "./state.js";
+import { TOOL_SHORTCUT_TOOL_ORDER, sanitizeToolShortcuts } from "./state.js";
 import { refreshAttrPanel } from "./ui_attr_panel.js";
 import { resolveTopActiveContext } from "./ui_context_panels.js";
 import { getTopContextHelpText } from "./ui_context_help.js";
@@ -28,6 +28,17 @@ export function refreshUiMain(state, dom) {
   dom.buildBadge.textContent = `Build ${state.buildVersion}`;
   dom.statusText.textContent = state.ui.statusText || "";
   applyLanguageUi(state, dom);
+  const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
+  const modeButtons = [
+    [dom.cadHomeModeViewer, "viewer"],
+    [dom.cadHomeModeEasy, "easy"],
+    [dom.cadHomeModeCad, "cad"],
+  ];
+  for (const [btn, mode] of modeButtons) {
+    if (!btn) continue;
+    btn.classList.toggle("is-active", displayMode === mode);
+    btn.style.display = (displayMode === mode) ? "none" : "";
+  }
   for (const node of Array.from(document.querySelectorAll(".sidebar [data-menu-item-key]"))) {
     const key = String(node.getAttribute("data-menu-item-key") || "");
     if (!key) continue;
@@ -66,17 +77,17 @@ export function refreshUiMain(state, dom) {
       moveOrigin: "Move Origin",
     }
     : {
-      hiddenSuffix: " (非表示)",
-      setAsCurrentLayerTitle: "ダブルクリックで現在レイヤーに設定",
-      toggleLayerModeTitle: "ON / OFF / LOCK を切替",
-      moveObjectsToLayer: "オブジェクトを移動",
-      noObjects: "オブジェクトなし",
-      active: "アクティブ",
-      clickToSelect: "クリックで選択",
-      ungrouped: "未グループ",
-      clickToSelectObject: "クリックでオブジェクト選択",
-      movingOrigin: "原点を移動中...",
-      moveOrigin: "原点を移動",
+      hiddenSuffix: " (hidden)",
+      setAsCurrentLayerTitle: "Double-click to set as current layer",
+      toggleLayerModeTitle: "Toggle ON / OFF / LOCK",
+      moveObjectsToLayer: "Move Objects",
+      noObjects: "No objects",
+      active: "Active",
+      clickToSelect: "Click to select",
+      ungrouped: "Ungrouped",
+      clickToSelectObject: "Click to select object",
+      movingOrigin: "Moving origin...",
+      moveOrigin: "Move Origin",
     };
   const tool = String(state.tool || "");
   const { getMaxGroupPanelHeight } = setupLayoutAndTopContext(state, tool, {
@@ -153,3 +164,4 @@ export function refreshUiMain(state, dom) {
     normalizeLineTypePreset,
   });
 }
+

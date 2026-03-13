@@ -1,4 +1,4 @@
-export function bindInputTailEvents(state, dom, helpers, deps) {
+﻿export function bindInputTailEvents(state, dom, helpers, deps) {
     const {
         touch,
         draw,
@@ -28,7 +28,7 @@ export function bindInputTailEvents(state, dom, helpers, deps) {
         }
         if (state.tool === "line" && getLineCreateMode() === "freehand") {
             const ok = finalizeBsplineDraft();
-            if (ok && setStatus) setStatus("Bスプライン作成完了");
+            if (ok && setStatus) setStatus("B-spline finished");
             if (draw) draw();
         }
         if (state.tool === "dim") {
@@ -67,7 +67,7 @@ export function bindInputTailEvents(state, dom, helpers, deps) {
         } else {
             state.hatchDraft.boundaryIds = chain;
         }
-        if (setStatus) setStatus("境界をダブルクリックで連続選択");
+        if (setStatus) setStatus("Boundary chain selected");
         if (draw) draw();
         e.preventDefault();
     });
@@ -86,7 +86,7 @@ export function bindInputTailEvents(state, dom, helpers, deps) {
         const base = e.shiftKey ? (state.selection?.ids || []).map(Number).filter(Number.isFinite) : [];
         setSelection(Array.from(new Set([...base, ...chain])));
         state.activeGroupId = null;
-        if (setStatus) setStatus("連続オブジェクトを選択");
+        if (setStatus) setStatus("Connected objects selected");
         if (draw) draw();
         e.preventDefault();
     });

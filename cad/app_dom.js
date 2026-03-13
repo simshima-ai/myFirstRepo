@@ -1,6 +1,12 @@
 ﻿export function createDomRefs() {
   return {
   canvas: document.getElementById("cadCanvas"),
+  cadHomeLink: document.getElementById("cadHomeLink"),
+  cadHomeMenu: document.getElementById("cadHomeMenu"),
+  cadHomeMenuWebtop: document.getElementById("cadHomeMenuWebtop"),
+  cadHomeModeViewer: document.getElementById("cadHomeModeViewer"),
+  cadHomeModeEasy: document.getElementById("cadHomeModeEasy"),
+  cadHomeModeCad: document.getElementById("cadHomeModeCad"),
   toolButtons: document.getElementById("toolButtons"),
   editToolButtons: document.getElementById("editToolButtons"),
   fileToolButtons: document.getElementById("fileToolButtons"),
@@ -259,6 +265,10 @@
   uiLanguageSelect: document.getElementById("uiLanguageSelect"),
   menuScaleSelect: document.getElementById("menuScaleSelect"),
   touchModeToggle: document.getElementById("touchModeToggle"),
+  adSettingsLabel: document.getElementById("adSettingsLabel"),
+  topRightAdZoneToggle: document.getElementById("topRightAdZoneToggle"),
+  bottomLeftAdZoneToggle: document.getElementById("bottomLeftAdZoneToggle"),
+  bottomCenterAdZoneToggle: document.getElementById("bottomCenterAdZoneToggle"),
   leftMenuVisibilityList: document.getElementById("leftMenuVisibilityList"),
   shortcutSettingsLabel: document.getElementById("shortcutSettingsLabel"),
   shortcutSettingsHint: document.getElementById("shortcutSettingsHint"),
@@ -316,5 +326,11 @@
   debugConsoleCopyBtn: document.getElementById("debugConsoleCopyBtn"),
   debugConsoleClearBtn: document.getElementById("debugConsoleClearBtn"),
   colorPalettePopup: document.getElementById("colorPalettePopup"),
+  rightAdSlot: document.getElementById("rightAdSlot"),
+  leftBottomAdSlot: document.getElementById("leftBottomAdSlot"),
+  bottomCenterAdSlot: document.getElementById("bottomCenterAdSlot"),
   };
 }
+
+
+

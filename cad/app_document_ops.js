@@ -1,4 +1,4 @@
-export function createDocumentOps(config) {
+﻿export function createDocumentOps(config) {
   const {
     state,
     dom,
@@ -22,10 +22,7 @@ export function createDocumentOps(config) {
   }
 
   function newFile() {
-    const lang = String(state.ui?.language || "ja").toLowerCase();
-    const msg = (lang === "en")
-      ? "Create a new file? Unsaved changes will be lost."
-      : "新規作成しますか？未保存の変更は失われます。";
+    const msg = "Create a new file? Unsaved changes will be lost.";
     if (typeof window !== "undefined" && typeof window.confirm === "function") {
       if (!window.confirm(msg)) return;
     }
@@ -69,7 +66,7 @@ export function createDocumentOps(config) {
     state.history.past = [];
     state.history.future = [];
     setTool(state, "select");
-    setStatus(lang === "en" ? "New file created" : "新規作成しました");
+    setStatus("New file created");
     draw();
   }
 

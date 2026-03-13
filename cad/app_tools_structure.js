@@ -127,6 +127,7 @@ export function lineToPolyline(state, helpers) {
     // 2) line -> polyline (only original targeted lines)
     const lineShapes = targetLines.filter((s) => Number.isFinite(Number(s?.id)));
     if (lineShapes.length > 0) {
+        const targetLineIds = new Set(lineShapes.map((s) => Number(s.id)).filter(Number.isFinite));
         const edges = [];
         const nodeMap = new Map();
         const addNodeEdge = (k, edgeIdx) => {
@@ -234,8 +235,7 @@ export function lineToPolyline(state, helpers) {
             }
 
             if (builtChains.length > 0) {
-                const sourceIds = new Set(edges.map((e) => Number(e.shape.id)).filter(Number.isFinite));
-                for (const id of sourceIds) helpers.removeShapeById?.(id);
+                for (const id of targetLineIds) helpers.removeShapeById?.(id);
                 for (const chain of builtChains) {
                     if (!chain.length) continue;
                     const firstItem = chain[0];
@@ -301,7 +301,7 @@ export function lineToPolyline(state, helpers) {
     }
 
     if (createdIds.length > 0) setSelection(state, createdIds);
-    helpers.setStatus?.(`線<>多角形: polyline→line ${polylineToLineCount}, line→polyline ${lineToPolylineCount}`);
+    helpers.setStatus?.(`Line<>Polyline: polyline->line ${polylineToLineCount}, line->polyline ${lineToPolylineCount}`);
     helpers.draw?.();
 }
 

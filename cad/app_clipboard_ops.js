@@ -1,4 +1,4 @@
-export function createClipboardOps(config) {
+﻿export function createClipboardOps(config) {
   const {
     state,
     pushHistory,
@@ -30,7 +30,7 @@ export function createClipboardOps(config) {
     const res = duplicateShapesByIds(state, nextShapeId, (state.selection?.ids || []), dx, dy);
     setSelection(state, res.newShapeIds || []);
     state.activeGroupId = null;
-    setStatus(`コピー: ${(res.newShapeIds || []).length} 個`);
+    setStatus(`Copied: ${(res.newShapeIds || []).length} object(s)`);
     draw();
   }
 
@@ -40,21 +40,21 @@ export function createClipboardOps(config) {
     if (!state.ui) state.ui = {};
     if (selectedGroupIds.length > 0) {
       state.ui.clipboard = { kind: "groups", groupIds: selectedGroupIds.slice(), copiedAt: Date.now() };
-      setStatus(`コピー: グループ ${selectedGroupIds.length} 個`);
+      setStatus(`Copied: ${selectedGroupIds.length} group(s)`);
       return;
     }
     if (selectedShapeIds.length > 0) {
       state.ui.clipboard = { kind: "shapes", shapeIds: selectedShapeIds.slice(), copiedAt: Date.now() };
-      setStatus(`コピー: オブジェクト ${selectedShapeIds.length} 個`);
+      setStatus(`Copied: ${selectedShapeIds.length} object(s)`);
       return;
     }
-    setStatus("コピー対象がありません");
+    setStatus("Nothing selected to copy");
   }
 
   function pasteClipboard() {
     const clip = state.ui?.clipboard;
     if (!clip || !clip.kind) {
-      setStatus("貼り付け対象がありません");
+      setStatus("Clipboard is empty");
       return;
     }
     const dx = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
@@ -69,9 +69,9 @@ export function createClipboardOps(config) {
         state.activeGroupId = state.selection.groupIds.length
           ? Number(state.selection.groupIds[state.selection.groupIds.length - 1])
           : null;
-        setStatus(`貼り付け: グループ ${state.selection.groupIds.length} 個`);
+        setStatus(`Pasted: ${state.selection.groupIds.length} group(s)`);
       } else {
-        setStatus("貼り付け対象がありません");
+        setStatus("Clipboard is empty");
       }
       draw();
       return;
@@ -81,9 +81,9 @@ export function createClipboardOps(config) {
       if (res.newShapeIds.length) {
         setSelection(state, res.newShapeIds);
         state.activeGroupId = null;
-        setStatus(`貼り付け: オブジェクト ${res.newShapeIds.length} 個`);
+        setStatus(`Pasted: ${res.newShapeIds.length} object(s)`);
       } else {
-        setStatus("貼り付け対象がありません");
+        setStatus("Clipboard is empty");
       }
     }
     draw();

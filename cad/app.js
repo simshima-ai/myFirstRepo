@@ -209,6 +209,43 @@ function setStatus(text) {
   appendDebugConsole(`status: ${text}`, "info");
 }
 
+function getDisplayModeFromUrl() {
+  try {
+    const params = new URLSearchParams(window.location?.search || "");
+    const raw = String(params.get("mode") || "").toLowerCase();
+    return (raw === "viewer" || raw === "easy" || raw === "cad") ? raw : "";
+  } catch (_) {
+    return "";
+  }
+}
+
+function getAutoBackupStartupPromptMessage() {
+  try {
+    if (typeof localStorage === "undefined") return "";
+    const raw = localStorage.getItem(AUTO_BACKUP_KEY);
+    if (!raw) return "";
+    const payload = JSON.parse(raw);
+    const data = payload?.data;
+    if (!data || data.format !== "s-cad") return "";
+    const savedAt = Number(payload?.savedAt);
+    if (Number.isFinite(savedAt)) {
+      const dt = new Date(savedAt);
+      const yyyy = String(dt.getFullYear());
+      const mm = String(dt.getMonth() + 1).padStart(2, "0");
+      const dd = String(dt.getDate()).padStart(2, "0");
+      const hh = String(dt.getHours()).padStart(2, "0");
+      const mi = String(dt.getMinutes()).padStart(2, "0");
+      const ss = String(dt.getSeconds()).padStart(2, "0");
+      return `An auto backup was found (${yyyy}-${mm}-${dd} ${hh}:${mi}:${ss}).
+Do you want to restore it?`;
+    }
+    return "An auto backup was found. Do you want to restore it?";
+  } catch (_) {
+    return "";
+  }
+}
+
+
 function initDebugConsole() {
   if (dom.debugConsoleClearBtn) {
     dom.debugConsoleClearBtn.addEventListener("click", () => {
@@ -1154,14 +1191,22 @@ if (!loadedAppSettings) {
   state.ui.language = detectInitialUiLanguage();
   saveAppSettingsNow();
 }
-applyDisplayModePreset(state, normalizeDisplayMode(state.ui?.displayMode || "cad"));
+const urlDisplayMode = getDisplayModeFromUrl();
+applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode || state.ui?.displayMode || "cad"));
 initUi(state, dom, helpers);
 
 // setupInputListeners
 setupInputListeners(state, dom, helpers);
 
 ensureUngroupedShapesHaveGroups(state);
-const restoredFromAutoBackup = restoreAutoBackupAtStartup();
+const autoBackupPrompt = (urlDisplayMode === "viewer") ? "" : getAutoBackupStartupPromptMessage();
+const shouldRestoreAutoBackup = !!autoBackupPrompt && (
+  typeof window === "undefined"
+  || typeof window.confirm !== "function"
+  || window.confirm(autoBackupPrompt)
+);
+const restoredFromAutoBackup = shouldRestoreAutoBackup ? restoreAutoBackupAtStartup() : false;
+if (urlDisplayMode) applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode));
 resizeCanvas();
 if (!restoredFromAutoBackup) resetView();
 if (!state.ui) state.ui = {};

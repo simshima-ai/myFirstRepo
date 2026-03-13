@@ -1,4 +1,4 @@
-export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText, helpers) {
+﻿export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText, helpers) {
   const { syncInputValue, normalizeLineWidthPreset, normalizeLineTypePreset } = helpers;
   if (dom.deleteGroupBtn) dom.deleteGroupBtn.disabled = (state.activeGroupId == null);
   if (dom.unparentGroupBtn) {
@@ -32,7 +32,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
   }
   const activeGroup = (state.groups || []).find((g) => Number(g.id) === Number(state.activeGroupId)) || null;
   if (dom.groupRotationLabel) {
-    dom.groupRotationLabel.textContent = (panelLang === "en") ? "Rotation" : "回転角";
+    dom.groupRotationLabel.textContent = "Rotation";
   }
   if (dom.groupRotationValue) {
     if (!activeGroup) {
@@ -40,7 +40,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     } else {
       const deg = Number(activeGroup.rotationDeg) || 0;
       const rounded = Math.round(deg * 100) / 100;
-      dom.groupRotationValue.textContent = `${rounded.toFixed(2)}°`;
+      dom.groupRotationValue.textContent = `${rounded.toFixed(2)} deg`;
     }
   }
   if (dom.groupScaleEnableToggle) {
@@ -78,27 +78,27 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     dom.groupAimPickBtn.disabled = (state.activeGroupId == null);
     dom.groupAimPickBtn.classList.toggle("is-active", aimPickActive);
     dom.groupAimPickBtn.textContent = aimPickActive
-      ? ((panelLang === "en") ? "Confirm" : "決定")
-      : ((panelLang === "en") ? "Pick Target" : "注視先を指定");
+      ? "Confirm"
+      : "Pick Target";
   }
   if (dom.groupAimClearBtn) {
     const hasAimTarget = aimTargetType.length > 0 && Number.isFinite(aimTargetId);
     dom.groupAimClearBtn.disabled = (state.activeGroupId == null) || (!hasAimTarget && !aimEnabled);
   }
   if (dom.groupAimStatus) {
-    let text = (panelLang === "en") ? "Target: None" : "ターゲット: なし";
+    let text = "Target: None";
     if (aimTargetType === "group" && Number.isFinite(aimTargetId)) {
-      text = (panelLang === "en") ? `Target: Group #${aimTargetId}` : `ターゲット: グループ #${aimTargetId}`;
+      text = `Target: Group #${aimTargetId}`;
     } else if (aimTargetType === "position" && Number.isFinite(aimTargetId)) {
-      text = (panelLang === "en") ? `Target: Position #${aimTargetId}` : `ターゲット: 位置 #${aimTargetId}`;
+      text = `Target: Position #${aimTargetId}`;
     }
     if (aimPickActive) {
       if (aimCandidateType === "group" && Number.isFinite(aimCandidateId)) {
-        text = (panelLang === "en") ? `Candidate: Group #${aimCandidateId}` : `候補: グループ #${aimCandidateId}`;
+        text = `Candidate: Group #${aimCandidateId}`;
       } else if (aimCandidateType === "position" && Number.isFinite(aimCandidateId)) {
-        text = (panelLang === "en") ? `Candidate: Position #${aimCandidateId}` : `候補: 位置 #${aimCandidateId}`;
+        text = `Candidate: Position #${aimCandidateId}`;
       } else {
-        text = (panelLang === "en") ? "Picking target..." : "クリック待機中...";
+        text = "Picking target...";
       }
     }
     if (aimEnabled && !aimPickActive) text += (panelLang === "en") ? " (ON)" : " (ON)";
@@ -183,8 +183,8 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     const on = !!state.lineSettings?.sizeLocked;
     dom.applyLineInputBtn.disabled = !(state.tool === "line");
     dom.applyLineInputBtn.textContent = on
-      ? (panelLang === "en" ? "Unlock Size" : "サイズ固定解除")
-      : (panelLang === "en" ? "Lock Size" : "サイズ固定");
+      ? "Unlock Size"
+      : "Lock Size";
     dom.applyLineInputBtn.classList.toggle("active", on);
   }
   if (dom.lineAnchorSelect) {
@@ -203,8 +203,8 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     const on = !!state.rectSettings?.sizeLocked;
     dom.applyRectInputBtn.disabled = !(state.tool === "rect");
     dom.applyRectInputBtn.textContent = on
-      ? (panelLang === "en" ? "Unlock Size" : "サイズ固定解除")
-      : (panelLang === "en" ? "Lock Size" : "サイズ固定");
+      ? "Unlock Size"
+      : "Lock Size";
     dom.applyRectInputBtn.classList.toggle("active", on);
   }
   if (dom.rectAnchorSelect) {
@@ -236,8 +236,8 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     const on = (modeRaw === "fixed") || (!!state.circleSettings?.radiusLocked && modeRaw !== "drag" && modeRaw !== "threepoint");
     dom.applyCircleInputBtn.disabled = !(state.tool === "circle");
     dom.applyCircleInputBtn.textContent = on
-      ? (panelLang === "en" ? "Unlock Radius" : "半径固定解除")
-      : (panelLang === "en" ? "Lock Radius" : "半径固定");
+      ? "Unlock Radius"
+      : "Lock Radius";
     dom.applyCircleInputBtn.classList.toggle("active", on);
   }
   if (dom.filletRadiusInput) {

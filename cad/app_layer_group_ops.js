@@ -38,7 +38,10 @@ export function createLayerGroupOps(config) {
     if (!state.ui.rightPanelCollapsed) state.ui.rightPanelCollapsed = {};
     state.ui.rightPanelCollapsed.layers = false;
     if (!state.ui.panelLayout) state.ui.panelLayout = {};
-    state.ui.panelLayout.layerPanelListHeight = 2000;
+    const prevListH = Number(state.ui.panelLayout.layerPanelListHeight);
+    if (!Number.isFinite(prevListH) || prevListH < 120) {
+      state.ui.panelLayout.layerPanelListHeight = 160;
+    }
     setStatus?.(`Layer created: ${layer?.name ?? ""}`.trim());
     draw?.();
   }

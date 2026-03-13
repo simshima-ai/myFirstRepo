@@ -130,7 +130,7 @@ export function setLineSizeLocked(state, helpers, on = null) {
     if (!state.lineSettings) state.lineSettings = {};
     const next = (on == null) ? !state.lineSettings.sizeLocked : !!on;
     state.lineSettings.sizeLocked = next;
-    if (helpers?.setStatus) helpers.setStatus(next ? "線作成: サイズ固定 ON" : "線作成: サイズ固定 OFF");
+    if (helpers?.setStatus) helpers.setStatus(next ? "Line creation: Size lock ON" : "Line creation: Size lock OFF");
     if (helpers?.draw) helpers.draw();
 }
 export function setLineAnchor(state, anchor) {
@@ -150,7 +150,7 @@ export function setRectSizeLocked(state, helpers, on = null) {
     const next = (on == null) ? !state.rectSettings.sizeLocked : !!on;
     state.rectSettings.sizeLocked = next;
     if (helpers?.setStatus) {
-        helpers.setStatus(next ? "四角作成: サイズ固定 ON" : "四角作成: サイズ固定 OFF");
+        helpers.setStatus(next ? "Rectangle creation: Size lock ON" : "Rectangle creation: Size lock OFF");
     }
     if (helpers?.draw) helpers.draw();
 }
@@ -172,9 +172,9 @@ export function setCircleMode(state, helpers, mode) {
     if (next !== "threepoint") state.input.circleThreePointRefs = [];
     state.input.dragStartWorld = null;
     if (helpers?.setStatus) {
-        if (next === "fixed") helpers.setStatus("円作成: 半径固定モード");
-        else if (next === "threepoint") helpers.setStatus("円作成: 三点指示モード");
-        else helpers.setStatus("円作成: マウスドラッグモード");
+        if (next === "fixed") helpers.setStatus("Circle creation: Fixed radius mode");
+        else if (next === "threepoint") helpers.setStatus("Circle creation: 3-point mode");
+        else helpers.setStatus("Circle creation: Drag mode");
     }
     if (helpers?.draw) helpers.draw();
 }
@@ -187,7 +187,7 @@ export function setCircleRadiusLocked(state, helpers, on = null) {
     if (state.circleSettings.mode !== "threepoint") state.input.circleThreePointRefs = [];
     state.input.dragStartWorld = null;
     if (helpers?.setStatus) {
-        helpers.setStatus(next ? "円作成: 半径固定 ON" : "円作成: 半径固定 OFF");
+        helpers.setStatus(next ? "Circle creation: Radius lock ON" : "Circle creation: Radius lock OFF");
     }
     if (helpers?.draw) helpers.draw();
 }
@@ -246,7 +246,7 @@ export function setLineWidthMm(state, helpers, v, toolKey = null) {
     const name = String(toolKey || state.tool || "tool");
     const target = resolveToolStyleTarget(state, name);
     if (target) target.lineWidthMm = nearest;
-    if (setStatus) setStatus(`${name} 線幅を ${nearest} mm に設定`);
+    if (setStatus) setStatus(`${name} line width set to ${nearest} mm`);
     if (draw) draw();
 }
 
@@ -260,7 +260,7 @@ export function setToolLineType(state, helpers, v, toolKey = null) {
         // Hatch uses dedicated property as render/export source.
         if (name === "hatch") target.lineType = type;
     }
-    if (setStatus) setStatus(`${name} 線種を ${type} に設定`);
+    if (setStatus) setStatus(`${name} line type set to ${type}`);
     if (draw) draw();
 }
 
@@ -270,7 +270,7 @@ export function setToolColor(state, helpers, color, toolKey = null) {
     const name = String(toolKey || state.tool || "tool");
     const target = resolveToolStyleTarget(state, name);
     if (target) target.color = next;
-    if (setStatus) setStatus(`${name} 色を ${next} に設定`);
+    if (setStatus) setStatus(`${name} color set to ${next}`);
     if (draw) draw();
 }
 
@@ -304,7 +304,7 @@ export function setSelectedLineWidthMm(state, helpers, v) {
     };
     const selected = (state.shapes || []).filter(s => selIds.has(Number(s.id)) && isStyleEditableShape(s));
     if (!selected.length) {
-        if (setStatus) setStatus("線幅変更: 対象オブジェクトなし");
+        if (setStatus) setStatus("Line width change: no target objects");
         if (draw) draw();
         return;
     }
@@ -313,7 +313,7 @@ export function setSelectedLineWidthMm(state, helpers, v) {
     for (const s of selected) {
         s.lineWidthMm = nearest;
     }
-    if (setStatus) setStatus(`選択オブジェクトの線幅を ${nearest} mm に設定`);
+    if (setStatus) setStatus(`Selected object line width set to ${nearest} mm`);
     if (draw) draw();
 }
 
@@ -335,14 +335,14 @@ export function setSelectedLineType(state, helpers, v) {
             || s.type === "circleDim";
     });
     if (!selected.length) {
-        if (setStatus) setStatus("線種変更: 対象オブジェクトなし");
+        if (setStatus) setStatus("Line type change: no target objects");
         if (draw) draw();
         return;
     }
     const hasAnyDiff = selected.some((s) => String(s.lineType || "solid") !== type);
     if (hasAnyDiff) pushHistory();
     for (const s of selected) s.lineType = type;
-    if (setStatus) setStatus(`選択オブジェクトの線種を ${type} に設定`);
+    if (setStatus) setStatus(`Selected object line type set to ${type}`);
     if (draw) draw();
 }
 
@@ -357,7 +357,7 @@ export function setSelectedColor(state, helpers, color) {
     const selIds = new Set((state.selection?.ids || []).map(Number));
     const selected = (state.shapes || []).filter((s) => selIds.has(Number(s.id)));
     if (!selected.length) {
-        if (setStatus) setStatus("色変更: 対象オブジェクトなし");
+        if (setStatus) setStatus("Color change: no target objects");
         if (draw) draw();
         return;
     }
@@ -373,7 +373,7 @@ export function setSelectedColor(state, helpers, color) {
         else if (s.type === "hatch") s.lineColor = next;
         else s.color = next;
     }
-    if (setStatus) setStatus(`選択オブジェクトの色を ${next} に設定`);
+    if (setStatus) setStatus(`Selected object color set to ${next}`);
     if (draw) draw();
 }
 export function setSelectionCircleCenterMark(state, helpers, on) {
@@ -474,6 +474,6 @@ export function updateSelectedImageSettings(state, helpers, settings = {}) {
         row.shape.lockAspect = row.lockAspect;
         row.shape.lockTransform = row.lockTransform;
     }
-    if (setStatus) setStatus(selected.length === 1 ? "画像設定を更新" : `${selected.length}個の画像設定を更新`);
+    if (setStatus) setStatus(selected.length === 1 ? "Image settings updated" : `Updated image settings for ${selected.length} objects`);
     if (draw) draw();
 }

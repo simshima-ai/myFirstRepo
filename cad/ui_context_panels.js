@@ -1,4 +1,5 @@
 export function resolveTopActiveContext(state, tool) {
+  const isEasyMode = String(state.ui?.displayMode || "cad").toLowerCase() === "easy";
   if (state.ui?.importAdjust?.active) return "importadjust";
   // Double line tool must keep its own context panel regardless of selection types.
   if (tool === "doubleline") return "doubleline";
@@ -55,6 +56,7 @@ export function resolveTopActiveContext(state, tool) {
   if (!activeCtx && (tool === "hatch" || hasHatchSelected)) activeCtx = "hatch";
   if (hasMixedDimSelection) activeCtx = "group";
   if (tool === "select") {
+    if (isEasyMode) return "";
     const hasActiveGroup = state.activeGroupId != null;
     const hasNonDimSelection = selIds.length > 0 && !allSelType("dim", "dimchain", "dimangle", "circleDim");
     const hasOnlyDimSelection = selIds.length > 0 && allSelType("dim", "dimchain", "dimangle", "circleDim");

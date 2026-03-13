@@ -1,4 +1,4 @@
-﻿import {
+import {
     getGroup, setSelection, clearSelection,
     snapshotModel, pushHistory, pushHistorySnapshot,
     isLayerVisible, isLayerLocked, isGroupVisible
@@ -658,6 +658,22 @@ export function applySelectionDrag(state, worldRaw) {
             }
             target.cx = nx; target.cy = ny;
             target.r = base.r;
+        } else if (target.type === "polyline") {
+            if (Array.isArray(base.points) && base.points.length) {
+                let tx = dxRaw;
+                let ty = dyRaw;
+                const first = base.points[0];
+                if (state.grid.snap && first) {
+                    const p = snapPoint({ x: Number(first.x) + dxRaw, y: Number(first.y) + dyRaw }, gridStep);
+                    tx = p.x - Number(first.x);
+                    ty = p.y - Number(first.y);
+                }
+                target.points = base.points.map((pt) => ({
+                    x: Number(pt?.x) + tx,
+                    y: Number(pt?.y) + ty,
+                }));
+            }
+            target.closed = !!base.closed;
         } else if (target.type === "arc") {
             let nx = base.cx + dxRaw;
             let ny = base.cy + dyRaw;

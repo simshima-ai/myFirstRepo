@@ -1,4 +1,4 @@
-export function refreshToolShortcutSettings(state, dom, helpers) {
+﻿export function refreshToolShortcutSettings(state, dom, helpers) {
   const { getUiLanguage, sanitizeToolShortcuts, toolOrder } = helpers;
   const host = dom.toolShortcutList;
   if (!host) return;
@@ -22,25 +22,25 @@ export function refreshToolShortcutSettings(state, dom, helpers) {
       none: "(None)",
     }
     : {
-      select: "選択",
-      line: "線",
-      rect: "四角",
-      circle: "円",
-      position: "位置",
-      dim: "寸法線",
-      text: "テキスト",
-      vertex: "頂点編集",
-      fillet: "フィレット",
-      trim: "トリム",
-      hatch: "ハッチング",
-      doubleline: "二重線",
-      patterncopy: "パターンコピー",
-      delete: "削除",
-      none: "(なし)",
+      select: "Select",
+      line: "Line",
+      rect: "Rect",
+      circle: "Circle",
+      position: "Position",
+      dim: "Dimension",
+      text: "Text",
+      vertex: "Vertex Edit",
+      fillet: "Fillet",
+      trim: "Trim",
+      hatch: "Hatch",
+      doubleline: "Double Line",
+      patterncopy: "Pattern Copy",
+      delete: "Delete",
+      none: "(None)",
     };
   const shortcuts = sanitizeToolShortcuts(state?.ui?.toolShortcuts);
   if (!labels.vertex_mode_toggle) {
-    labels.vertex_mode_toggle = (lang === "en") ? "Vertex Mode Toggle" : "頂点モード切替";
+    labels.vertex_mode_toggle = "Vertex Mode Toggle";
   }
   host.innerHTML = "";
   for (const tool of toolOrder) {

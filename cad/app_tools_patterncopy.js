@@ -1,4 +1,4 @@
-import { nextShapeId, pushHistory, setSelection } from "./state.js";
+﻿import { nextShapeId, pushHistory, setSelection } from "./state.js";
 import { rotatePointAround } from "./solvers.js";
 import { getSelectedShapes } from "./app_selection.js";
 function patternShiftShapeDeep(node, dx, dy) {
@@ -244,12 +244,12 @@ export function setPatternCopyCenterFromSelection(state, helpers) {
     const selected = getSelectedShapes(state);
     const pos = selected.find(s => s && s.type === "position");
     if (!pos) {
-        if (setStatus) setStatus("中心には位置オブジェクトを選択してください");
+        if (setStatus) setStatus("Pattern copy: select a position object as the center");
         if (draw) draw();
         return false;
     }
     state.input.patternCopyFlow.centerPositionId = Number(pos.id);
-    if (setStatus) setStatus(`中心を設定: 点 #${pos.id}`);
+    if (setStatus) setStatus(`Pattern copy center set: Point #${pos.id}`);
     if (draw) draw();
     return true;
 }
@@ -257,7 +257,7 @@ export function setPatternCopyCenterFromSelection(state, helpers) {
 export function clearPatternCopyCenter(state, helpers) {
     const { setStatus, draw } = helpers;
     state.input.patternCopyFlow.centerPositionId = null;
-    if (setStatus) setStatus("中心設定を解除");
+    if (setStatus) setStatus("Pattern copy center cleared");
     if (draw) draw();
 }
 
@@ -266,12 +266,12 @@ export function setPatternCopyAxisFromSelection(state, helpers) {
     const selected = getSelectedShapes(state);
     const ln = selected.find(s => s && s.type === "line");
     if (!ln) {
-        if (setStatus) setStatus("軸には線オブジェクトを選択してください");
+        if (setStatus) setStatus("Pattern copy: select a line object as the axis");
         if (draw) draw();
         return false;
     }
     state.input.patternCopyFlow.axisLineId = Number(ln.id);
-    if (setStatus) setStatus(`軸を設定: 線 #${ln.id}`);
+    if (setStatus) setStatus(`Pattern copy axis set: Line #${ln.id}`);
     if (draw) draw();
     return true;
 }
@@ -279,7 +279,7 @@ export function setPatternCopyAxisFromSelection(state, helpers) {
 export function clearPatternCopyAxis(state, helpers) {
     const { setStatus, draw } = helpers;
     state.input.patternCopyFlow.axisLineId = null;
-    if (setStatus) setStatus("軸設定を解除");
+    if (setStatus) setStatus("Pattern copy axis cleared");
     if (draw) draw();
 }
 
@@ -289,7 +289,7 @@ export function executePatternCopy(state, helpers) {
     const selected = getSelectedShapes(state);
     const rootGroupIds = getRootSelectedGroupIds(state);
     if (!selected.length && !rootGroupIds.length) {
-        if (setStatus) setStatus("Pattern copy: コピー元を選択してください");
+        if (setStatus) setStatus("Pattern copy: select source objects first");
         if (draw) draw();
         return false;
     }
@@ -303,7 +303,7 @@ export function executePatternCopy(state, helpers) {
         const dyBase = Number(state.patternCopySettings?.arrayDy) || 0;
         const instanceCount = Math.max(0, countX * countY - 1);
         if (instanceCount <= 0) {
-            if (setStatus) setStatus("Pattern copy: 配列数が不足しています");
+            if (setStatus) setStatus("Pattern copy: array count is too small");
             if (draw) draw();
             return false;
         }
@@ -340,7 +340,7 @@ export function executePatternCopy(state, helpers) {
         const centerId = Number(state.input?.patternCopyFlow?.centerPositionId);
         const center = (state.shapes || []).find(s => Number(s.id) === centerId && s.type === "position");
         if (!center) {
-            if (setStatus) setStatus("Pattern copy: 回転中心が未設定です");
+            if (setStatus) setStatus("Pattern copy: rotation center is not set");
             if (draw) draw();
             return false;
         }
@@ -348,7 +348,7 @@ export function executePatternCopy(state, helpers) {
         const angleDeg = Number(state.patternCopySettings?.rotateAngleDeg) || 0;
         const count = Math.max(1, Math.round(Number(state.patternCopySettings?.rotateCount) || 1));
         if (count <= 1) {
-            if (setStatus) setStatus("Pattern copy: 回転数が不足しています");
+            if (setStatus) setStatus("Pattern copy: rotate count is too small");
             if (draw) draw();
             return false;
         }
@@ -392,7 +392,7 @@ export function executePatternCopy(state, helpers) {
         const axisId = Number(state.input?.patternCopyFlow?.axisLineId);
         const axis = (state.shapes || []).find(s => Number(s.id) === axisId && s.type === "line");
         if (!axis) {
-            if (setStatus) setStatus("Pattern copy: 反転軸が未設定です");
+            if (setStatus) setStatus("Pattern copy: mirror axis is not set");
             if (draw) draw();
             return false;
         }
@@ -428,7 +428,7 @@ export function executePatternCopy(state, helpers) {
             }
         }
     } else {
-        if (setStatus) setStatus(`Pattern copy: ${mode} は現在調整中です`);
+        if (setStatus) setStatus(`Pattern copy: ${mode} is still under adjustment`);
         if (draw) draw();
         return false;
     }
@@ -440,7 +440,7 @@ export function executePatternCopy(state, helpers) {
     } else {
         state.activeGroupId = null;
     }
-    if (setStatus) setStatus(`Pattern copy: ${newIds.length} 個作成`);
+    if (setStatus) setStatus(`Pattern copy: created ${newIds.length} object(s)`);
     if (draw) draw();
     return newIds.length > 0;
 }

@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>料金プラン | S-CAD</title>
+<meta name="description" content="S-CADの料金プランです。無料で始めて、必要なときにアップグレードできます。">
+<link rel="stylesheet" href="./site.css">
+<style>
+/* ── Pricing page ───────────────────────────── */
+.pricing-hero {
+  text-align: center;
+  padding: 64px 24px 48px;
+  border-bottom: 1px solid var(--border);
+}
+.pricing-hero h1 {
+  font-size: clamp(28px, 5vw, 44px);
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 10px;
+}
+.pricing-hero .sub { font-size: 15px; color: var(--muted); }
+
+/* Toggle */
+.toggle-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 40px 0 0;
+}
+.toggle-label {
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.toggle-label.active { color: #fff; }
+
+.toggle-switch {
+  position: relative;
+  width: 48px;
+  height: 26px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+.toggle-switch::after {
+  content: '';
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  background: var(--muted);
+  border-radius: 50%;
+  transition: transform 0.2s, background 0.2s;
+}
+.toggle-switch.annual::after {
+  transform: translateX(22px);
+  background: var(--accent);
+}
+
+.badge-save {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: #fff;
+  padding: 2px 7px;
+  border-radius: 10px;
+}
+
+/* Cards */
+.pricing-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  max-width: 760px;
+  margin: 48px auto 64px;
+  padding: 0 24px;
+}
+
+.plan-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 32px 28px;
+  display: flex;
+  flex-direction: column;
+}
+.plan-card.featured {
+  border-color: var(--accent);
+  position: relative;
+}
+.plan-card.featured::before {
+  content: 'おすすめ';
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: #fff;
+  padding: 3px 12px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.plan-name {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+.plan-card.featured .plan-name { color: var(--accent); }
+
+.plan-price {
+  margin-bottom: 8px;
+}
+.plan-price .amount {
+  font-size: 40px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+.plan-price .currency {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  vertical-align: top;
+  line-height: 1.4;
+  margin-right: 2px;
+}
+.plan-price .period {
+  font-size: 13px;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.plan-price-note {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 24px;
+  min-height: 18px;
+}
+
+.plan-btn {
+  display: block;
+  text-align: center;
+  padding: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  text-decoration: none;
+  transition: background 0.2s, color 0.2s;
+  margin-bottom: 28px;
+}
+.plan-btn-free {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+}
+.plan-btn-free:hover { border-color: var(--muted); color: var(--text); }
+.plan-btn-pro {
+  background: var(--accent);
+  color: #fff;
+  border: 1px solid transparent;
+}
+.plan-btn-pro:hover { background: var(--accent2); }
+
+/* Features list */
+.feature-list {
+  list-style: none;
+  flex: 1;
+}
+.feature-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text);
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+.feature-list li:last-child { border-bottom: none; }
+.feature-list .icon { flex-shrink: 0; margin-top: 1px; }
+.feature-list .icon.check { color: var(--accent); }
+.feature-list .icon.cross { color: #555; }
+.feature-limit { color: var(--muted); }
+
+/* Comparison table */
+.compare-wrap {
+  max-width: 760px;
+  margin: 0 auto 80px;
+  padding: 0 24px;
+}
+.compare-wrap h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 20px;
+}
+.compare-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.compare-table th, .compare-table td {
+  padding: 13px 16px;
+  text-align: left;
+  font-size: 13px;
+  border-bottom: 1px solid var(--border);
+}
+.compare-table th {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 400;
+  background: var(--bg2);
+}
+.compare-table th:not(:first-child),
+.compare-table td:not(:first-child) {
+  text-align: center;
+  width: 120px;
+}
+.compare-table td:first-child { color: var(--text); }
+.compare-table td.yes { color: var(--accent); font-size: 16px; }
+.compare-table td.no { color: #444; font-size: 16px; }
+.compare-table td.val { color: var(--text); }
+.compare-table td.val-muted { color: var(--muted); font-size: 12px; }
+.compare-table tr:last-child td { border-bottom: none; }
+.compare-table .col-pro { background: rgba(0,170,221,0.04); }
+
+/* Note */
+.pricing-note {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+  padding: 0 24px 64px;
+}
+.pricing-note a { color: var(--accent); }
+
+@media (max-width: 600px) {
+  .pricing-grid { grid-template-columns: 1fr; }
+  .compare-table th:not(:first-child),
+  .compare-table td:not(:first-child) { width: 80px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="./index.html"><span>S-</span>CAD</a>
+  <ul class="nav-links">
+    <li><a href="./pricing.html" class="active">料金</a></li>
+    <li><a href="./tutorial.html">チュートリアル</a></li>
+    <li><a href="./about.html">About</a></li>
+    <li><a href="./contact.html">Contact</a></li>
+  </ul>
+  <a href="./cad.html" class="nav-cta">アプリを開く</a>
+</nav>
+
+<main>
+  <div class="pricing-hero">
+    <h1>シンプルな料金プラン</h1>
+    <p class="sub">無料で始めて、必要なときにアップグレード</p>
+
+    <!-- 月額/年額トグル -->
+    <div class="toggle-wrap">
+      <span class="toggle-label active" id="label-monthly">月額</span>
+      <div class="toggle-switch" id="billing-toggle" role="switch" aria-checked="false" tabindex="0"></div>
+      <span class="toggle-label" id="label-annual">年額 <span class="badge-save">20% OFF</span></span>
+    </div>
+  </div>
+
+  <!-- プランカード -->
+  <div class="pricing-grid">
+
+    <!-- Free -->
+    <div class="plan-card">
+      <div class="plan-name">Free</div>
+      <div class="plan-price">
+        <span class="amount">$0</span>
+      </div>
+      <div class="plan-price-note">ずっと無料</div>
+      <a href="./cad.html" class="plan-btn plan-btn-free">無料で始める</a>
+      <ul class="feature-list">
+        <li>
+          <span class="icon cross">✕</span>
+          <span>ファイル数 <span class="feature-limit">1ファイルまで</span></span>
+        </li>
+        <li>
+          <span class="icon cross">✕</span>
+          <span>オブジェクト数 <span class="feature-limit">500まで</span></span>
+        </li>
+        <li>
+          <span class="icon cross">✕</span>
+          <span>レイヤー数 <span class="feature-limit">3まで</span></span>
+        </li>
+        <li>
+          <span class="icon cross">✕</span>
+          <span>広告表示あり</span>
+        </li>
+        <li>
+          <span class="icon check">✓</span>
+          <span>DXF / SVG エクスポート</span>
+        </li>
+        <li>
+          <span class="icon check">✓</span>
+          <span>全描画ツール使用可能</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Pro -->
+    <div class="plan-card featured">
+      <div class="plan-name">Pro</div>
+      <div class="plan-price" id="pro-price-display">
+        <span class="currency">$</span><span class="amount" id="price-amount">5</span>
+        <span class="period" id="price-period">/ 月</span>
+      </div>
+      <div class="plan-price-note" id="price-note">&nbsp;</div>
+      <!--
+        TODO: Lemon Squeezy でアカウントを作成・商品を登録後、
+              下記 href を以下の形式に書き換えてください。
+        月額: https://your-store.lemonsqueezy.com/checkout/buy/MONTHLY_VARIANT_ID
+        年額: https://your-store.lemonsqueezy.com/checkout/buy/ANNUAL_VARIANT_ID
+
+        オーバーレイチェックアウトを使う場合はクラス "lemonsqueezy-button" を追加し、
+        <script src="https://assets.lemonsqueezy.com/lemon.js" defer></script> を追加してください。
+      -->
+      <a href="#" id="pro-cta-btn" class="plan-btn plan-btn-pro">今すぐ始める</a>
+      <ul class="feature-list">
+        <li>
+          <span class="icon check">✓</span>
+          <span>ファイル数 <strong>無制限</strong></span>
+        </li>
+        <li>
+          <span class="icon check">✓</span>
+          <span>オブジェクト数 <strong>無制限</strong></span>
+        </li>
+        <li>
+          <span class="icon check">✓</span>
+          <span>レイヤー数 <strong>無制限</strong></span>
+        </li>
+        <li>
+          <span class="icon check">✓</span>
+          <span><strong>広告なし</strong></span>
+        </li>
+        <li>
+          <span class="icon check">✓</span>
+          <span>DXF / SVG エクスポート</span>
+        </li>
+        <li>
+          <span class="icon check">✓</span>
+          <span>全描画ツール使用可能</span>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+
+  <!-- 比較表 -->
+  <div class="compare-wrap">
+    <h2>機能比較</h2>
+    <table class="compare-table">
+      <thead>
+        <tr>
+          <th>機能</th>
+          <th>Free</th>
+          <th class="col-pro">Pro</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>料金</td>
+          <td class="val">$0</td>
+          <td class="val col-pro" id="compare-price">$5 / 月</td>
+        </tr>
+        <tr>
+          <td>ファイル数</td>
+          <td class="val-muted">1ファイル</td>
+          <td class="val col-pro">無制限</td>
+        </tr>
+        <tr>
+          <td>オブジェクト数</td>
+          <td class="val-muted">500まで</td>
+          <td class="val col-pro">無制限</td>
+        </tr>
+        <tr>
+          <td>レイヤー数</td>
+          <td class="val-muted">3まで</td>
+          <td class="val col-pro">無制限</td>
+        </tr>
+        <tr>
+          <td>広告</td>
+          <td class="no">●</td>
+          <td class="yes col-pro">広告なし</td>
+        </tr>
+        <tr>
+          <td>DXF / SVG エクスポート</td>
+          <td class="yes">✓</td>
+          <td class="yes col-pro">✓</td>
+        </tr>
+        <tr>
+          <td>全描画ツール</td>
+          <td class="yes">✓</td>
+          <td class="yes col-pro">✓</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p class="pricing-note">
+    ご不明な点は<a href="./contact.html">お問い合わせ</a>ください。<br>
+    決済はLemon Squeezyが処理します。クレジットカード・PayPalが使えます。
+  </p>
+</main>
+
+<footer class="site-footer">
+  <span class="footer-copy">&copy; 2026 S-CAD</span>
+  <nav class="footer-links">
+    <a href="./privacy.html">プライバシーポリシー</a>
+    <a href="./contact.html">お問い合わせ</a>
+    <a href="./about.html">About</a>
+  </nav>
+</footer>
+
+<script>
+// TODO: Lemon Squeezy で商品を作成後に差し替えてください
+const LS_MONTHLY_URL = 'https://YOUR_STORE.lemonsqueezy.com/checkout/buy/MONTHLY_VARIANT_ID';
+const LS_ANNUAL_URL  = 'https://YOUR_STORE.lemonsqueezy.com/checkout/buy/ANNUAL_VARIANT_ID';
+
+const toggle       = document.getElementById('billing-toggle');
+const labelMonthly = document.getElementById('label-monthly');
+const labelAnnual  = document.getElementById('label-annual');
+const priceAmount  = document.getElementById('price-amount');
+const pricePeriod  = document.getElementById('price-period');
+const priceNote    = document.getElementById('price-note');
+const comparePrice = document.getElementById('compare-price');
+const ctaBtn       = document.getElementById('pro-cta-btn');
+
+let isAnnual = false;
+
+function update() {
+  if (isAnnual) {
+    toggle.classList.add('annual');
+    labelMonthly.classList.remove('active');
+    labelAnnual.classList.add('active');
+    priceAmount.textContent = '4';
+    pricePeriod.textContent = '/ 月';
+    priceNote.textContent   = '$48 / 年（$60相当）';
+    comparePrice.textContent = '$48 / 年';
+    ctaBtn.href = LS_ANNUAL_URL;
+  } else {
+    toggle.classList.remove('annual');
+    labelMonthly.classList.add('active');
+    labelAnnual.classList.remove('active');
+    priceAmount.textContent = '5';
+    pricePeriod.textContent = '/ 月';
+    priceNote.textContent   = '\u00a0';
+    comparePrice.textContent = '$5 / 月';
+    ctaBtn.href = LS_MONTHLY_URL;
+  }
+}
+
+toggle.addEventListener('click', () => { isAnnual = !isAnnual; update(); });
+toggle.addEventListener('keydown', e => {
+  if (e.key === ' ' || e.key === 'Enter') { isAnnual = !isAnnual; update(); }
+});
+labelAnnual.addEventListener('click', () => { if (!isAnnual) { isAnnual = true; update(); } });
+labelMonthly.addEventListener('click', () => { if (isAnnual) { isAnnual = false; update(); } });
+
+update();
+</script>
+
+</body>
+</html>

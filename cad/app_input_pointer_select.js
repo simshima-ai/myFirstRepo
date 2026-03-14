@@ -46,45 +46,48 @@
         }
     }
     const rotateHandleHit = hitActiveGroupRotateHandle(state, screen);
-    if (rotateHandleHit && !isAppendSelect(e)) {
+    if (rotateHandleHit && !e.shiftKey) {
         const hitGroupId = Number(rotateHandleHit.id);
         const selectedGroupIds = Array.isArray(state.selection?.groupIds)
             ? state.selection.groupIds.map(Number).filter(Number.isFinite)
             : [];
         const keepMultiGroupSelection = selectedGroupIds.length > 1 && selectedGroupIds.includes(hitGroupId);
         if (!keepMultiGroupSelection) {
-            setSelection((rotateHandleHit.shapeIds || []).slice());
+            state.selection.ids = [];
             state.selection.groupIds = [hitGroupId];
+            state.activeGroupId = hitGroupId;
         }
         beginGroupRotateDrag(state, rotateHandleHit, worldRaw);
         if (draw) draw();
         return true;
     }
     const groupHandleHit = hitActiveGroupOriginHandle(state, screen);
-    if (groupHandleHit && !isAppendSelect(e)) {
+    if (groupHandleHit && !e.shiftKey) {
         const hitGroupId = Number(groupHandleHit.id);
         const selectedGroupIds = Array.isArray(state.selection?.groupIds)
             ? state.selection.groupIds.map(Number).filter(Number.isFinite)
             : [];
         const keepMultiGroupSelection = selectedGroupIds.length > 1 && selectedGroupIds.includes(hitGroupId);
         if (!keepMultiGroupSelection) {
-            setSelection((groupHandleHit.shapeIds || []).slice());
+            state.selection.ids = [];
             state.selection.groupIds = [hitGroupId];
+            state.activeGroupId = hitGroupId;
         }
         beginGroupOriginDrag(state, groupHandleHit, worldRaw);
         if (draw) draw();
         return true;
     }
     const scaleHandleHit = hitActiveGroupScaleHandle(state, screen);
-    if (scaleHandleHit && !isAppendSelect(e)) {
+    if (scaleHandleHit && !e.shiftKey) {
         const hitGroupId = Number(scaleHandleHit.id);
         const selectedGroupIds = Array.isArray(state.selection?.groupIds)
             ? state.selection.groupIds.map(Number).filter(Number.isFinite)
             : [];
         const keepMultiGroupSelection = selectedGroupIds.length > 1 && selectedGroupIds.includes(hitGroupId);
         if (!keepMultiGroupSelection) {
-            setSelection((scaleHandleHit.shapeIds || []).slice());
+            state.selection.ids = [];
             state.selection.groupIds = [hitGroupId];
+            state.activeGroupId = hitGroupId;
         }
         beginGroupScaleDrag(state, scaleHandleHit, worldRaw);
         if (draw) draw();
@@ -135,7 +138,7 @@
             }
         }
         let dragStarted = beginSelectionDrag(state, worldRaw, helpers);
-        if (!dragStarted && hit.type === "line") {
+        if (!dragStarted && hit.type === "line" && pickMode !== "group") {
             setSelection([Number(hit.id)]);
             state.activeGroupId = null;
             dragStarted = beginSelectionDrag(state, worldRaw, helpers);

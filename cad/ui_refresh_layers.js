@@ -69,7 +69,7 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
         modeBtn.style.padding = "2px 6px";
         const visible = layer.visible !== false;
         const locked = layer.locked === true;
-        modeBtn.textContent = visible ? (locked ? "LOCK" : "ON") : "OFF";
+        modeBtn.textContent = visible ? (locked ? panelText.layerLocked : panelText.layerOn) : panelText.layerOff;
         modeBtn.title = panelText.toggleLayerModeTitle;
         if (!visible) {
           modeBtn.style.background = "rgba(148,163,184,0.16)";

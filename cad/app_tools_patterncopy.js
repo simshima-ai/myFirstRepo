@@ -122,9 +122,11 @@ function applyTransformToShapeDeep(node, transformPoint) {
 
 function makeCopiedGroupName(baseName, usedNameKeys) {
     const base = String(baseName || "Group").trim() || "Group";
-    let i = 1;
+    const match = /^(.*?)(\d+)$/.exec(base);
+    const prefix = match ? match[1] : base;
+    let i = match ? (Number(match[2]) + 1) : 1;
     while (i < 1000000) {
-        const cand = `${base}_${i}`;
+        const cand = `${prefix}${i}`;
         const key = cand.toLowerCase();
         if (!usedNameKeys.has(key)) {
             usedNameKeys.add(key);
@@ -132,7 +134,7 @@ function makeCopiedGroupName(baseName, usedNameKeys) {
         }
         i += 1;
     }
-    return `${base}_${Date.now()}`;
+    return `${prefix}${Date.now()}`;
 }
 
 function cloneGroupsWithTransform(state, rootGroupIds, transformPoint, options = {}) {

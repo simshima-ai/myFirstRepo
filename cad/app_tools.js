@@ -4,7 +4,7 @@ export {
     splitLineForFillet, tryCreateLineLineFillet, getFilletSelectionPair, computeLineCircleAutoTrimPlan,
     trimArcEndpointForFillet, trimArcEndpointForFilletTowardPoint, getArcKeepSideByPoint, trimArcForFilletKeepSide,
     trimateFillet, applyFillet, applyPendingLineCircleFillet, applyPendingArcArcFillet,
-    applyCircleInput
+    applyCircleInput, normalizeFilletLineSource
 } from "./app_tools_fillet.js";
 
 export {

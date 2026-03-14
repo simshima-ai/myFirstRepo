@@ -179,7 +179,8 @@ export function createPersistenceRuntime(config) {
       if (!state.ui) state.ui = {};
       state.ui.lastAutoBackupAt = payload.savedAt;
       if (dom.autoBackupBadge) {
-        dom.autoBackupBadge.textContent = "Auto backup saved";
+        const lang = String(state.ui?.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
+        dom.autoBackupBadge.textContent = lang === "ja" ? "\u81ea\u52d5\u30d0\u30c3\u30af\u30a2\u30c3\u30d7\u4fdd\u5b58" : "Auto backup saved";
         dom.autoBackupBadge.style.display = "";
         if (autoBackupBadgeTimer) clearTimeout(autoBackupBadgeTimer);
         autoBackupBadgeTimer = setTimeout(() => {

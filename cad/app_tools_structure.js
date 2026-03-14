@@ -1,5 +1,6 @@
 import { createGroupFromSelection, getGroup, moveGroupOrigin, setSelection } from "./state.js";
 import { getSelectedShapes, collectGroupTreeShapeIds } from "./app_selection.js";
+import { mmPerUnit } from "./geom.js";
 
 function pointKey(x, y, tol = 1e-6) {
     const nx = Number(x) || 0;
@@ -7,6 +8,102 @@ function pointKey(x, y, tol = 1e-6) {
     const qx = Math.round(nx / tol);
     const qy = Math.round(ny / tol);
     return `${qx},${qy}`;
+}
+
+function normalizeRad(a) {
+    let x = Number(a) || 0;
+    const tau = Math.PI * 2;
+    while (x < 0) x += tau;
+    while (x >= tau) x -= tau;
+    return x;
+}
+
+function getArcSweepRad(a1, a2, ccw) {
+    const tau = Math.PI * 2;
+    const n1 = normalizeRad(a1);
+    const n2 = normalizeRad(a2);
+    return ccw
+        ? ((n2 - n1) + tau) % tau
+        : ((n1 - n2) + tau) % tau;
+}
+
+function getPaperRadiusMm(state, radiusWorld) {
+    const r = Math.max(0, Math.abs(Number(radiusWorld) || 0));
+    const pageScale = Math.max(1e-9, Number(state?.pageSetup?.scale ?? 1) || 1);
+    const unitMm = Math.max(1e-9, Number(mmPerUnit(state?.pageSetup?.unit || "mm")) || 1);
+    return (r * unitMm) / pageScale;
+}
+
+function getAdaptiveSegmentCount(state, radiusWorld, sweepRad = Math.PI * 2) {
+    const paperRadiusMm = getPaperRadiusMm(state, radiusWorld);
+    const sweep = Math.max(0, Number(sweepRad) || 0);
+    if (paperRadiusMm <= 1e-9 || sweep <= 1e-9) return 0;
+    const rawFullSegments = 16 * Math.pow(Math.max(0.1, paperRadiusMm) / 5, 0.60206);
+    const fullSegments = Math.max(16, Math.min(384, Math.round(rawFullSegments)));
+    return Math.max(2, Math.ceil(fullSegments * (sweep / (Math.PI * 2))));
+}
+
+function buildCirclePolylinePoints(state, shape) {
+    const cx = Number(shape?.cx);
+    const cy = Number(shape?.cy);
+    const r = Math.abs(Number(shape?.r) || 0);
+    if (![cx, cy, r].every(Number.isFinite) || r <= 1e-9) return [];
+    const segments = getAdaptiveSegmentCount(state, r, Math.PI * 2);
+    const pts = [];
+    for (let i = 0; i < segments; i++) {
+        const t = (Math.PI * 2 * i) / segments;
+        pts.push({
+            x: cx + Math.cos(t) * r,
+            y: cy + Math.sin(t) * r,
+        });
+    }
+    return pts;
+}
+
+function buildArcPolylinePoints(state, shape) {
+    const cx = Number(shape?.cx);
+    const cy = Number(shape?.cy);
+    const r = Math.abs(Number(shape?.r) || 0);
+    const a1 = Number(shape?.a1);
+    const a2 = Number(shape?.a2);
+    const ccw = shape?.ccw !== false;
+    if (![cx, cy, r, a1, a2].every(Number.isFinite) || r <= 1e-9) return [];
+    const sweep = getArcSweepRad(a1, a2, ccw);
+    const segments = getAdaptiveSegmentCount(state, r, sweep);
+    const dir = ccw ? 1 : -1;
+    const pts = [];
+    for (let i = 0; i <= segments; i++) {
+        const t = a1 + dir * (sweep * (i / segments));
+        pts.push({
+            x: cx + Math.cos(t) * r,
+            y: cy + Math.sin(t) * r,
+        });
+    }
+    return pts;
+}
+
+function createPolylineFromShapePoints(sourceShape, points, closed, state, helpers, commonGroupId) {
+    const normalizedPoints = Array.isArray(points)
+        ? points
+            .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
+            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+        : [];
+    if (normalizedPoints.length < 2) return null;
+    const polyline = {
+        id: helpers.nextShapeId?.(),
+        type: "polyline",
+        points: normalizedPoints,
+        closed: !!closed,
+        layerId: Number(sourceShape?.layerId ?? state.activeLayerId),
+        lineWidthMm: Math.max(0.01, Number(sourceShape?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25),
+        lineType: String(sourceShape?.lineType || "solid"),
+        color: String(sourceShape?.color || "#0f172a"),
+        groupId: Number.isFinite(Number(commonGroupId))
+            ? Number(commonGroupId)
+            : (Number.isFinite(Number(sourceShape?.groupId)) ? Number(sourceShape.groupId) : null),
+    };
+    helpers.addShape?.(polyline);
+    return polyline;
 }
 
 export function moveSelectedShapes(state, helpers, dx, dy) {
@@ -73,8 +170,10 @@ export function lineToPolyline(state, helpers) {
 
     const targetPolylines = targetShapes.filter((s) => String(s?.type || "") === "polyline");
     const targetLines = targetShapes.filter((s) => String(s?.type || "") === "line");
-    if (!targetPolylines.length && !targetLines.length) {
-        helpers.setStatus?.("No line/polyline selected");
+    const targetCircles = targetShapes.filter((s) => String(s?.type || "") === "circle");
+    const targetArcs = targetShapes.filter((s) => String(s?.type || "") === "arc");
+    if (!targetPolylines.length && !targetLines.length && !targetCircles.length && !targetArcs.length) {
+        helpers.setStatus?.("No line/polyline/circle/arc selected");
         helpers.draw?.();
         return;
     }
@@ -94,6 +193,8 @@ export function lineToPolyline(state, helpers) {
     const createdIds = [];
     let polylineToLineCount = 0;
     let lineToPolylineCount = 0;
+    let circleToPolylineCount = 0;
+    let arcToPolylineCount = 0;
 
     // 1) polyline -> lines (always for selected/targeted polylines)
     for (const s of targetPolylines) {
@@ -290,18 +391,54 @@ export function lineToPolyline(state, helpers) {
         }
     }
 
-    if (Number.isFinite(Number(commonGroupId)) && createdIds.length > 0) {
-        const gid = Number(commonGroupId);
-        const g = (state.groups || []).find((x) => Number(x?.id) === gid);
-        if (g) {
-            const merged = new Set((g.shapeIds || []).map(Number).filter(Number.isFinite));
-            for (const id of createdIds) merged.add(Number(id));
-            g.shapeIds = Array.from(merged);
+    // 3) circle -> polyline
+    for (const s of targetCircles) {
+        const points = buildCirclePolylinePoints(state, s);
+        const polyline = createPolylineFromShapePoints(s, points, true, state, helpers, commonGroupId);
+        if (!polyline) continue;
+        helpers.removeShapeById?.(Number(s.id));
+        if (Number.isFinite(Number(polyline.id))) createdIds.push(Number(polyline.id));
+        circleToPolylineCount++;
+    }
+
+    // 4) arc -> polyline
+    for (const s of targetArcs) {
+        const points = buildArcPolylinePoints(state, s);
+        const polyline = createPolylineFromShapePoints(s, points, false, state, helpers, commonGroupId);
+        if (!polyline) continue;
+        helpers.removeShapeById?.(Number(s.id));
+        if (Number.isFinite(Number(polyline.id))) createdIds.push(Number(polyline.id));
+        arcToPolylineCount++;
+    }
+
+    if (createdIds.length > 0) {
+        if (Number.isFinite(Number(commonGroupId))) {
+            const gid = Number(commonGroupId);
+            const g = (state.groups || []).find((x) => Number(x?.id) === gid);
+            if (g) {
+                const merged = new Set((g.shapeIds || []).map(Number).filter(Number.isFinite));
+                for (const id of createdIds) merged.add(Number(id));
+                g.shapeIds = Array.from(merged);
+                for (const s of (state.shapes || [])) {
+                    if (merged.has(Number(s?.id))) s.groupId = gid;
+                }
+            }
+        } else {
+            setSelection(state, createdIds);
+            const newGroup = createGroupFromSelection(state, "");
+            if (newGroup) {
+                state.activeGroupId = Number(newGroup.id);
+                setSelection(state, collectGroupTreeShapeIds(state, newGroup.id));
+            }
         }
     }
 
-    if (createdIds.length > 0) setSelection(state, createdIds);
-    helpers.setStatus?.(`Line<>Polyline: polyline->line ${polylineToLineCount}, line->polyline ${lineToPolylineCount}`);
+    if (createdIds.length > 0 && !Number.isFinite(Number(commonGroupId))) {
+        // selection already updated above when regrouping new objects
+    } else if (createdIds.length > 0) {
+        setSelection(state, createdIds);
+    }
+    helpers.setStatus?.(`Polygon Convert: polyline->line ${polylineToLineCount}, line->polyline ${lineToPolylineCount}, circle->polyline ${circleToPolylineCount}, arc->polyline ${arcToPolylineCount}`);
     helpers.draw?.();
 }
 

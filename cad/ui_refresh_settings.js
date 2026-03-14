@@ -1,3 +1,4 @@
+import { getTouchConfirmText } from "./ui_text.js";
 import { ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
 
 export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
@@ -13,6 +14,7 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     normalizeLineTypePreset,
   } = helpers;
 
+  const touchText = getTouchConfirmText(panelLang);
   ensurePanelVisibilityState(state);
 
   if (dom.dimLinearMode) dom.dimLinearMode.value = state.dimSettings.linearMode || "single";
@@ -180,41 +182,41 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     ));
     const show = touchMode && (hasLinearDraft || canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy" || tool === "rect");
     let enabled = false;
-    let label = "Confirm";
+    let label = touchText.confirm;
     if (hasLinearDraft) {
       enabled = true;
-      label = "Finish Continuous Line";
+      label = touchText.finishContinuousLine;
     } else if (canLineFinalize) {
       enabled = !!(state.polylineDraft && (state.polylineDraft.points || []).length >= 2);
       label = (lineMode === "freehand")
-        ? "Finalize B-Spline"
-        : "Finish Continuous Line";
+        ? touchText.finalizeBSpline
+        : touchText.finishContinuousLine;
     } else if (isChainDim) {
       enabled = canPrepareDim || canFinalizeDim;
       label = canFinalizeDim
-        ? "Finalize Dim"
-        : "Set Placement";
+        ? touchText.finalizeDim
+        : touchText.setPlacement;
     } else if (tool === "circle" && circleMode === "threepoint") {
       enabled = canCircleThreePoint;
-      label = "Create 3-Point Circle";
+      label = touchText.createThreePointCircle;
     } else if (tool === "fillet") {
       enabled = canFillet;
-      label = "Apply Fillet";
+      label = touchText.applyFillet;
     } else if (tool === "doubleline") {
       enabled = canDline;
-      label = "Apply Double Line";
+      label = touchText.applyDoubleLine;
     } else if (tool === "hatch") {
       enabled = canHatch;
-      label = "Apply Hatch";
+      label = touchText.applyHatch;
     } else if (tool === "patterncopy") {
       enabled = canPatternCopy;
-      label = "Run Pattern Copy";
+      label = touchText.runPatternCopy;
     }
     if (tool === "rect") {
       enabled = canRectConfirm;
       label = (Number(rectDraft.stage) === 1)
-        ? "Create Rectangle"
-        : "Confirm 1st Point";
+        ? touchText.createRectangle
+        : touchText.confirmFirstPoint;
     }
     dom.touchConfirmOverlay.style.display = (isPanelVisible(state, "touchConfirmOverlay") && show) ? "flex" : "none";
     if (show) {

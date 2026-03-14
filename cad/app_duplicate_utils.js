@@ -98,14 +98,12 @@ function normalizeLayerIdForClone(state, sourceLayerId) {
 
 function makeCopiedGroupName(baseName, usedNameKeys) {
   const base = String(baseName || "").trim() || "Group";
-  const lower = base.toLowerCase();
-  if (!usedNameKeys.has(lower)) {
-    usedNameKeys.add(lower);
-    return base;
-  }
-  let i = 2;
-  while (i < 10000) {
-    const cand = `${base} (${i})`;
+  const match = /^(.*?)(\d+)$/.exec(base);
+  const prefix = match ? match[1] : base;
+  const start = match ? (Number(match[2]) + 1) : 1;
+  let i = start;
+  while (i < 1000000) {
+    const cand = `${prefix}${i}`;
     const key = cand.toLowerCase();
     if (!usedNameKeys.has(key)) {
       usedNameKeys.add(key);
@@ -113,7 +111,7 @@ function makeCopiedGroupName(baseName, usedNameKeys) {
     }
     i += 1;
   }
-  const fallback = `${base} (${Date.now()})`;
+  const fallback = `${prefix}${Date.now()}`;
   usedNameKeys.add(fallback.toLowerCase());
   return fallback;
 }

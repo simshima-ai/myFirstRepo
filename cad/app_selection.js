@@ -143,8 +143,7 @@ export function getSelectedShapes(state) {
 
 
 export function hitActiveGroupOriginHandle(state, screen) {
-    if (state.activeGroupId == null) return null;
-    const g = getGroup(state, state.activeGroupId);
+    const g = resolveHandleGroup(state);
     if (!g) return null;
     const c = {
         x: (Number(g.originX) || 0) * state.view.scale + state.view.offsetX,
@@ -156,14 +155,13 @@ export function hitActiveGroupOriginHandle(state, screen) {
 }
 
 export function hitActiveGroupRotateHandle(state, screen) {
-    if (state.activeGroupId == null) return null;
-    const g = getGroup(state, state.activeGroupId);
+    const g = resolveHandleGroup(state);
     if (!g) return null;
     const c = {
         x: (Number(g.originX) || 0) * state.view.scale + state.view.offsetX,
         y: (Number(g.originY) || 0) * state.view.scale + state.view.offsetY,
     };
-    const originR = 14;
+    const originR = 12;
     const handleDist = originR * 4.7;
     const ang = (Number(g.rotationDeg) || 0) * Math.PI / 180;
     const h = { x: c.x + Math.cos(ang) * handleDist, y: c.y + Math.sin(ang) * handleDist };
@@ -233,10 +231,20 @@ export function resolveVertexTangentAttribs(state, excludeShapeIds) {
 export function moveSelectedVerticesByDelta(state, dx, dy, helpers) {
     return selectionVertexOps.moveSelectedVerticesByDelta(state, dx, dy, helpers);
 }
+function resolveHandleGroup(state) {
+    const selectedGroupIds = Array.isArray(state.selection?.groupIds)
+        ? state.selection.groupIds.map(Number).filter(Number.isFinite)
+        : [];
+    const gid = (state.activeGroupId != null)
+        ? Number(state.activeGroupId)
+        : (selectedGroupIds.length ? Number(selectedGroupIds[selectedGroupIds.length - 1]) : NaN);
+    if (!Number.isFinite(gid)) return null;
+    return getGroup(state, gid) || null;
+}
+
 
 export function hitActiveGroupScaleHandle(state, screen) {
-    if (state.activeGroupId == null) return null;
-    const g = getGroup(state, state.activeGroupId);
+    const g = resolveHandleGroup(state);
     if (!g) return null;
     const scOpt = (g.scaleOptions && typeof g.scaleOptions === "object")
         ? g.scaleOptions
@@ -246,11 +254,11 @@ export function hitActiveGroupScaleHandle(state, screen) {
         x: (Number(g.originX) || 0) * state.view.scale + state.view.offsetX,
         y: (Number(g.originY) || 0) * state.view.scale + state.view.offsetY,
     };
-    const originR = 14;
+    const originR = 12;
     const handleDist = originR * 6.6;
     const ang = ((Number(g.rotationDeg) || 0) + 45) * Math.PI / 180;
     const h = { x: c.x + Math.cos(ang) * handleDist, y: c.y + Math.sin(ang) * handleDist };
-    return (Math.hypot(screen.x - h.x, screen.y - h.y) <= 20) ? g : null;
+    return (Math.hypot(screen.x - h.x, screen.y - h.y) <= 28) ? g : null;
 }
 
 export function deleteSelectedPolylineVertices(state, helpers) {

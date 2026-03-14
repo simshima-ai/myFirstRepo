@@ -311,6 +311,11 @@ export function createSelectionBoxOps(config) {
         if (box.additive) state.hatchDraft.boundaryIds = Array.from(new Set([...state.hatchDraft.boundaryIds, ...valid]));
         else state.hatchDraft.boundaryIds = valid;
         if (setStatus) setStatus(`Hatch: ${state.hatchDraft.boundaryIds.length} selected`);
+      } else if (state.tool === "trim") {
+        setSelection(state, picked);
+        state.selection.groupIds = [];
+        state.activeGroupId = null;
+        if (setStatus) setStatus(`Trim target: ${picked.length} object(s) (${leftToRight ? "Window" : "Crossing"})`);
       } else {
         const pickMode = String(state.ui?.selectPickMode || "object");
         if (pickMode === "group") {

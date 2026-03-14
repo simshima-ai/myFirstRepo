@@ -378,7 +378,7 @@ export function buildHatchLoopsFromBoundaryIds(shapes, boundaryIds, viewScale) {
         }
     }
 
-    if (loops.length === 0) return { ok: false, error: "髢蛾伜沺縺ｫ縺ｪ縺｣縺ｦ縺・∪縺帙ｓ" };
+    if (loops.length === 0) return { ok: false, error: "\u5883\u754c\u30eb\u30fc\u30d7\u3092\u4f5c\u6210\u3067\u304d\u307e\u305b\u3093" };
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
     for (const loop of loops) {

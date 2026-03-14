@@ -1,4 +1,4 @@
-export function createBsplineDraftController(state, deps) {
+export function finalizeBsplineDraftState(state, deps) {
     const {
         nextShapeId,
         pushHistory,
@@ -6,7 +6,32 @@ export function createBsplineDraftController(state, deps) {
         clearSelection,
         applyToolStrokeToShape
     } = deps;
+    const d = state.polylineDraft;
+    if (!d || d.kind !== "bspline" || !Array.isArray(d.points) || d.points.length < 2) {
+        state.polylineDraft = null;
+        return false;
+    }
+    const controlPoints = d.points
+        .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
+        .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+    state.polylineDraft = null;
+    if (controlPoints.length < 2) return false;
+    const shape = {
+        type: "bspline",
+        controlPoints,
+        degree: Math.max(1, Math.min(3, controlPoints.length - 1)),
+    };
+    shape.id = nextShapeId();
+    shape.layerId = state.activeLayerId;
+    applyToolStrokeToShape(shape, "line");
+    pushHistory();
+    addShape(shape);
+    clearSelection();
+    state.activeGroupId = null;
+    return true;
+}
 
+export function createBsplineDraftController(state, deps) {
     return {
         beginOrExtend(world) {
             const x = Number(world?.x), y = Number(world?.y);
@@ -25,29 +50,7 @@ export function createBsplineDraftController(state, deps) {
             state.polylineDraft.hoverPoint = { x: Number(world?.x) || 0, y: Number(world?.y) || 0 };
         },
         finalize() {
-            const d = state.polylineDraft;
-            if (!d || d.kind !== "bspline" || !Array.isArray(d.points) || d.points.length < 2) {
-                state.polylineDraft = null;
-                return false;
-            }
-            const controlPoints = d.points
-                .map((p) => ({ x: Number(p?.x), y: Number(p?.y) }))
-                .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-            state.polylineDraft = null;
-            if (controlPoints.length < 2) return false;
-            const shape = {
-                type: "bspline",
-                controlPoints,
-                degree: Math.max(1, Math.min(3, controlPoints.length - 1)),
-            };
-            shape.id = nextShapeId();
-            shape.layerId = state.activeLayerId;
-            applyToolStrokeToShape(shape, "line");
-            pushHistory();
-            addShape(shape);
-            clearSelection();
-            state.activeGroupId = null;
-            return true;
+            return finalizeBsplineDraftState(state, deps);
         }
     };
 }

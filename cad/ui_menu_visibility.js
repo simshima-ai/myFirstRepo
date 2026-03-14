@@ -1,4 +1,6 @@
-﻿export function refreshLeftMenuVisibilitySettings(state, dom, helpers) {
+﻿import { getLeftMenuGroupTitle } from "./ui_text.js";
+
+export function refreshLeftMenuVisibilitySettings(state, dom, helpers) {
   const { getUiLanguage, isLeftMenuItemVisible, onToggle } = helpers;
   const host = dom.leftMenuVisibilityList;
   if (!host) return;
@@ -6,20 +8,6 @@
   host.innerHTML = "";
   const lang = getUiLanguage(state);
   const groupOrder = ["snap", "create", "edit", "file", "other"];
-  const groupTitle = (g) => {
-    if (lang === "en") {
-      if (g === "snap") return "Snap";
-      if (g === "create") return "Create";
-      if (g === "edit") return "Edit";
-      if (g === "file") return "File";
-      return "Other";
-    }
-    if (g === "snap") return "Snap";
-    if (g === "create") return "Create";
-    if (g === "edit") return "Edit";
-    if (g === "file") return "File";
-    return "Other";
-  };
   const byGroup = new Map();
   for (const g of groupOrder) byGroup.set(g, []);
   for (const node of nodes) {
@@ -40,7 +28,7 @@
     const items = byGroup.get(group) || [];
     if (!items.length) continue;
     const title = document.createElement("div");
-    title.textContent = groupTitle(group);
+    title.textContent = getLeftMenuGroupTitle(lang, group);
     title.style.gridColumn = "1 / -1";
     title.style.fontSize = "12px";
     title.style.fontWeight = "700";

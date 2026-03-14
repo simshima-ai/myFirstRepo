@@ -60,6 +60,13 @@ export function bindInitTailEvents(params) {
       actions.clearActiveGroupAimTarget?.();
     });
   }
+  const normalizeGroupScaleInput = (el, fallback = 1) => {
+    if (!el) return fallback;
+    const v = Math.max(1e-6, Number(el.value) || fallback);
+    const rounded = Math.round(v * 1000) / 1000;
+    el.value = String(rounded);
+    return rounded;
+  };
   if (dom.groupScaleEnableToggle) {
     dom.groupScaleEnableToggle.addEventListener("change", () => {
       actions.setActiveGroupScaleOptions?.({
@@ -67,19 +74,55 @@ export function bindInitTailEvents(params) {
       });
     });
   }
+  if (dom.groupScaleKeepAspectToggle) {
+    dom.groupScaleKeepAspectToggle.addEventListener("change", () => {
+      const keepAspect = !!dom.groupScaleKeepAspectToggle.checked;
+      const sx = normalizeGroupScaleInput(dom.groupScaleFactorXInput, 1);
+      let sy = normalizeGroupScaleInput(dom.groupScaleFactorYInput, sx);
+      if (keepAspect) {
+        sy = sx;
+        if (dom.groupScaleFactorYInput) dom.groupScaleFactorYInput.value = String(sx);
+      }
+      if (dom.groupScaleFactorInput) dom.groupScaleFactorInput.value = String(sx);
+      actions.setActiveGroupScaleOptions?.({ keepAspect, scaleX: sx, scaleY: sy, scaleFactor: sx });
+    });
+  }
   if (dom.groupScaleApplyBtn) {
     dom.groupScaleApplyBtn.addEventListener("click", () => {
-      const v = Math.max(1e-6, Number(dom.groupScaleFactorInput?.value) || 1);
-      const rounded = Math.round(v * 1000) / 1000;
-      if (dom.groupScaleFactorInput) dom.groupScaleFactorInput.value = String(rounded);
-      actions.setActiveGroupScaleFactor?.(rounded);
+      const sx = normalizeGroupScaleInput(dom.groupScaleFactorXInput, 1);
+      const keepAspect = !!dom.groupScaleKeepAspectToggle?.checked;
+      const sy = keepAspect ? sx : normalizeGroupScaleInput(dom.groupScaleFactorYInput, 1);
+      if (dom.groupScaleFactorYInput) dom.groupScaleFactorYInput.value = String(sy);
+      if (dom.groupScaleFactorInput) dom.groupScaleFactorInput.value = String(sx);
+      actions.setActiveGroupScaleFactors?.(sx, sy);
+    });
+  }
+  if (dom.groupScaleFactorXInput) {
+    dom.groupScaleFactorXInput.addEventListener("change", () => {
+      const sx = normalizeGroupScaleInput(dom.groupScaleFactorXInput, 1);
+      if (dom.groupScaleKeepAspectToggle?.checked && dom.groupScaleFactorYInput) {
+        dom.groupScaleFactorYInput.value = String(sx);
+      }
+      if (dom.groupScaleFactorInput) dom.groupScaleFactorInput.value = String(sx);
+    });
+  }
+  if (dom.groupScaleFactorYInput) {
+    dom.groupScaleFactorYInput.addEventListener("change", () => {
+      if (dom.groupScaleKeepAspectToggle?.checked) {
+        const sx = normalizeGroupScaleInput(dom.groupScaleFactorXInput, 1);
+        dom.groupScaleFactorYInput.value = String(sx);
+        return;
+      }
+      normalizeGroupScaleInput(dom.groupScaleFactorYInput, 1);
     });
   }
   if (dom.groupScaleFactorInput) {
     dom.groupScaleFactorInput.addEventListener("change", () => {
-      const v = Math.max(1e-6, Number(dom.groupScaleFactorInput?.value) || 1);
-      const rounded = Math.round(v * 1000) / 1000;
-      dom.groupScaleFactorInput.value = String(rounded);
+      const sx = normalizeGroupScaleInput(dom.groupScaleFactorInput, 1);
+      if (dom.groupScaleFactorXInput) dom.groupScaleFactorXInput.value = String(sx);
+      if (dom.groupScaleKeepAspectToggle?.checked && dom.groupScaleFactorYInput) {
+        dom.groupScaleFactorYInput.value = String(sx);
+      }
     });
   }
   if (dom.moveSelectedShapesBtn) {
@@ -325,8 +368,10 @@ export function bindInitTailEvents(params) {
       const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
       const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
       if (tool === "line" && (lineMode === "continuous" || lineMode === "freehand")) {
-        const ok = !!actions.finalizePolylineDraft?.();
-        touchDebugLog(`fallback finalizePolylineDraft() => ${ok}`);
+        const ok = lineMode === "freehand"
+          ? !!actions.finalizeBsplineDraft?.()
+          : !!actions.finalizePolylineDraft?.();
+        touchDebugLog(lineMode === "freehand" ? `fallback finalizeBsplineDraft() => ${ok}` : `fallback finalizePolylineDraft() => ${ok}`);
         actions.draw?.();
         return;
       }

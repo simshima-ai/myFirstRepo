@@ -454,7 +454,7 @@
 
     const selectSameBtn = document.createElement("button");
     selectSameBtn.type = "button";
-    selectSameBtn.textContent = "Select Same Color Objects";
+    selectSameBtn.textContent = lang === "ja" ? "\u540c\u3058\u8272\u3092\u9078\u629e" : "Select Same Color Objects";
     selectSameBtn.style.minHeight = "30px";
     selectSameBtn.style.padding = "4px 10px";
     selectSameBtn.style.fontSize = "12px";
@@ -472,7 +472,7 @@
     cmdRow.style.gridTemplateColumns = "1fr 1fr";
     const applyBtn = document.createElement("button");
     applyBtn.type = "button";
-    applyBtn.textContent = "Apply";
+    applyBtn.textContent = lang === "ja" ? "\u9069\u7528" : "Apply";
     applyBtn.style.minHeight = "30px";
     applyBtn.style.padding = "4px 10px";
     applyBtn.style.fontSize = "12px";
@@ -484,7 +484,7 @@
     });
     const cancelBtn = document.createElement("button");
     cancelBtn.type = "button";
-    cancelBtn.textContent = "Cancel";
+    cancelBtn.textContent = lang === "ja" ? "\u30ad\u30e3\u30f3\u30bb\u30eb" : "Cancel";
     cancelBtn.style.minHeight = "30px";
     cancelBtn.style.padding = "4px 10px";
     cancelBtn.style.fontSize = "12px";

@@ -139,27 +139,30 @@ export function createSelectionVertexOps(config) {
 
   function vertexKeyOf(v) { return `${Number(v.shapeId)}:${v.key}`; }
 
+  function isVertexEditableType(shape) {
+    const t = String(shape?.type || "");
+    return t === "line" || t === "rect" || t === "arc" || t === "bspline" || t === "polyline";
+  }
+
+  function getEditableVertexKeys(shape) {
+    if (!shape || !isVertexEditableType(shape)) return [];
+    if (shape.type === "arc") return ["a1", "a2"];
+    if (shape.type === "bspline") return Array.isArray(shape.controlPoints) ? shape.controlPoints.map((_, i) => `cp${i}`) : [];
+    if (shape.type === "polyline") return Array.isArray(shape.points) ? shape.points.map((_, i) => `v${i}`) : [];
+    return ["p1", "p2"];
+  }
+
   function getCoincidentVertexGroup(state, hit) {
     if (state.vertexEdit?.linkCoincident === false) return [{ shapeId: Number(hit.shapeId), key: hit.key }];
-    const targetSet = getVertexTargetSet(state);
-    if (!targetSet.size) return [{ shapeId: Number(hit.shapeId), key: hit.key }];
     const baseShape = state.shapes.find(s => Number(s.id) === Number(hit.shapeId));
     const base = getVertexAtKey(baseShape, hit.key);
     if (!base) return [{ shapeId: Number(hit.shapeId), key: hit.key }];
     const eps = 1e-9;
     const out = [];
     for (const s of state.shapes) {
-      if (!targetSet.has(Number(s.id))) continue;
       if (!s || !isLayerVisible(state, s.layerId)) continue;
-      if (!(s.type === "line" || s.type === "rect" || s.type === "arc" || s.type === "bspline" || s.type === "polyline")) continue;
-      const keys = (s.type === "arc")
-        ? ["a1", "a2"]
-        : (s.type === "bspline"
-          ? (Array.isArray(s.controlPoints) ? s.controlPoints.map((_, i) => `cp${i}`) : [])
-          : (s.type === "polyline"
-            ? (Array.isArray(s.points) ? s.points.map((_, i) => `v${i}`) : [])
-            : ["p1", "p2"]));
-      for (const k of keys) {
+      if (!isVertexEditableType(s)) continue;
+      for (const k of getEditableVertexKeys(s)) {
         const p = getVertexAtKey(s, k);
         if (!p) continue;
         if (Math.hypot(Number(p.x) - base.x, Number(p.y) - base.y) <= eps) out.push({ shapeId: Number(s.id), key: k });
@@ -404,6 +407,10 @@ export function createSelectionVertexOps(config) {
     if (!selected.length) return false;
     const keySet = new Set(selected.map(vertexKeyOf));
     const shapeIdSet = new Set(selected.map(v => Number(v.shapeId)));
+    state.vertexEdit.targetShapeIds = Array.from(new Set([
+      ...((state.vertexEdit.targetShapeIds || []).map(Number).filter(Number.isFinite)),
+      ...Array.from(shapeIdSet)
+    ]));
     const baseSnaps = [];
     for (const s of state.shapes) if (shapeIdSet.has(Number(s.id))) baseSnaps.push({ id: Number(s.id), shape: cloneShapeForDrag(s) });
     state.vertexEdit.drag.active = true;

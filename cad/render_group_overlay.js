@@ -5,9 +5,20 @@ export function createRenderGroupOverlayOps(deps) {
     return;
   }
 
+  function resolveActiveGroup(state) {
+    const selectedGroupIds = Array.isArray(state.selection?.groupIds)
+      ? state.selection.groupIds.map(Number).filter(Number.isFinite)
+      : [];
+    const gid = (state.activeGroupId != null)
+      ? Number(state.activeGroupId)
+      : (selectedGroupIds.length ? Number(selectedGroupIds[selectedGroupIds.length - 1]) : NaN);
+    if (!Number.isFinite(gid)) return null;
+    return (state.groups || []).find((gg) => Number(gg.id) === gid) || null;
+  }
+
+
   function drawActiveGroupOriginHandle(ctx, state) {
-    if (state.activeGroupId == null) return;
-    const g = (state.groups || []).find((gg) => Number(gg.id) === Number(state.activeGroupId));
+    const g = resolveActiveGroup(state);
     if (!g) return;
     const c = worldToScreen(state.view, { x: Number(g.originX) || 0, y: Number(g.originY) || 0 });
     const r = 12;
@@ -29,8 +40,7 @@ export function createRenderGroupOverlayOps(deps) {
   }
 
   function drawActiveGroupRotateHandle(ctx, state) {
-    if (state.activeGroupId == null) return;
-    const g = (state.groups || []).find((gg) => Number(gg.id) === Number(state.activeGroupId));
+    const g = resolveActiveGroup(state);
     if (!g) return;
     const c = worldToScreen(state.view, { x: Number(g.originX) || 0, y: Number(g.originY) || 0 });
     const originR = 12;
@@ -63,8 +73,7 @@ export function createRenderGroupOverlayOps(deps) {
   }
 
   function drawActiveGroupScaleHandle(ctx, state) {
-    if (state.activeGroupId == null) return;
-    const g = (state.groups || []).find((gg) => Number(gg.id) === Number(state.activeGroupId));
+    const g = resolveActiveGroup(state);
     if (!g) return;
     const scOpt = (g.scaleOptions && typeof g.scaleOptions === "object")
       ? g.scaleOptions

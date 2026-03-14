@@ -1,4 +1,4 @@
-import { parseSvgToCadShapes, parseDxfToCadShapes } from "./app_vector_import.js";
+﻿import { parseSvgToCadShapes, parseDxfToCadShapes } from "./app_vector_import.js";
 
 export function createFileOpsRuntime(config) {
   const {
@@ -1286,6 +1286,20 @@ export function createFileOpsRuntime(config) {
     throw new Error("Unsupported file type");
   }
 
+  async function importDroppedFiles(files) {
+    const list = Array.from(files || []).filter(Boolean);
+    if (!list.length) return false;
+    const isViewerMode = String(state.ui?.displayMode || "cad").toLowerCase() === "viewer";
+    for (let i = 0; i < list.length; i++) {
+      const file = list[i];
+      const importMode = isViewerMode ? (i === 0 ? "replace" : "import") : "import";
+      await importAnyFile(file, importMode);
+    }
+    if (!state.ui) state.ui = {};
+    state.ui._needsTangentResolve = true;
+    return true;
+  }
+
   function bindDropImport() {
     const target = document;
     const canHandle = (e) => {
@@ -1369,9 +1383,11 @@ export function createFileOpsRuntime(config) {
     importImageFile,
     bindJsonFileInputChange,
     bindDropImport,
+    importDroppedFiles,
     onImportSourceUnitChanged,
     setImportAdjustParam,
     applyImportAdjust,
     cancelImportAdjust
   };
 }
+

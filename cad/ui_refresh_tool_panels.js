@@ -1,4 +1,6 @@
-﻿export function refreshToolPanels(state, dom, panelLang, helpers) {
+import { getPatternCopyText } from "./ui_text.js";
+export function refreshToolPanels(state, dom, panelLang, helpers) {
+  const patternCopyText = getPatternCopyText(panelLang);
   const {
     getUiLanguage,
     normalizeGridPreset,
@@ -41,7 +43,9 @@
       const t10 = Math.max(100, Math.min(2000, Math.round(Number(state.grid.autoThreshold10 ?? 180))));
       const t5 = Math.max(100, Math.min(2000, Math.round(Number(state.grid.autoThreshold5 ?? 240))));
       const t1 = Math.max(100, Math.min(2000, Math.round(Number(state.grid.autoThreshold1 ?? 320))));
-      dom.gridAutoTimingHint.textContent = `Thresholds: 50=${t50}% / 10=${t10}% / 5=${t5}% / 1=${t1}%`;
+      dom.gridAutoTimingHint.textContent = lang === "ja"
+        ? `??: 50=${t50}% / 10=${t10}% / 5=${t5}% / 1=${t1}%`
+        : `Thresholds: 50=${t50}% / 10=${t10}% / 5=${t5}% / 1=${t1}%`;
     }
   }
   if (dom.objSnapToggle) dom.objSnapToggle.checked = state.objectSnap?.enabled !== false;
@@ -58,8 +62,8 @@
       const show = !touchMode && state.tool === "line" && (mode === "continuous" || mode === "freehand");
       dom.lineTouchFinalizeBtn.style.display = show ? "" : "none";
       dom.lineTouchFinalizeBtn.textContent = mode === "freehand"
-        ? "Finalize B-Spline"
-        : "Finish Continuous Line";
+        ? (panelLang === "ja" ? "Bスプライン確定" : "Finalize B-Spline")
+        : (panelLang === "ja" ? "連続ライン確定" : "Finish Continuous Line");
     }
   }
   if (dom.objSnapTangentToggle) dom.objSnapTangentToggle.checked = !!state.objectSnap?.tangent;
@@ -130,17 +134,17 @@
       if (!loopOk) {
         const err = String(v.loopError || "Boundary loop build failed");
         dom.hatchValidateResult.textContent = (lang === "ja")
-          ? `Endpoint check: NG (${err})`
+          ? `\u7aef\u70b9\u4e00\u81f4: NG (${err})`
           : `Endpoint match: NG (${err})`;
         dom.hatchValidateResult.style.color = "#b91c1c";
       } else if (openCount === 0) {
         dom.hatchValidateResult.textContent = (lang === "ja")
-          ? "Endpoint check: OK"
+          ? "\u7aef\u70b9\u4e00\u81f4: OK"
           : "Endpoint match: OK";
         dom.hatchValidateResult.style.color = "#15803d";
       } else {
         dom.hatchValidateResult.textContent = (lang === "ja")
-          ? `Endpoint check: open ${openCount} / near ${nearCount}`
+          ? `\u7aef\u70b9\u4e00\u81f4: open ${openCount} / near ${nearCount}`
           : `Endpoint match: open ${openCount} / near ${nearCount}`;
         dom.hatchValidateResult.style.color = "#b91c1c";
       }
@@ -162,23 +166,23 @@
   if (dom.patternCopyCenterStatus) {
     const cid = state.input.patternCopyFlow.centerPositionId;
     dom.patternCopyCenterStatus.textContent = cid
-      ? `Set: Point #${cid}`
-      : "Not set (pick a point on canvas)";
+      ? patternCopyText.centerSetStatus(cid)
+      : patternCopyText.centerUnsetStatus;
     if (dom.patternCopySetCenterBtn) {
       dom.patternCopySetCenterBtn.textContent = cid
-        ? "Clear Center"
-        : "Set as Center";
+        ? patternCopyText.centerClearButton
+        : patternCopyText.centerSetButton;
     }
   }
   if (dom.patternCopyAxisStatus) {
     const aid = state.input.patternCopyFlow.axisLineId;
     dom.patternCopyAxisStatus.textContent = aid
-      ? `Set: Line #${aid}`
-      : "Not set (pick a line on canvas)";
+      ? patternCopyText.axisSetStatus(aid)
+      : patternCopyText.axisUnsetStatus;
     if (dom.patternCopySetAxisBtn) {
       dom.patternCopySetAxisBtn.textContent = aid
-        ? "Clear Axis"
-        : "Set as Axis";
+        ? patternCopyText.axisClearButton
+        : patternCopyText.axisSetButton;
     }
   }
 
@@ -230,11 +234,11 @@
       }
       dom.traceTargetInfo.textContent = (panelLang === "en")
         ? `Target: image #${Number(selectedImage.id)} (${count} lines)`
-        : `Target: Image #${Number(selectedImage.id)} (${count})`;
+        : `\u5bfe\u8c61: \u753b\u50cf #${Number(selectedImage.id)} (${count}\u672c)`;
     } else {
       dom.traceTargetInfo.textContent = (panelLang === "en")
         ? "Select an imported image object"
-        : "Select an imported image";
+        : "インポート画像を選択";
     }
   }
   const setIfNotEditing = (el, v) => {

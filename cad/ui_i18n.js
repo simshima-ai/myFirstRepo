@@ -130,7 +130,7 @@ export function applyLanguageUi(state, dom) {
       trim: "トリム",
       doubleline: "二重線",
       patterncopy: "パターンコピー",
-      lineToPolyline: "線<>多角形",
+      lineToPolyline: "多角形変換",
       undo: "Undo",
       redo: "Redo",
       del: "削除",
@@ -229,6 +229,8 @@ export function applyLanguageUi(state, dom) {
       filletSplit: "トリムしない",
       filletApply: "実行",
       language: "言語",
+      languageJa: "\u65e5\u672c\u8a9e",
+      languageEn: "English",
       menuScale: "メニュー倍率",
       touchMode: "タッチモード",
       leftMenuVisibleItems: "\u5de6\u30e1\u30cb\u30e5\u30fc\u8868\u793a\u9805\u76ee",
@@ -256,7 +258,10 @@ export function applyLanguageUi(state, dom) {
       colorize: "カラー分け表示",
       currentLayerOnly: "現在レイヤー所属のみ表示",
       groupAllowScale: "グループにスケールを許可",
+      groupKeepAspect: "比率を維持",
       groupScaleFactor: "スケール値",
+      groupScaleX: "X倍率",
+      groupScaleY: "Y倍率",
       editOnlyActive: "選択レイヤーのみ編集",
       moveObjectsToLayer: "オブジェクトを移動",
       deleteLayer: "レイヤー削除",
@@ -341,6 +346,7 @@ export function applyLanguageUi(state, dom) {
       vertexMode: "モード",
       vertexModeMove: "頂点移動",
       vertexModeInsert: "頂点挿入",
+      vertexKeepLinks: "\u7e4b\u304c\u308a\u3092\u7dad\u6301",
       vertexDelete: "頂点削除",
       length: "長さ",
       anchor: "基準",
@@ -446,7 +452,7 @@ export function applyLanguageUi(state, dom) {
       trim: "Trim",
       doubleline: "Double Line",
       patterncopy: "Pattern Copy",
-      lineToPolyline: "Line<>Polyline",
+      lineToPolyline: "Polygon Convert",
       undo: "Undo",
       redo: "Redo",
       del: "Delete",
@@ -545,6 +551,8 @@ export function applyLanguageUi(state, dom) {
       filletSplit: "No Trim",
       filletApply: "Execute",
       language: "Language",
+      languageJa: "Japanese",
+      languageEn: "English",
       menuScale: "Menu Scale",
       touchMode: "Touch Mode",
       leftMenuVisibleItems: "Left Menu Items",
@@ -572,7 +580,10 @@ export function applyLanguageUi(state, dom) {
       colorize: "Colorize",
       currentLayerOnly: "Show Active-Layer Items Only",
       groupAllowScale: "Allow Group Scaling",
+      groupKeepAspect: "Keep Aspect",
       groupScaleFactor: "Scale Value",
+      groupScaleX: "Scale X",
+      groupScaleY: "Scale Y",
       editOnlyActive: "Edit Active Layer Only",
       moveObjectsToLayer: "Move Objects",
       deleteLayer: "Delete Layer",
@@ -657,6 +668,7 @@ export function applyLanguageUi(state, dom) {
       vertexMode: "Mode",
       vertexModeMove: "Move Vertex",
       vertexModeInsert: "Insert Vertex",
+      vertexKeepLinks: "Keep Vertex Links",
       vertexDelete: "Delete Vertex",
       length: "Length",
       anchor: "Anchor",
@@ -746,8 +758,8 @@ export function applyLanguageUi(state, dom) {
     if (dom.uiLanguageSelect.value !== lang) dom.uiLanguageSelect.value = lang;
     const oJa = dom.uiLanguageSelect.querySelector("option[value='ja']");
     const oEn = dom.uiLanguageSelect.querySelector("option[value='en']");
-    if (oJa) oJa.textContent = "日本語";
-    if (oEn) oEn.textContent = "English";
+    if (oJa) oJa.textContent = t.languageJa;
+    if (oEn) oEn.textContent = t.languageEn;
   }
 
   setText(".sidebar .section[data-panel-id='tools'] > .panel-toggle", t.create);
@@ -913,6 +925,7 @@ export function applyLanguageUi(state, dom) {
   setPrevSpanByControl("vertexModeSelect", t.vertexMode);
   setOptionText("vertexModeSelect", "move", t.vertexModeMove);
   setOptionText("vertexModeSelect", "insert", t.vertexModeInsert);
+  setLabelByControl("vertexLinkCoincidentToggle", t.vertexKeepLinks);
   setButtonById("deleteVertexBtn", t.vertexDelete);
   setPrevSpanByControl("lineLengthInput", t.length);
   setPrevSpanByControl("lineAngleInput", t.angle);
@@ -938,7 +951,7 @@ export function applyLanguageUi(state, dom) {
   setPrevSpanByControl("rectToolLineWidthInput", t.lineWidth);
   setPrevSpanByControl("rectToolLineTypeInput", t.lineType);
   setPrevSpanByControl("rectToolColorInput", t.color);
-  setLabelByControl("circleRadiusInput", t.radius);
+  setPrevSpanByControl("circleRadiusInput", t.radius);
   setPrevSpanByControl("circleModeSelect", t.circleMode);
   setOptionText("circleModeSelect", "drag", t.circleModeDrag);
   setOptionText("circleModeSelect", "fixed", t.circleModeFixed);
@@ -959,7 +972,10 @@ export function applyLanguageUi(state, dom) {
   setButtonById("dimMergeGroupsBtn", t.groupSelectedShapes);
   setButtonById("unparentGroupBtn", t.unparent);
   setButtonById("deleteGroupBtn", t.deleteThisGroup);
-  setLabelByControl("groupScaleEnableToggle", t.groupAllowScale);
+  setText("#groupScaleEnableLabel", t.groupAllowScale);
+  setText("#groupScaleKeepAspectLabel", t.groupKeepAspect);
+  setText("#groupScaleFactorXLabel", t.groupScaleX);
+  setText("#groupScaleFactorYLabel", t.groupScaleY);
   setLabelByControl("groupScaleFactorInput", t.groupScaleFactor);
   setButtonById("groupScaleApplyBtn", t.apply);
   setLabelByControl("groupAimEnableToggle", t.aimConstraint);

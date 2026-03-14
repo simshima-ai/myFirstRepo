@@ -343,8 +343,13 @@ export function createState() {
         groupId: null,
         startDistance: 0,
         startScaleFactor: 1,
+        startScaleX: 1,
+        startScaleY: 1,
+        startVectorX: 0,
+        startVectorY: 0,
         groupOrigin: null,
         shapeSnapshots: null,
+        groupSnapshots: null,
         modelSnapshotBeforeScale: null,
         moved: false,
       },
@@ -463,9 +468,9 @@ export function createState() {
         touchSelectBackOverlay: true,
       },
       adZones: {
-        topRight: true,
-        bottomLeft: true,
-        bottomCenter: true,
+        topRight: false,
+        bottomLeft: false,
+        bottomCenter: false,
       },
       autoBackupEnabled: true,
       autoBackupIntervalSec: 60,
@@ -701,7 +706,11 @@ function normalizeGroupScaleOptions(raw) {
   const keepAspect = allowScale ? (raw?.keepAspect !== false) : false;
   const scaleFactorRaw = Number(raw?.scaleFactor);
   const scaleFactor = Number.isFinite(scaleFactorRaw) && scaleFactorRaw > 1e-9 ? scaleFactorRaw : 1;
-  return { allowScale, keepAspect, scaleFactor };
+  const scaleXRaw = Number(raw?.scaleX);
+  const scaleYRaw = Number(raw?.scaleY);
+  const scaleX = Number.isFinite(scaleXRaw) && scaleXRaw > 1e-9 ? scaleXRaw : scaleFactor;
+  const scaleY = Number.isFinite(scaleYRaw) && scaleYRaw > 1e-9 ? scaleYRaw : scaleFactor;
+  return { allowScale, keepAspect, scaleFactor, scaleX, scaleY };
 }
 
 export function clearSelection(state) {
@@ -743,6 +752,16 @@ export function addShape(state, shape) {
   }
   if (shape && typeof shape.lineType !== "string") {
     shape.lineType = "solid";
+  }
+
+  const explicitGroupId = Number(shape?.groupId);
+  if (shape && Number.isFinite(explicitGroupId) && shape.type !== "position") {
+    const group = (state.groups || []).find((g) => Number(g?.id) === explicitGroupId) || null;
+    if (group) {
+      if (!Array.isArray(group.shapeIds)) group.shapeIds = [];
+      const sid = Number(shape.id);
+      if (Number.isFinite(sid) && !group.shapeIds.map(Number).includes(sid)) group.shapeIds.push(sid);
+    }
   }
 
   // 自動グループ作成: groupId が指定されていない新規オブジェクトの場合
@@ -1078,6 +1097,7 @@ export function createGroupFromSelection(state, name) {
   for (const g of (state.groups || [])) {
     g.shapeIds = (g.shapeIds || []).filter((sid) => !ids.includes(Number(sid)));
   }
+  pruneEmptyGroups(state);
   const id = state.nextGroupId++;
   let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
   const shapeIdSet = new Set(ids);

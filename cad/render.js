@@ -154,10 +154,27 @@ function collectGroupTreeShapeIdSet(state, rootGroupId) {
   return shapeIds;
 }
 
+function collectHighlightedGroupShapeIdSet(state) {
+  const groupIds = new Set();
+  for (const gidRaw of (state.selection?.groupIds || [])) {
+    const gid = Number(gidRaw);
+    if (Number.isFinite(gid)) groupIds.add(gid);
+  }
+  if (state.activeGroupId != null) {
+    const gid = Number(state.activeGroupId);
+    if (Number.isFinite(gid)) groupIds.add(gid);
+  }
+  if (!groupIds.size) return null;
+  const shapeIds = new Set();
+  for (const gid of groupIds) {
+    for (const sid of collectGroupTreeShapeIdSet(state, gid)) shapeIds.add(Number(sid));
+  }
+  return shapeIds;
+}
+
 function isInActiveGroup(state, shapeId) {
-  if (state.activeGroupId == null) return false;
-  const ids = collectGroupTreeShapeIdSet(state, state.activeGroupId);
-  return ids.has(Number(shapeId));
+  const ids = collectHighlightedGroupShapeIdSet(state);
+  return !!ids && ids.has(Number(shapeId));
 }
 
 
@@ -268,7 +285,7 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
   if (shape.type === "hatch") {
     drawHatchFill(ctx, state, shape);
     if (selectedVisual) {
-      // ハッチE��択時にバウンチE��ングボックスを描画
+      // Draw a bounding box while the hatch is selected.
       const parsed = buildHatchLoopsFromBoundaryIds(state.shapes, shape.boundaryIds || [], state.view.scale);
       if (parsed.ok && parsed.bounds) {
         const b = parsed.bounds;
@@ -661,9 +678,7 @@ export function render(ctx, canvas, state) {
       maxY: Math.max(top, bottom),
     };
     const selectedSet = new Set((state.selection?.ids || []).map(Number));
-    const activeGroupShapeSet = (state.activeGroupId == null)
-      ? null
-      : collectGroupTreeShapeIdSet(state, state.activeGroupId);
+    const activeGroupShapeSet = collectHighlightedGroupShapeIdSet(state);
     const currentShapeGroupMap = buildCurrentShapeGroupMap(state);
     // Render order is linked to layer order:
     // panel top( index 0 ) is top-most, so we draw from bottom layer to top layer.

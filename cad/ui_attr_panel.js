@@ -1,4 +1,5 @@
 ﻿export function refreshAttrPanel(state, dom, selectedShapes) {
+  const lang = String(state?.ui?.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
   if (!dom?.attrPanel) return;
   const selectedWithAttrs = (selectedShapes || []).find(s => {
     const explicit = Array.isArray(s?.attributes) && s.attributes.length > 0;
@@ -77,7 +78,7 @@
     for (const a of attrs) {
       const row = document.createElement("div");
       row.className = "attr-row";
-      row.title = `target: ${String(a?.target || "object")}`;
+      row.title = lang === "ja" ? `??: ${String(a?.target || "object")}` : `target: ${String(a?.target || "object")}`;
       const nameIn = document.createElement("input");
       nameIn.type = "text";
       nameIn.value = String(a?.name ?? "");
@@ -98,7 +99,7 @@
       }
       const delBtn = document.createElement("button");
       delBtn.type = "button";
-      delBtn.textContent = "Delete";
+      delBtn.textContent = lang === "ja" ? "??" : "Delete";
       if (!a?._implicit) delBtn.setAttribute("data-attr-remove", String(a?.id ?? ""));
       else delBtn.disabled = true;
       row.append(nameIn, valIn, delBtn);

@@ -1,15 +1,25 @@
-﻿export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText, helpers) {
+﻿import { getGroupAimText } from "./ui_text.js";
+
+export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText, helpers) {
   const { syncInputValue, normalizeLineWidthPreset, normalizeLineTypePreset } = helpers;
-  if (dom.deleteGroupBtn) dom.deleteGroupBtn.disabled = (state.activeGroupId == null);
-  if (dom.unparentGroupBtn) {
-    const g = (state.groups || []).find(gg => Number(gg.id) === Number(state.activeGroupId));
-    dom.unparentGroupBtn.disabled = !(g && g.parentId != null);
+  const selectedGroupIds = Array.isArray(state.selection?.groupIds)
+    ? state.selection.groupIds.map(Number).filter(Number.isFinite)
+    : [];
+  const effectiveActiveGroupId = (state.activeGroupId != null)
+    ? Number(state.activeGroupId)
+    : (selectedGroupIds.length ? Number(selectedGroupIds[selectedGroupIds.length - 1]) : null);
+  if (state.activeGroupId == null && Number.isFinite(effectiveActiveGroupId)) {
+    state.activeGroupId = effectiveActiveGroupId;
   }
-  if (dom.moveGroupBtn) dom.moveGroupBtn.disabled = (state.activeGroupId == null);
-  if (dom.copyGroupBtn) dom.copyGroupBtn.disabled = (state.activeGroupId == null);
-  if (dom.renameGroupBtn) dom.renameGroupBtn.disabled = (state.activeGroupId == null);
+  const activeGroup = (state.groups || []).find((g) => Number(g.id) === Number(effectiveActiveGroupId)) || null;
+  if (dom.deleteGroupBtn) dom.deleteGroupBtn.disabled = (effectiveActiveGroupId == null);
+  if (dom.unparentGroupBtn) {
+    dom.unparentGroupBtn.disabled = !(activeGroup && activeGroup.parentId != null);
+  }
+  if (dom.moveGroupBtn) dom.moveGroupBtn.disabled = (effectiveActiveGroupId == null);
+  if (dom.copyGroupBtn) dom.copyGroupBtn.disabled = (effectiveActiveGroupId == null);
+  if (dom.renameGroupBtn) dom.renameGroupBtn.disabled = (effectiveActiveGroupId == null);
   if (dom.renameGroupNameInput) {
-    const activeGroup = (state.groups || []).find(g => Number(g.id) === Number(state.activeGroupId));
     if (!activeGroup) {
       if (document.activeElement !== dom.renameGroupNameInput) dom.renameGroupNameInput.value = "";
     } else if (document.activeElement !== dom.renameGroupNameInput) {
@@ -18,7 +28,7 @@
   }
   if (dom.moveGroupUpBtn || dom.moveGroupDownBtn) {
     const groups = state.groups || [];
-    const idx = groups.findIndex(g => Number(g.id) === Number(state.activeGroupId));
+    const idx = groups.findIndex(g => Number(g.id) === Number(effectiveActiveGroupId));
     const canUp = idx > 0;
     const canDown = idx >= 0 && idx < (groups.length - 1);
     if (dom.moveGroupUpBtn) dom.moveGroupUpBtn.disabled = !canUp;
@@ -26,13 +36,13 @@
   }
   if (dom.moveGroupOriginOnlyBtn) {
     const active = !!(state.input?.groupOriginPick?.active);
-    dom.moveGroupOriginOnlyBtn.disabled = (state.activeGroupId == null);
+    dom.moveGroupOriginOnlyBtn.disabled = (effectiveActiveGroupId == null);
     dom.moveGroupOriginOnlyBtn.classList.toggle("is-active", active);
     dom.moveGroupOriginOnlyBtn.textContent = active ? panelText.movingOrigin : panelText.moveOrigin;
   }
-  const activeGroup = (state.groups || []).find((g) => Number(g.id) === Number(state.activeGroupId)) || null;
+  const aimText = getGroupAimText(panelLang);
   if (dom.groupRotationLabel) {
-    dom.groupRotationLabel.textContent = "Rotation";
+    dom.groupRotationLabel.textContent = aimText.rotation;
   }
   if (dom.groupRotationValue) {
     if (!activeGroup) {
@@ -40,26 +50,40 @@
     } else {
       const deg = Number(activeGroup.rotationDeg) || 0;
       const rounded = Math.round(deg * 100) / 100;
-      dom.groupRotationValue.textContent = `${rounded.toFixed(2)} deg`;
+      dom.groupRotationValue.textContent = `${rounded.toFixed(2)} ${aimText.deg}`;
     }
   }
   if (dom.groupScaleEnableToggle) {
     const scOpt = (activeGroup && activeGroup.scaleOptions && typeof activeGroup.scaleOptions === "object")
       ? activeGroup.scaleOptions
-      : { allowScale: false, keepAspect: false };
+      : { allowScale: false, keepAspect: false, scaleFactor: 1, scaleX: 1, scaleY: 1 };
     const allowScale = !!scOpt.allowScale;
-    if (dom.groupScaleEnableToggle) {
-      dom.groupScaleEnableToggle.disabled = (state.activeGroupId == null);
-      dom.groupScaleEnableToggle.checked = allowScale;
+    const keepAspect = scOpt.keepAspect !== false;
+    const scaleX = Math.max(1e-9, Number(scOpt.scaleX) || Number(scOpt.scaleFactor) || 1);
+    const scaleY = Math.max(1e-9, Number(scOpt.scaleY) || Number(scOpt.scaleFactor) || 1);
+    dom.groupScaleEnableToggle.disabled = (effectiveActiveGroupId == null);
+    dom.groupScaleEnableToggle.checked = allowScale;
+    if (dom.groupScaleKeepAspectToggle) {
+      dom.groupScaleKeepAspectToggle.disabled = (effectiveActiveGroupId == null) || !allowScale;
+      dom.groupScaleKeepAspectToggle.checked = keepAspect;
+    }
+    if (dom.groupScaleFactorXInput) {
+      const rounded = Math.round(scaleX * 1000) / 1000;
+      if (document.activeElement !== dom.groupScaleFactorXInput) syncInputValue(dom.groupScaleFactorXInput, rounded);
+      dom.groupScaleFactorXInput.disabled = (effectiveActiveGroupId == null) || !allowScale;
+    }
+    if (dom.groupScaleFactorYInput) {
+      const rounded = Math.round(scaleY * 1000) / 1000;
+      if (document.activeElement !== dom.groupScaleFactorYInput) syncInputValue(dom.groupScaleFactorYInput, rounded);
+      dom.groupScaleFactorYInput.disabled = (effectiveActiveGroupId == null) || !allowScale || keepAspect;
     }
     if (dom.groupScaleFactorInput) {
-      const sf = Math.max(1e-9, Number(scOpt.scaleFactor) || 1);
-      const sfRounded = Math.round(sf * 1000) / 1000;
-      if (document.activeElement !== dom.groupScaleFactorInput) syncInputValue(dom.groupScaleFactorInput, sfRounded);
-      dom.groupScaleFactorInput.disabled = (state.activeGroupId == null) || !allowScale;
+      const rounded = Math.round(scaleX * 1000) / 1000;
+      if (document.activeElement !== dom.groupScaleFactorInput) syncInputValue(dom.groupScaleFactorInput, rounded);
+      dom.groupScaleFactorInput.disabled = true;
     }
     if (dom.groupScaleApplyBtn) {
-      dom.groupScaleApplyBtn.disabled = (state.activeGroupId == null) || !allowScale;
+      dom.groupScaleApplyBtn.disabled = (effectiveActiveGroupId == null) || !allowScale;
     }
   }
   const aim = activeGroup?.aimConstraint || {};
@@ -71,37 +95,37 @@
   const aimCandidateType = String(state.input?.groupAimPick?.candidateType || "");
   const aimCandidateId = Number(state.input?.groupAimPick?.candidateId);
   if (dom.groupAimEnableToggle) {
-    dom.groupAimEnableToggle.disabled = (state.activeGroupId == null);
+    dom.groupAimEnableToggle.disabled = (effectiveActiveGroupId == null);
     dom.groupAimEnableToggle.checked = aimEnabled;
   }
   if (dom.groupAimPickBtn) {
-    dom.groupAimPickBtn.disabled = (state.activeGroupId == null);
+    dom.groupAimPickBtn.disabled = (effectiveActiveGroupId == null);
     dom.groupAimPickBtn.classList.toggle("is-active", aimPickActive);
     dom.groupAimPickBtn.textContent = aimPickActive
-      ? "Confirm"
-      : "Pick Target";
+      ? aimText.confirm
+      : aimText.pickTarget;
   }
   if (dom.groupAimClearBtn) {
     const hasAimTarget = aimTargetType.length > 0 && Number.isFinite(aimTargetId);
-    dom.groupAimClearBtn.disabled = (state.activeGroupId == null) || (!hasAimTarget && !aimEnabled);
+    dom.groupAimClearBtn.disabled = (effectiveActiveGroupId == null) || (!hasAimTarget && !aimEnabled);
   }
   if (dom.groupAimStatus) {
-    let text = "Target: None";
+    let text = aimText.targetNone;
     if (aimTargetType === "group" && Number.isFinite(aimTargetId)) {
-      text = `Target: Group #${aimTargetId}`;
+      text = aimText.targetGroup(aimTargetId);
     } else if (aimTargetType === "position" && Number.isFinite(aimTargetId)) {
-      text = `Target: Position #${aimTargetId}`;
+      text = aimText.targetPosition(aimTargetId);
     }
     if (aimPickActive) {
       if (aimCandidateType === "group" && Number.isFinite(aimCandidateId)) {
-        text = `Candidate: Group #${aimCandidateId}`;
+        text = aimText.candidateGroup(aimCandidateId);
       } else if (aimCandidateType === "position" && Number.isFinite(aimCandidateId)) {
-        text = `Candidate: Position #${aimCandidateId}`;
+        text = aimText.candidatePosition(aimCandidateId);
       } else {
-        text = "Picking target...";
+        text = aimText.picking;
       }
     }
-    if (aimEnabled && !aimPickActive) text += (panelLang === "en") ? " (ON)" : " (ON)";
+    if (aimEnabled && !aimPickActive) text += aimText.on;
     dom.groupAimStatus.textContent = text;
   }
   if (dom.mergeGroupsBtn) {
@@ -120,11 +144,15 @@
   const canCopyLineCircle = state.tool === "select"
     && selectedShapesForMove.length > 0
     && selectedShapesForMove.every(s => s.type === "line" || s.type === "polyline" || s.type === "circle" || s.type === "arc");
+  const objectMoveOps = document.getElementById("lineCircleMoveOps");
+  if (objectMoveOps) {
+    objectMoveOps.style.display = (state.activeGroupId != null) ? "none" : objectMoveOps.style.display;
+  }
   if (dom.moveSelectedShapesBtn) {
-    dom.moveSelectedShapesBtn.disabled = !hasObjectSelectionForMove;
+    dom.moveSelectedShapesBtn.disabled = !hasObjectSelectionForMove || (state.activeGroupId != null);
   }
   if (dom.copySelectedShapesBtn) {
-    dom.copySelectedShapesBtn.disabled = !canCopyLineCircle;
+    dom.copySelectedShapesBtn.disabled = !canCopyLineCircle || (state.activeGroupId != null);
   }
   if (dom.groupRotateSnapInput) {
     const v = Number(state.input?.groupRotate?.snapDeg || 5);
@@ -234,11 +262,16 @@
   if (dom.applyCircleInputBtn) {
     const modeRaw = String(state.circleSettings?.mode || "").toLowerCase();
     const on = (modeRaw === "fixed") || (!!state.circleSettings?.radiusLocked && modeRaw !== "drag" && modeRaw !== "threepoint");
+    const isJa = String(state.ui?.language || "en").toLowerCase().startsWith("ja");
     dom.applyCircleInputBtn.disabled = !(state.tool === "circle");
     dom.applyCircleInputBtn.textContent = on
-      ? "Unlock Radius"
-      : "Lock Radius";
+      ? (isJa ? "半径固定解除" : "Unlock Radius")
+      : (isJa ? "半径固定" : "Lock Radius");
     dom.applyCircleInputBtn.classList.toggle("active", on);
+    dom.applyCircleInputBtn.style.justifySelf = "start";
+    dom.applyCircleInputBtn.style.textAlign = "left";
+    dom.applyCircleInputBtn.style.paddingLeft = "10px";
+    dom.applyCircleInputBtn.style.paddingRight = "10px";
   }
   if (dom.filletRadiusInput) {
     const v = Number(state.filletSettings?.radius || 20);

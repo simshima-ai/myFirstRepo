@@ -1,4 +1,4 @@
-import {
+﻿import {
   applyPanelVisibilityPatch,
   ensurePanelVisibilityState,
   normalizePanelVisibilityKey,
@@ -57,7 +57,7 @@ export function createUiPrefsOps(config) {
   function setAdZoneEnabled(zone, on) {
     if (!state.ui) state.ui = {};
     if (!state.ui.adZones || typeof state.ui.adZones !== "object") {
-      state.ui.adZones = { topRight: true, bottomLeft: true, bottomCenter: true };
+      state.ui.adZones = { topRight: false, bottomLeft: false, bottomCenter: false };
     }
     const key = String(zone || "");
     if (!(key === "topRight" || key === "bottomLeft" || key === "bottomCenter")) return;
@@ -69,7 +69,7 @@ export function createUiPrefsOps(config) {
   function setAllAdZonesEnabled(on) {
     if (!state.ui) state.ui = {};
     if (!state.ui.adZones || typeof state.ui.adZones !== "object") {
-      state.ui.adZones = { topRight: true, bottomLeft: true, bottomCenter: true };
+      state.ui.adZones = { topRight: false, bottomLeft: false, bottomCenter: false };
     }
     const nextOn = !!on;
     state.ui.adZones.topRight = nextOn;
@@ -121,8 +121,19 @@ export function createUiPrefsOps(config) {
     return next;
   }
 
+  function syncDisplayModeUrl(mode) {
+    try {
+      const url = new URL(window.location.href);
+      url.searchParams.set("mode", String(mode || "cad").toLowerCase());
+      window.history.replaceState({}, "", url.toString());
+    } catch (_) {
+      // noop
+    }
+  }
+
   function setDisplayMode(mode) {
     const preset = applyDisplayModePreset(state, normalizeDisplayMode(mode));
+    syncDisplayModeUrl(preset?.mode || "cad");
     refreshAutoBackupTimer();
     scheduleSaveAppSettings();
     draw();

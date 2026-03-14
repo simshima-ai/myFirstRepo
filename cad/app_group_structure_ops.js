@@ -7,11 +7,104 @@ export function createGroupStructureOps(config) {
     draw
   } = config || {};
 
-  function scalePointAround(x, y, ox, oy, factor) {
+  function scalePointAround(x, y, ox, oy, factorX, factorY = factorX) {
     return {
-      x: ox + (Number(x) - ox) * factor,
-      y: oy + (Number(y) - oy) * factor,
+      x: ox + (Number(x) - ox) * factorX,
+      y: oy + (Number(y) - oy) * factorY,
     };
+  }
+
+  function averageScale(factorX, factorY) {
+    return (Math.abs(Number(factorX) || 0) + Math.abs(Number(factorY) || 0)) / 2 || 1;
+  }
+
+  function normalizeScaleOptions(raw) {
+    const allowScale = !!raw?.allowScale;
+    const keepAspect = allowScale ? (raw?.keepAspect !== false) : false;
+    const scaleFactor = Math.max(1e-9, Number(raw?.scaleFactor) || 1);
+    const scaleX = Math.max(1e-9, Number(raw?.scaleX) || scaleFactor);
+    const scaleY = Math.max(1e-9, Number(raw?.scaleY) || scaleFactor);
+    return { allowScale, keepAspect, scaleFactor, scaleX, scaleY };
+  }
+
+  function applyScaleToShape(target, base, ox, oy, factorX, factorY) {
+    const radialFactor = averageScale(factorX, factorY);
+    if (target.type === "line" || target.type === "rect") {
+      const p1 = scalePointAround(base.x1, base.y1, ox, oy, factorX, factorY);
+      const p2 = scalePointAround(base.x2, base.y2, ox, oy, factorX, factorY);
+      target.x1 = p1.x; target.y1 = p1.y; target.x2 = p2.x; target.y2 = p2.y;
+    } else if (target.type === "polyline") {
+      if (Array.isArray(base.points)) {
+        target.points = base.points.map((pt) => scalePointAround(Number(pt?.x), Number(pt?.y), ox, oy, factorX, factorY));
+      }
+    } else if (target.type === "circle") {
+      const c = scalePointAround(base.cx, base.cy, ox, oy, factorX, factorY);
+      target.cx = c.x; target.cy = c.y; target.r = Math.abs(Number(base.r) || 0) * radialFactor;
+    } else if (target.type === "arc") {
+      const c = scalePointAround(base.cx, base.cy, ox, oy, factorX, factorY);
+      target.cx = c.x; target.cy = c.y; target.r = Math.abs(Number(base.r) || 0) * radialFactor;
+      target.a1 = base.a1; target.a2 = base.a2; target.ccw = base.ccw;
+    } else if (target.type === "position") {
+      const p = scalePointAround(base.x, base.y, ox, oy, factorX, factorY);
+      target.x = p.x; target.y = p.y; target.size = Math.max(0.1, Number(base.size) * radialFactor);
+    } else if (target.type === "dim") {
+      const p1 = scalePointAround(base.x1, base.y1, ox, oy, factorX, factorY);
+      const p2 = scalePointAround(base.x2, base.y2, ox, oy, factorX, factorY);
+      const pp = scalePointAround(base.px, base.py, ox, oy, factorX, factorY);
+      target.x1 = p1.x; target.y1 = p1.y; target.x2 = p2.x; target.y2 = p2.y; target.px = pp.x; target.py = pp.y;
+      if (Number.isFinite(Number(base.tx)) && Number.isFinite(Number(base.ty))) {
+        const tp = scalePointAround(Number(base.tx), Number(base.ty), ox, oy, factorX, factorY);
+        target.tx = tp.x; target.ty = tp.y;
+      }
+      if (Number.isFinite(Number(base.tdx)) && Number.isFinite(Number(base.tdy))) {
+        target.tdx = Number(base.tdx) * factorX;
+        target.tdy = Number(base.tdy) * factorY;
+      }
+      target.groupScaleComp = Math.max(1e-9, (Number(base.groupScaleComp) || 1) * radialFactor);
+    } else if (target.type === "dimchain") {
+      if (Array.isArray(base.points)) target.points = base.points.map((pt) => scalePointAround(Number(pt?.x), Number(pt?.y), ox, oy, factorX, factorY));
+      if (Number.isFinite(Number(base.px)) && Number.isFinite(Number(base.py))) {
+        const pp = scalePointAround(Number(base.px), Number(base.py), ox, oy, factorX, factorY);
+        target.px = pp.x; target.py = pp.y;
+      }
+      if (Number.isFinite(Number(base.tx)) && Number.isFinite(Number(base.ty))) {
+        const tp = scalePointAround(Number(base.tx), Number(base.ty), ox, oy, factorX, factorY);
+        target.tx = tp.x; target.ty = tp.y;
+      }
+      target.groupScaleComp = Math.max(1e-9, (Number(base.groupScaleComp) || 1) * radialFactor);
+    } else if (target.type === "circleDim") {
+      if (Number.isFinite(Number(base.tx)) && Number.isFinite(Number(base.ty))) {
+        const tp = scalePointAround(Number(base.tx), Number(base.ty), ox, oy, factorX, factorY);
+        target.tx = tp.x; target.ty = tp.y;
+      }
+      if (Number.isFinite(Number(base.tdx)) && Number.isFinite(Number(base.tdy))) {
+        target.tdx = Number(base.tdx) * factorX;
+        target.tdy = Number(base.tdy) * factorY;
+      }
+      target.groupScaleComp = Math.max(1e-9, (Number(base.groupScaleComp) || 1) * radialFactor);
+    } else if (target.type === "dimangle") {
+      if (Number.isFinite(Number(base.cx)) && Number.isFinite(Number(base.cy))) {
+        const cp = scalePointAround(Number(base.cx), Number(base.cy), ox, oy, factorX, factorY);
+        target.cx = cp.x; target.cy = cp.y;
+      }
+      if (Number.isFinite(Number(base.r))) target.r = Math.abs(Number(base.r)) * radialFactor;
+      if (Number.isFinite(Number(base.tx)) && Number.isFinite(Number(base.ty))) {
+        const tp = scalePointAround(Number(base.tx), Number(base.ty), ox, oy, factorX, factorY);
+        target.tx = tp.x; target.ty = tp.y;
+      }
+    } else if (target.type === "text") {
+      const p = scalePointAround(base.x1, base.y1, ox, oy, factorX, factorY);
+      target.x1 = p.x; target.y1 = p.y;
+    } else if (target.type === "image") {
+      const p = scalePointAround(Number(base.x), Number(base.y), ox, oy, factorX, factorY);
+      target.x = p.x; target.y = p.y;
+      target.width = Math.max(1e-6, Number(base.width) * factorX);
+      target.height = Math.max(1e-6, Number(base.height) * factorY);
+    } else if (target.type === "bspline") {
+      if (Array.isArray(base.controlPoints)) {
+        target.controlPoints = base.controlPoints.map((cp) => scalePointAround(Number(cp?.x), Number(cp?.y), ox, oy, factorX, factorY));
+      }
+    }
   }
 
   function setActiveGroupParent(pid) {
@@ -22,7 +115,6 @@ export function createGroupStructureOps(config) {
     if (!moving) return;
     if (newParentId != null && newParentId === movingGroupId) return;
 
-    // Prevent making a cycle: parent cannot be self or any descendant.
     if (newParentId != null) {
       const byId = new Map((state.groups || []).map(g => [Number(g.id), g]));
       let cur = byId.get(newParentId);
@@ -47,18 +139,13 @@ export function createGroupStructureOps(config) {
     if (!shape || !target) return;
 
     pushHistory(state);
-
-    // Remove from all groups first.
     for (const g of (state.groups || [])) {
       if (!Array.isArray(g.shapeIds)) g.shapeIds = [];
       g.shapeIds = g.shapeIds.map(Number).filter(id => Number.isFinite(id) && id !== shapeId);
     }
-
-    // Add to target group.
     if (!Array.isArray(target.shapeIds)) target.shapeIds = [];
     if (!target.shapeIds.map(Number).includes(shapeId)) target.shapeIds.push(shapeId);
     shape.groupId = targetGroupId;
-
     draw();
   }
 
@@ -68,19 +155,16 @@ export function createGroupStructureOps(config) {
     if (!target) return;
     const ids = Array.from(new Set((shapeIds || []).map(Number).filter(Number.isFinite)));
     if (!ids.length) return;
-    const idSet = new Set(ids);
     const shapeById = new Map((state.shapes || []).map(sh => [Number(sh.id), sh]));
     const validIds = ids.filter((id) => shapeById.has(id));
     if (!validIds.length) return;
     const validSet = new Set(validIds);
 
     pushHistory(state);
-
     for (const g of (state.groups || [])) {
       if (!Array.isArray(g.shapeIds)) g.shapeIds = [];
       g.shapeIds = g.shapeIds.map(Number).filter(id => Number.isFinite(id) && !validSet.has(id));
     }
-
     if (!Array.isArray(target.shapeIds)) target.shapeIds = [];
     const targetSet = new Set(target.shapeIds.map(Number).filter(Number.isFinite));
     for (const sid of validIds) {
@@ -88,7 +172,6 @@ export function createGroupStructureOps(config) {
       const shape = shapeById.get(sid);
       if (shape) shape.groupId = targetGroupId;
     }
-
     draw();
   }
 
@@ -97,43 +180,63 @@ export function createGroupStructureOps(config) {
     if (!Number.isFinite(gid)) return;
     const g = getGroup(state, gid);
     if (!g) return;
-    const prev = g.scaleOptions && typeof g.scaleOptions === "object"
-      ? g.scaleOptions
-      : { allowScale: false, keepAspect: false, scaleFactor: 1 };
+    const prev = normalizeScaleOptions(g.scaleOptions);
     const allowScale = Object.prototype.hasOwnProperty.call(options, "allowScale")
       ? !!options.allowScale
-      : !!prev.allowScale;
+      : prev.allowScale;
     const keepAspect = allowScale
-      ? (Object.prototype.hasOwnProperty.call(options, "keepAspect") ? !!options.keepAspect : (prev.keepAspect !== false))
+      ? (Object.prototype.hasOwnProperty.call(options, "keepAspect") ? !!options.keepAspect : prev.keepAspect)
       : false;
-    const scaleFactorRaw = Number(prev.scaleFactor);
-    const scaleFactor = Number.isFinite(scaleFactorRaw) && scaleFactorRaw > 1e-9 ? scaleFactorRaw : 1;
+    const requestedScaleX = Object.prototype.hasOwnProperty.call(options, "scaleX") ? Number(options.scaleX) : prev.scaleX;
+    const requestedScaleY = Object.prototype.hasOwnProperty.call(options, "scaleY") ? Number(options.scaleY) : prev.scaleY;
+    const requestedScaleFactor = Object.prototype.hasOwnProperty.call(options, "scaleFactor") ? Number(options.scaleFactor) : prev.scaleFactor;
+    let scaleX = Math.max(1e-9, Number.isFinite(requestedScaleX) && requestedScaleX > 0 ? requestedScaleX : prev.scaleX);
+    let scaleY = Math.max(1e-9, Number.isFinite(requestedScaleY) && requestedScaleY > 0 ? requestedScaleY : prev.scaleY);
+    let scaleFactor = Math.max(1e-9, Number.isFinite(requestedScaleFactor) && requestedScaleFactor > 0 ? requestedScaleFactor : prev.scaleFactor);
+    if (keepAspect) {
+      const unified = Math.max(1e-9, Number.isFinite(requestedScaleFactor) && requestedScaleFactor > 0
+        ? requestedScaleFactor
+        : (Number.isFinite(requestedScaleX) && requestedScaleX > 0 ? requestedScaleX : scaleX));
+      scaleX = unified;
+      scaleY = unified;
+      scaleFactor = unified;
+    } else {
+      scaleFactor = averageScale(scaleX, scaleY);
+    }
     if (
-      !!prev.allowScale === allowScale
-      && !!prev.keepAspect === keepAspect
-      && Number(prev.scaleFactor || 1) === scaleFactor
+      prev.allowScale === allowScale &&
+      prev.keepAspect === keepAspect &&
+      Math.abs(prev.scaleFactor - scaleFactor) < 1e-9 &&
+      Math.abs(prev.scaleX - scaleX) < 1e-9 &&
+      Math.abs(prev.scaleY - scaleY) < 1e-9
     ) {
       draw();
       return;
     }
     pushHistory(state);
-    g.scaleOptions = { allowScale, keepAspect, scaleFactor };
+    g.scaleOptions = { allowScale, keepAspect, scaleFactor, scaleX, scaleY };
     draw();
   }
 
-  function setActiveGroupScaleFactor(targetScaleFactor) {
+  function setActiveGroupScaleFactors(targetScaleX, targetScaleY = targetScaleX) {
     const gid = Number(state.activeGroupId);
     if (!Number.isFinite(gid)) return;
     const g = getGroup(state, gid);
     if (!g) return;
-    const scOpt = (g.scaleOptions && typeof g.scaleOptions === "object")
-      ? g.scaleOptions
-      : { allowScale: false, keepAspect: false, scaleFactor: 1 };
+    const scOpt = normalizeScaleOptions(g.scaleOptions);
     if (!scOpt.allowScale) return;
-    const current = Math.max(1e-9, Number(scOpt.scaleFactor) || 1);
-    const target = Math.max(1e-9, Number(targetScaleFactor) || 1);
-    const ratio = target / current;
-    if (!Number.isFinite(ratio) || ratio <= 0 || Math.abs(ratio - 1) < 1e-9) {
+    const currentScaleX = Math.max(1e-9, scOpt.scaleX || scOpt.scaleFactor || 1);
+    const currentScaleY = Math.max(1e-9, scOpt.scaleY || scOpt.scaleFactor || 1);
+    let nextScaleX = Math.max(1e-9, Number(targetScaleX) || 1);
+    let nextScaleY = Math.max(1e-9, Number(targetScaleY) || nextScaleX);
+    if (scOpt.keepAspect) nextScaleY = nextScaleX;
+    const ratioX = nextScaleX / currentScaleX;
+    const ratioY = nextScaleY / currentScaleY;
+    if (!Number.isFinite(ratioX) || !Number.isFinite(ratioY) || ratioX <= 0 || ratioY <= 0) {
+      draw();
+      return;
+    }
+    if (Math.abs(ratioX - 1) < 1e-9 && Math.abs(ratioY - 1) < 1e-9) {
       draw();
       return;
     }
@@ -143,84 +246,17 @@ export function createGroupStructureOps(config) {
     const idSet = new Set((shapeIds || []).map(Number).filter(Number.isFinite));
     const ox = Number(g.originX) || 0;
     const oy = Number(g.originY) || 0;
+    const baseById = new Map();
+    for (const t of (state.shapes || [])) {
+      if (!idSet.has(Number(t.id))) continue;
+      baseById.set(Number(t.id), JSON.parse(JSON.stringify(t)));
+    }
     pushHistory(state);
     for (const t of (state.shapes || [])) {
       if (!idSet.has(Number(t.id))) continue;
-      if (t.type === "line" || t.type === "rect") {
-        const p1 = scalePointAround(t.x1, t.y1, ox, oy, ratio);
-        const p2 = scalePointAround(t.x2, t.y2, ox, oy, ratio);
-        t.x1 = p1.x; t.y1 = p1.y; t.x2 = p2.x; t.y2 = p2.y;
-      } else if (t.type === "polyline") {
-        if (Array.isArray(t.points)) {
-          t.points = t.points.map((pt) => scalePointAround(Number(pt?.x), Number(pt?.y), ox, oy, ratio));
-        }
-      } else if (t.type === "circle") {
-        const c = scalePointAround(t.cx, t.cy, ox, oy, ratio);
-        t.cx = c.x; t.cy = c.y; t.r = Math.abs(Number(t.r) || 0) * ratio;
-      } else if (t.type === "arc") {
-        const c = scalePointAround(t.cx, t.cy, ox, oy, ratio);
-        t.cx = c.x; t.cy = c.y; t.r = Math.abs(Number(t.r) || 0) * ratio;
-      } else if (t.type === "position") {
-        const p = scalePointAround(t.x, t.y, ox, oy, ratio);
-        t.x = p.x; t.y = p.y; t.size = Math.max(0.1, Number(t.size) * ratio);
-      } else if (t.type === "dim") {
-        const p1 = scalePointAround(t.x1, t.y1, ox, oy, ratio);
-        const p2 = scalePointAround(t.x2, t.y2, ox, oy, ratio);
-        const pp = scalePointAround(t.px, t.py, ox, oy, ratio);
-        t.x1 = p1.x; t.y1 = p1.y; t.x2 = p2.x; t.y2 = p2.y; t.px = pp.x; t.py = pp.y;
-        if (Number.isFinite(Number(t.tx)) && Number.isFinite(Number(t.ty))) {
-          const tp = scalePointAround(Number(t.tx), Number(t.ty), ox, oy, ratio);
-          t.tx = tp.x; t.ty = tp.y;
-        }
-        if (Number.isFinite(Number(t.tdx)) && Number.isFinite(Number(t.tdy))) {
-          t.tdx = Number(t.tdx) * ratio;
-          t.tdy = Number(t.tdy) * ratio;
-        }
-        t.groupScaleComp = Math.max(1e-9, (Number(t.groupScaleComp) || 1) * ratio);
-      } else if (t.type === "dimchain") {
-        if (Array.isArray(t.points)) t.points = t.points.map((pt) => scalePointAround(Number(pt?.x), Number(pt?.y), ox, oy, ratio));
-        if (Number.isFinite(Number(t.px)) && Number.isFinite(Number(t.py))) {
-          const pp = scalePointAround(Number(t.px), Number(t.py), ox, oy, ratio);
-          t.px = pp.x; t.py = pp.y;
-        }
-        if (Number.isFinite(Number(t.tx)) && Number.isFinite(Number(t.ty))) {
-          const tp = scalePointAround(Number(t.tx), Number(t.ty), ox, oy, ratio);
-          t.tx = tp.x; t.ty = tp.y;
-        }
-        t.groupScaleComp = Math.max(1e-9, (Number(t.groupScaleComp) || 1) * ratio);
-      } else if (t.type === "circleDim") {
-        if (Number.isFinite(Number(t.tx)) && Number.isFinite(Number(t.ty))) {
-          const tp = scalePointAround(Number(t.tx), Number(t.ty), ox, oy, ratio);
-          t.tx = tp.x; t.ty = tp.y;
-        }
-        if (Number.isFinite(Number(t.tdx)) && Number.isFinite(Number(t.tdy))) {
-          t.tdx = Number(t.tdx) * ratio;
-          t.tdy = Number(t.tdy) * ratio;
-        }
-        t.groupScaleComp = Math.max(1e-9, (Number(t.groupScaleComp) || 1) * ratio);
-      } else if (t.type === "dimangle") {
-        if (Number.isFinite(Number(t.cx)) && Number.isFinite(Number(t.cy))) {
-          const cp = scalePointAround(Number(t.cx), Number(t.cy), ox, oy, ratio);
-          t.cx = cp.x; t.cy = cp.y;
-        }
-        if (Number.isFinite(Number(t.r))) t.r = Math.abs(Number(t.r)) * ratio;
-        if (Number.isFinite(Number(t.tx)) && Number.isFinite(Number(t.ty))) {
-          const tp = scalePointAround(Number(t.tx), Number(t.ty), ox, oy, ratio);
-          t.tx = tp.x; t.ty = tp.y;
-        }
-      } else if (t.type === "text") {
-        const p = scalePointAround(t.x1, t.y1, ox, oy, ratio);
-        t.x1 = p.x; t.y1 = p.y;
-      } else if (t.type === "image") {
-        const p = scalePointAround(Number(t.x), Number(t.y), ox, oy, ratio);
-        t.x = p.x; t.y = p.y;
-        t.width = Math.max(1e-6, Number(t.width) * ratio);
-        t.height = Math.max(1e-6, Number(t.height) * ratio);
-      } else if (t.type === "bspline") {
-        if (Array.isArray(t.controlPoints)) {
-          t.controlPoints = t.controlPoints.map((cp) => scalePointAround(Number(cp?.x), Number(cp?.y), ox, oy, ratio));
-        }
-      }
+      const base = baseById.get(Number(t.id));
+      if (!base) continue;
+      applyScaleToShape(t, base, ox, oy, ratioX, ratioY);
     }
     const byParent = new Map();
     for (const gg of (state.groups || [])) {
@@ -233,14 +269,25 @@ export function createGroupStructureOps(config) {
       const cgId = Number(queue.shift());
       const cg = getGroup(state, cgId);
       if (cg) {
-        const p = scalePointAround(Number(cg.originX) || 0, Number(cg.originY) || 0, ox, oy, ratio);
+        const p = scalePointAround(Number(cg.originX) || 0, Number(cg.originY) || 0, ox, oy, ratioX, ratioY);
         cg.originX = p.x;
         cg.originY = p.y;
       }
       for (const ccId of (byParent.get(cgId) || [])) queue.push(Number(ccId));
     }
-    g.scaleOptions = { allowScale: true, keepAspect: scOpt.keepAspect !== false, scaleFactor: target };
+    g.scaleOptions = {
+      allowScale: true,
+      keepAspect: scOpt.keepAspect,
+      scaleFactor: averageScale(nextScaleX, nextScaleY),
+      scaleX: nextScaleX,
+      scaleY: nextScaleY,
+    };
     draw();
+  }
+
+  function setActiveGroupScaleFactor(targetScaleFactor) {
+    const target = Math.max(1e-9, Number(targetScaleFactor) || 1);
+    setActiveGroupScaleFactors(target, target);
   }
 
   return {
@@ -248,6 +295,7 @@ export function createGroupStructureOps(config) {
     moveShapeToGroup,
     moveShapesToGroup,
     setActiveGroupScaleOptions,
-    setActiveGroupScaleFactor
+    setActiveGroupScaleFactor,
+    setActiveGroupScaleFactors,
   };
 }

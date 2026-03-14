@@ -1,5 +1,43 @@
-import { applyPendingLineCircleFillet, applyPendingArcArcFillet } from "./app_tools.js";
-import { circleCircleIntersectionPoints, isAngleOnArc, solveLineCircleFillet } from "./solvers.js";
+import { applyPendingLineCircleFillet, applyPendingArcArcFillet, normalizeFilletLineSource } from "./app_tools.js";
+import { circleCircleIntersectionPoints, isAngleOnArc, solveLineLineFilletWithEnds } from "./solvers.js";
+import { pruneEmptyGroups } from "./state.js";
+
+function findShapeGroupId(state, shapeOrId) {
+    const sid = Number(typeof shapeOrId === "object" ? shapeOrId?.id : shapeOrId);
+    if (Number.isFinite(sid)) {
+        for (const g of (state.groups || [])) {
+            const ids = Array.isArray(g?.shapeIds) ? g.shapeIds : [];
+            if (ids.some((id) => Number(id) === sid)) return Number(g.id);
+        }
+    }
+    const gid = Number(typeof shapeOrId === "object" ? shapeOrId?.groupId : NaN);
+    return Number.isFinite(gid) ? gid : null;
+}
+
+function attachShapesToGroup(state, groupId, shapes) {
+    const gid = Number(groupId);
+    if (!Number.isFinite(gid)) return false;
+    const group = (state.groups || []).find((g) => Number(g?.id) === gid);
+    if (!group) return false;
+    if (!Array.isArray(group.shapeIds)) group.shapeIds = [];
+    const idSet = new Set(group.shapeIds.map(Number).filter(Number.isFinite));
+    for (const shape of (shapes || [])) {
+        const sid = Number(shape?.id);
+        if (!Number.isFinite(sid)) continue;
+        shape.groupId = gid;
+        if (!idSet.has(sid)) {
+            group.shapeIds.push(sid);
+            idSet.add(sid);
+        }
+    }
+    return true;
+}
+
+function resolvePreferredFilletGroupId(groupIds) {
+    const ids = Array.from(new Set((groupIds || []).map(Number).filter(Number.isFinite)));
+    if (!ids.length) return null;
+    return ids[0];
+}
 
 export function getFilletTargetRef(shape, worldRaw = null) {
     if (!shape) return null;
@@ -49,32 +87,18 @@ function getArcKeepSideByTangent(arcShape, tangentPoint) {
 const TAU = Math.PI * 2;
 
 function applyLineLikeFilletTrim(source, tangentPoint, keepEnd) {
-    if (!source || !tangentPoint) return false;
+    if (!source || !tangentPoint || source.kind !== "line") return false;
     const tx = Number(tangentPoint.x), ty = Number(tangentPoint.y);
     if (![tx, ty].every(Number.isFinite)) return false;
-    if (source.kind === "line") {
-        const line = source.shape;
-        if (!line || String(line.type || "") !== "line") return false;
-        const e = source.keepEnd || keepEnd;
-        if (e === "p1") {
-            line.x2 = tx; line.y2 = ty;
-        } else {
-            line.x1 = tx; line.y1 = ty;
-        }
-        return Math.hypot(Number(line.x2) - Number(line.x1), Number(line.y2) - Number(line.y1)) > 1e-6;
+    const line = source.shape;
+    if (!line || String(line.type || "") !== "line") return false;
+    const e = source.keepEnd || keepEnd;
+    if (e === "p1") {
+        line.x2 = tx; line.y2 = ty;
+    } else {
+        line.x1 = tx; line.y1 = ty;
     }
-    if (source.kind === "polyline") {
-        const poly = source.shape;
-        const pts = Array.isArray(poly?.points) ? poly.points : null;
-        if (!pts || pts.length < 2) return false;
-        const idx = (source.keepEnd || keepEnd) === "p1" ? Number(source.i2) : Number(source.i1);
-        if (!Number.isInteger(idx) || idx < 0 || idx >= pts.length) return false;
-        pts[idx] = { x: tx, y: ty };
-        const a = pts[Number(source.i1)];
-        const b = pts[Number(source.i2) % pts.length];
-        return Math.hypot(Number(b?.x) - Number(a?.x), Number(b?.y) - Number(a?.y)) > 1e-6;
-    }
-    return false;
+    return Math.hypot(Number(line.x2) - Number(line.x1), Number(line.y2) - Number(line.y1)) > 1e-6;
 }
 const normAng = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const spanCCW = (aFrom, aTo) => ((aTo - aFrom) + TAU) % TAU;
@@ -138,7 +162,7 @@ function pickArcKeepSideByABCMid(arcShape, tangentPointB, intersectionA, c3Point
 }
 
 export function commitFilletFromHover(state, helpers, deps, worldRawHint = null) {
-    const { nextShapeId, pushHistory, addShape, setSelection, setStatus } = deps;
+    const { nextShapeId, pushHistory, addShape, removeShapeById, setSelection, setStatus } = deps;
     if (state.input?.filletFlow?.kind === "line-circle" && state.input?.filletFlow?.debugStepActive) {
         applyPendingLineCircleFillet(state, helpers, state.input.filletFlow.hoverKeepEnd);
         return true;
@@ -160,43 +184,89 @@ export function commitFilletFromHover(state, helpers, deps, worldRawHint = null)
             return false;
         }
         const sol = cand.sol;
+        const normalizedPolylineCache = new Map();
+        const activeLines = selLines.map((source) => {
+            if (source?.kind !== "polyline") return normalizeFilletLineSource(state, { nextShapeId }, source);
+            const key = Number(source.shape?.id);
+            const cached = normalizedPolylineCache.get(key);
+            if (!cached) {
+                const normalized = normalizeFilletLineSource(state, { nextShapeId }, source);
+                if (normalized) normalizedPolylineCache.set(key, normalized);
+                return normalized;
+            }
+            const targetLine = Array.isArray(cached.normalizedShapes) ? cached.normalizedShapes[Number(source.segIndex)] : null;
+            if (!targetLine) return null;
+            return {
+                ...cached,
+                keepEnd: source.keepEnd,
+                shape: targetLine,
+                line: targetLine,
+                pendingAddShapes: [],
+                pendingRemoveShapeIds: [],
+            };
+        });
+        if (activeLines.length !== 2 || activeLines.some((source) => !source || source.kind !== "line" || !source.shape)) {
+            if (setStatus) setStatus("Fillet failed: could not convert polyline target to lines.");
+            return false;
+        }
+        const finalSol = solveLineLineFilletWithEnds(activeLines[0].line, activeLines[1].line, r, sol.keepEnd1 || "p1", sol.keepEnd2 || "p1");
+        const useSol = finalSol?.ok ? finalSol : sol;
         const arc = {
             id: nextShapeId(),
             type: "arc",
-            cx: Number(sol.arc?.cx ?? sol.center?.x),
-            cy: Number(sol.arc?.cy ?? sol.center?.y),
-            r: Number(sol.arc?.r ?? sol.radius),
-            a1: Number(sol.arc?.a1),
-            a2: Number(sol.arc?.a2),
-            ccw: sol.arc?.ccw !== false,
-            layerId: selLines[0].line?.layerId ?? state.activeLayerId
+            cx: Number(useSol.arc?.cx ?? useSol.center?.x),
+            cy: Number(useSol.arc?.cy ?? useSol.center?.y),
+            r: Number(useSol.arc?.r ?? useSol.radius),
+            a1: Number(useSol.arc?.a1),
+            a2: Number(useSol.arc?.a2),
+            ccw: useSol.arc?.ccw !== false,
+            layerId: activeLines[0].line?.layerId ?? state.activeLayerId
         };
-        arc.lineWidthMm = Math.max(0.01, Number(selLines[0]?.line?.lineWidthMm ?? selLines[0]?.shape?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
-        arc.lineType = String(selLines[0]?.line?.lineType || selLines[0]?.shape?.lineType || "solid");
+        arc.lineWidthMm = Math.max(0.01, Number(activeLines[0]?.line?.lineWidthMm ?? activeLines[0]?.shape?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+        arc.lineType = String(activeLines[0]?.line?.lineType || activeLines[0]?.shape?.lineType || "solid");
         if (![arc.cx, arc.cy, arc.r, arc.a1, arc.a2].every(Number.isFinite) || arc.r <= 0) {
             if (setStatus) setStatus("Fillet failed: invalid arc geometry.");
             return false;
         }
         pushHistory();
+        for (const source of activeLines) {
+            const gid = Number(source?.sourceGroupId);
+            const shapes = Array.isArray(source.pendingAddShapes) ? source.pendingAddShapes.filter(Boolean) : [];
+            if (Number.isFinite(gid)) {
+                for (const shape of shapes) shape.groupId = gid;
+                attachShapesToGroup(state, gid, shapes);
+            }
+            for (const shape of shapes) addShape(shape);
+        }
+        const removeIds = Array.from(new Set(activeLines.flatMap((source) => Array.isArray(source.pendingRemoveShapeIds) ? source.pendingRemoveShapeIds : []).map(Number).filter(Number.isFinite)));
+        for (const id of removeIds) {
+            if (!removeShapeById?.(id)) {
+                if (setStatus) setStatus("Fillet failed: could not convert polyline target to lines.");
+                return false;
+            }
+        }
+        const targetGroupId = resolvePreferredFilletGroupId(activeLines.map((source) => source?.sourceGroupId));
+        if (Number.isFinite(Number(targetGroupId))) arc.groupId = Number(targetGroupId);
+        addShape(arc);
+        if (Number.isFinite(Number(targetGroupId))) attachShapesToGroup(state, Number(targetGroupId), [arc]);
+        pruneEmptyGroups(state);
         const mode = state.filletSettings.lineMode || "trim";
         const doTrim = (mode === "trim") && !state.filletSettings?.noTrim;
         let trimWarning = false;
-        // Always add fillet arc first (same behavior as no-trim), then trim source lines.
-        addShape(arc);
         if (doTrim) {
-            const line1Snap = JSON.stringify(selLines[0].shape);
-            const line2Snap = JSON.stringify(selLines[1].shape);
+            const line1Snap = JSON.stringify(activeLines[0].shape);
+            const line2Snap = JSON.stringify(activeLines[1].shape);
             let okAll = true;
-            const s1 = sol.t1, s2 = sol.t2;
+            const s1 = useSol.t1, s2 = useSol.t2;
             if (!s1 || !s2) {
                 okAll = false;
             } else {
-                okAll = applyLineLikeFilletTrim(selLines[0], s1, sol.keepEnd1 || "p1")
-                    && applyLineLikeFilletTrim(selLines[1], s2, sol.keepEnd2 || "p1");
+                okAll = applyLineLikeFilletTrim(activeLines[0], s1, useSol.keepEnd1 || "p1")
+                    && applyLineLikeFilletTrim(activeLines[1], s2, useSol.keepEnd2 || "p1");
             }
             if (!okAll) {
-                Object.assign(selLines[0].shape, JSON.parse(line1Snap));
-                Object.assign(selLines[1].shape, JSON.parse(line2Snap));
+                Object.assign(activeLines[0].shape, JSON.parse(line1Snap));
+                Object.assign(activeLines[1].shape, JSON.parse(line2Snap));
                 trimWarning = true;
             }
         }
@@ -205,19 +275,15 @@ export function commitFilletFromHover(state, helpers, deps, worldRawHint = null)
         return true;
     }
     if (cand.mode === "line-circle") {
-        let fixedSol = cand.sol;
-        // For line-arc fillet, avoid mouse-position-dependent solution choice at commit time.
-        if (cand.sol?.circle?.type === "arc" && cand.sol?.line) {
-            const recomputed = solveLineCircleFillet(cand.sol.line, cand.sol.circle, r, null);
-            if (recomputed && recomputed.ok) fixedSol = recomputed;
-        }
+        const fixedSol = cand.sol;
         state.input.filletFlow = {
             kind: "line-circle",
             stage: "confirm-line-side",
             sol: fixedSol,
             line: fixedSol.line,
             circle: fixedSol.circle,
-            hoverKeepEnd: fixedSol.keepEnd || "p1",
+            lineSource: cand.lineSource || null,
+            hoverKeepEnd: fixedSol.desiredKeepEnd || fixedSol.keepEnd || "p1",
             clickWorld: (worldRawHint && Number.isFinite(Number(worldRawHint.x)) && Number.isFinite(Number(worldRawHint.y)))
                 ? { x: Number(worldRawHint.x), y: Number(worldRawHint.y) }
                 : null,
@@ -251,3 +317,5 @@ export function commitFilletFromHover(state, helpers, deps, worldRawHint = null)
     void worldRawHint;
     return false;
 }
+
+

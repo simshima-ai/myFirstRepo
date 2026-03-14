@@ -1,4 +1,5 @@
 import { ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
+import { getStatusBarText } from "./ui_text.js";
 
 export function setupLayoutAndTopContext(state, tool, helpers) {
   const {
@@ -13,7 +14,7 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   if (!state.ui) state.ui = {};
   state.ui.menuScalePct = menuScalePct;
   if (!state.ui.adZones || typeof state.ui.adZones !== "object") {
-    state.ui.adZones = { topRight: true, bottomLeft: true, bottomCenter: true };
+    state.ui.adZones = { topRight: false, bottomLeft: false, bottomCenter: false };
   }
   ensurePanelVisibilityState(state);
   const menuScale = menuScalePct / 100;
@@ -63,18 +64,10 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     for (const child of Array.from(sidebarEl.children || [])) {
       if (child?.style) child.style.zoom = String(menuScale);
     }
-    const sidebarRect = sidebarEl.getBoundingClientRect();
-    let contentH = 0;
-    for (const child of Array.from(sidebarEl.children || [])) {
-      const cs = window.getComputedStyle(child);
-      if (cs.display === "none") continue;
-      const r = child.getBoundingClientRect();
-      const h = Number(r.bottom || 0) - Number(sidebarRect.top || 0);
-      if (h > contentH) contentH = h;
-    }
-    const viewH = Number(sidebarRect.height || sidebarEl.clientHeight || 0);
-    const needScroll = (contentH - viewH) > 6;
-    sidebarEl.style.overflowY = "auto";
+    const viewH = Number(sidebarEl.clientHeight || sidebarEl.getBoundingClientRect().height || 0);
+    const contentH = Number(sidebarEl.scrollHeight || 0);
+    const needScroll = (contentH - viewH) > 2;
+    sidebarEl.style.overflowY = needScroll ? "auto" : "hidden";
     sidebarEl.style.scrollbarGutter = "stable";
     if (!needScroll) sidebarEl.scrollTop = 0;
   };
@@ -83,6 +76,7 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
 
   const vp = getViewportSizeForUi();
   const lang = getUiLanguage(state);
+  const statusText = getStatusBarText(lang);
   const rootStyle = document.documentElement.style;
   const rightAdEl = document.getElementById("rightAdSlot");
   const leftBottomAdEl = document.getElementById("leftBottomAdSlot");
@@ -100,8 +94,8 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     const label = el?.querySelector?.(".ad-zone-label");
     if (label) label.innerHTML = text;
   };
-  setZoneLabel(rightAdEl, "Ad Space<br>Top Right");
-  setZoneLabel(leftBottomAdEl, "Ad Space<br>Bottom Left");
+  setZoneLabel(rightAdEl, lang === "ja" ? "\u5e83\u544a\u30b9\u30da\u30fc\u30b9<br>\u53f3\u4e0a" : "Ad Space<br>Top Right");
+  setZoneLabel(leftBottomAdEl, lang === "ja" ? "\u5e83\u544a\u30b9\u30da\u30fc\u30b9<br>\u5de6\u4e0b" : "Ad Space<br>Bottom Left");
   const setBottomCenterCards = (el, count) => {
     if (!el) return;
     const n = Math.max(1, Math.min(3, Math.round(Number(count) || 1)));
@@ -109,7 +103,7 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     for (let i = 0; i < n; i++) {
       labels.push(lang === "en"
         ? `<div class="ad-zone-card">Ad Space<br>Bottom Center ${i + 1}</div>`
-        : `<div class="ad-zone-card">Ad Space<br>Bottom Center ${i + 1}</div>`);
+        : `<div class="ad-zone-card">\u5e83\u544a\u30b9\u30da\u30fc\u30b9<br>\u4e2d\u592e\u4e0b ${i + 1}</div>`);
     }
     el.innerHTML = labels.join("");
   };
@@ -301,7 +295,7 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     if (!isEasySelect && (selectedCount > 0 || state.activeGroupId != null)) {
       if (topContextHelp) {
         const baseTxt = getTopContextHelpText(state, tool, lang);
-        topContextHelp.textContent = (baseTxt ? `${baseTxt} | ` : "") + "Space: Clear selection";
+        topContextHelp.textContent = (baseTxt ? `${baseTxt} | ` : "") + statusText.clearSelection;
         topContextHelp.style.display = topContextVisible ? "flex" : "none";
       }
       topContext.style.display = topContextVisible ? "grid" : "none";

@@ -182,6 +182,16 @@
     }
     return null;
   };
+  const syncSelectPickMode = (mode) => {
+    if (typeof actions.setSelectPickMode === "function") {
+      actions.setSelectPickMode(mode);
+      return;
+    }
+    if (!state.ui) state.ui = {};
+    state.ui.selectPickMode = String(mode) === "group" ? "group" : "object";
+    if (state.ui.selectPickMode !== "group") state.activeGroupId = null;
+    refreshUi(state, dom);
+  };
 
   const toggleGroupTreeExpandedByRow = (row, e) => {
     if (!row) return false;
@@ -224,6 +234,7 @@
         showLayerRestrictionMessage(getShapePickDenyReasonFromId(sid));
         return;
       }
+      syncSelectPickMode("object");
       if (e.shiftKey) actions.toggleShapeSelectionById?.(sid);
       else actions.selectShapeById?.(sid);
       return;
@@ -253,6 +264,7 @@
       return;
     }
     if (t?.closest?.("button[data-group-toggle]")) return;
+    syncSelectPickMode("group");
 
     if (groupRowClickTimer) {
       clearTimeout(groupRowClickTimer);
@@ -299,6 +311,7 @@
         e.preventDefault();
         return;
       }
+      syncSelectPickMode("object");
       if (!state.ui.groupDragDrop) state.ui.groupDragDrop = { draggingGroupId: null, draggingShapeId: null, overGroupId: null };
       const selectedIds = Array.from(new Set((state.selection?.ids || []).map(Number).filter(Number.isFinite)));
       const multiShapeIds = (selectedIds.length > 1 && selectedIds.includes(sid))
@@ -325,6 +338,7 @@
       e.preventDefault();
       return;
     }
+    syncSelectPickMode("group");
     if (!state.ui.groupDragDrop) state.ui.groupDragDrop = { draggingGroupId: null, draggingShapeId: null, overGroupId: null };
     state.ui.groupDragDrop.draggingGroupId = gid;
     state.ui.groupDragDrop.draggingShapeId = null;

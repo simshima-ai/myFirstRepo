@@ -1,5 +1,5 @@
-﻿import { pushHistory, setSelection } from "./state.js";
-import { solveLineLineFillet, solveLineCircleFillet, solveArcArcFillet, chooseTrimSideForIntersectionByT, chooseEndsForLineByKeepEnd, segmentCircleIntersectionPoints, isAngleOnArc } from "./solvers.js";
+import { pushHistory, setSelection, pruneEmptyGroups } from "./state.js";
+import { solveLineLineFillet, solveLineCircleFillet, solveLineCircleFilletWithEnds, solveArcArcFillet, chooseTrimSideForIntersectionByT, chooseEndsForLineByKeepEnd, segmentCircleIntersectionPoints, isAngleOnArc } from "./solvers.js";
 import { getSelectedShapes, getTrimHoverCandidate } from "./app_selection.js";
 export function splitLineForFillet(line, p) {
     const ax = Number(line.x1), ay = Number(line.y1), bx = Number(line.x2), by = Number(line.y2);
@@ -35,17 +35,273 @@ function applyLineLikeFilletTrim(source, tangentPoint, keepEnd) {
         return Math.hypot(Number(line.x2) - Number(line.x1), Number(line.y2) - Number(line.y1)) > 1e-6;
     }
     if (source.kind === "polyline") {
-        const poly = source.shape;
-        const pts = Array.isArray(poly?.points) ? poly.points : null;
-        if (!pts || pts.length < 2) return false;
-        const idx = (source.keepEnd || keepEnd) === "p1" ? Number(source.i2) : Number(source.i1);
-        if (!Number.isInteger(idx) || idx < 0 || idx >= pts.length) return false;
+        const pts = Array.isArray(source.shape?.points) ? source.shape.points : null;
+        const i1 = Number(source.i1);
+        const i2 = Number(source.i2);
+        if (!pts || !Number.isInteger(i1) || !Number.isInteger(i2) || i1 < 0 || i2 < 0 || i1 >= pts.length || i2 >= pts.length) return false;
+        const e = source.keepEnd || keepEnd;
+        const idx = (e === "p1") ? i2 : i1;
         pts[idx] = { x: tx, y: ty };
-        const a = pts[Number(source.i1)];
-        const b = pts[Number(source.i2) % pts.length];
-        return Math.hypot(Number(b?.x) - Number(a?.x), Number(b?.y) - Number(a?.y)) > 1e-6;
+        if (source.line) {
+            source.line.x1 = Number(pts[i1]?.x);
+            source.line.y1 = Number(pts[i1]?.y);
+            source.line.x2 = Number(pts[i2]?.x);
+            source.line.y2 = Number(pts[i2]?.y);
+        }
+        return Math.hypot(Number(pts[i2]?.x) - Number(pts[i1]?.x), Number(pts[i2]?.y) - Number(pts[i1]?.y)) > 1e-6;
     }
     return false;
+}
+
+
+function findShapeGroupId(state, shapeOrId) {
+    const sid = Number(typeof shapeOrId === "object" ? shapeOrId?.id : shapeOrId);
+    if (Number.isFinite(sid)) {
+        for (const g of (state.groups || [])) {
+            const ids = Array.isArray(g?.shapeIds) ? g.shapeIds : [];
+            if (ids.some((id) => Number(id) === sid)) return Number(g.id);
+        }
+    }
+    const gid = Number(typeof shapeOrId === "object" ? shapeOrId?.groupId : NaN);
+    return Number.isFinite(gid) ? gid : null;
+}
+
+function attachShapesToGroup(state, groupId, shapes) {
+    const gid = Number(groupId);
+    if (!Number.isFinite(gid)) return false;
+    const group = (state.groups || []).find((g) => Number(g?.id) === gid);
+    if (!group) return false;
+    if (!Array.isArray(group.shapeIds)) group.shapeIds = [];
+    const idSet = new Set(group.shapeIds.map(Number).filter(Number.isFinite));
+    for (const shape of (shapes || [])) {
+        const sid = Number(shape?.id);
+        if (!Number.isFinite(sid)) continue;
+        shape.groupId = gid;
+        if (!idSet.has(sid)) {
+            group.shapeIds.push(sid);
+            idSet.add(sid);
+        }
+    }
+    return true;
+}
+
+function resolvePreferredFilletGroupId(groupIds) {
+    const ids = Array.from(new Set((groupIds || []).map(Number).filter(Number.isFinite)));
+    if (!ids.length) return null;
+    return ids[0];
+}
+
+function createVirtualLineFromLineLikeSource(source) {
+    if (!source) return null;
+    if (source.kind === "line") {
+        const line = source.shape;
+        if (!line || String(line.type || "") !== "line") return null;
+        return {
+            id: Number(line.id),
+            type: "line",
+            x1: Number(line.x1),
+            y1: Number(line.y1),
+            x2: Number(line.x2),
+            y2: Number(line.y2),
+            layerId: line.layerId,
+            lineWidthMm: Number.isFinite(Number(line.lineWidthMm)) ? Number(line.lineWidthMm) : undefined,
+            lineType: typeof line.lineType === "string" ? String(line.lineType) : undefined,
+            color: typeof line.color === "string" ? String(line.color) : undefined,
+        };
+    }
+    if (source.kind === "polyline") {
+        const pts = Array.isArray(source.shape?.points) ? source.shape.points : null;
+        const i1 = Number(source.i1);
+        const i2 = Number(source.i2);
+        if (!pts || !Number.isInteger(i1) || !Number.isInteger(i2) || i1 < 0 || i2 < 0 || i1 >= pts.length || i2 >= pts.length) return null;
+        return {
+            id: Number(source.shape?.id),
+            type: "line",
+            x1: Number(pts[i1]?.x),
+            y1: Number(pts[i1]?.y),
+            x2: Number(pts[i2]?.x),
+            y2: Number(pts[i2]?.y),
+            layerId: source.shape?.layerId,
+            lineWidthMm: Number.isFinite(Number(source.shape?.lineWidthMm)) ? Number(source.shape.lineWidthMm) : undefined,
+            lineType: typeof source.shape?.lineType === "string" ? String(source.shape.lineType) : undefined,
+            color: typeof source.shape?.color === "string" ? String(source.shape.color) : undefined,
+        };
+    }
+    return null;
+}
+
+export function normalizeFilletLineSource(state, deps, source) {
+    void state;
+    if (!source) return null;
+    if (source.kind === "line") {
+        return {
+            ...source,
+            shape: source.shape,
+            line: source.line || source.shape,
+            sourceGroupId: findShapeGroupId(state, source.shape),
+            normalizedShapes: [source.shape],
+            pendingAddShapes: [],
+            pendingRemoveShapeIds: [],
+        };
+    }
+    if (source.kind !== "polyline") return null;
+    const poly = source.shape;
+    const pts = Array.isArray(poly?.points) ? poly.points : null;
+    const segCount = Math.max(0, (pts?.length || 0) - 1) + (poly?.closed ? 1 : 0);
+    const nextShapeId = deps?.nextShapeId;
+    if (!pts || pts.length < 2 || segCount < 1 || typeof nextShapeId !== "function") return null;
+    const lines = [];
+    let targetLine = null;
+    for (let si = 0; si < segCount; si++) {
+        const i1 = si;
+        const i2 = (si + 1) % pts.length;
+        const p1 = pts[i1];
+        const p2 = pts[i2];
+        const x1 = Number(p1?.x), y1 = Number(p1?.y), x2 = Number(p2?.x), y2 = Number(p2?.y);
+        if (![x1, y1, x2, y2].every(Number.isFinite)) continue;
+        if (Math.hypot(x2 - x1, y2 - y1) <= 1e-6) continue;
+        const line = {
+            id: nextShapeId(),
+            type: "line",
+            x1,
+            y1,
+            x2,
+            y2,
+            layerId: poly.layerId,
+            lineWidthMm: Number.isFinite(Number(poly.lineWidthMm)) ? Number(poly.lineWidthMm) : undefined,
+            lineType: typeof poly.lineType === "string" ? String(poly.lineType) : undefined,
+            color: typeof poly.color === "string" ? String(poly.color) : undefined,
+        };
+        lines.push(line);
+        if (Number(si) === Number(source.segIndex)) targetLine = line;
+    }
+    if (!lines.length || !targetLine) return null;
+    return {
+        kind: "line",
+        shape: targetLine,
+        keepEnd: normalizeKeepEndValue(source.keepEnd) || undefined,
+        line: targetLine,
+        sourceGroupId: findShapeGroupId(state, poly),
+        normalizedShapes: lines.slice(),
+        pendingAddShapes: lines.slice(),
+        pendingRemoveShapeIds: [Number(poly.id)],
+    };
+}
+
+function commitNormalizedLineSources(state, helpers, sources) {
+    const arr = Array.isArray(sources) ? sources.filter(Boolean) : [];
+    for (const source of arr) {
+        const shapes = Array.isArray(source.pendingAddShapes) ? source.pendingAddShapes.filter(Boolean) : [];
+        const gid = Number(source?.sourceGroupId);
+        if (Number.isFinite(gid)) {
+            for (const shape of shapes) shape.groupId = gid;
+            attachShapesToGroup(state, gid, shapes);
+        }
+        for (const shape of shapes) helpers.addShape?.(shape);
+    }
+    const removeIds = Array.from(new Set(arr.flatMap((source) => Array.isArray(source.pendingRemoveShapeIds) ? source.pendingRemoveShapeIds : []).map(Number).filter(Number.isFinite)));
+    for (const id of removeIds) {
+        if (!helpers.removeShapeById?.(id)) return false;
+    }
+    pruneEmptyGroups(state);
+    return true;
+}
+
+function normalizeKeepEndValue(value) {
+    return (value === "p1" || value === "p2") ? value : null;
+}
+
+function resolveEffectiveKeepEnd(preferredKeepEnd, sol) {
+    return normalizeKeepEndValue(preferredKeepEnd)
+        || normalizeKeepEndValue(sol?.keepEnd)
+        || normalizeKeepEndValue(sol?.desiredKeepEnd)
+        || "p1";
+}
+
+function solveLineCircleFilletForSource(lineSource, roundConn, radius, worldHint = null) {
+    const workingLine = createVirtualLineFromLineLikeSource(lineSource);
+    if (!workingLine || !roundConn) return { ok: false, reason: "invalid-source" };
+    const preferredKeepEnd = normalizeKeepEndValue(lineSource?.keepEnd);
+    if (preferredKeepEnd) {
+        const fixed = solveLineCircleFilletWithEnds(workingLine, roundConn, radius, preferredKeepEnd, worldHint);
+        if (fixed?.ok) return fixed;
+    }
+    return solveLineCircleFillet(workingLine, roundConn, radius, worldHint);
+}
+
+function trimVirtualLineForFillet(line, tangentPoint, keepEnd) {
+    if (!line || String(line.type || "") !== "line" || !tangentPoint) return false;
+    const tx = Number(tangentPoint.x);
+    const ty = Number(tangentPoint.y);
+    if (![tx, ty].every(Number.isFinite)) return false;
+    if (String(keepEnd || "p1") === "p1") {
+        line.x2 = tx;
+        line.y2 = ty;
+    } else {
+        line.x1 = tx;
+        line.y1 = ty;
+    }
+    return Math.hypot(Number(line.x2) - Number(line.x1), Number(line.y2) - Number(line.y1)) > 1e-6;
+}
+
+function buildLineCircleFilletMeta(lineSource, circleRef, keepEnd, arcCutKey) {
+    if (!lineSource || !circleRef) return null;
+    const lineMeta = (lineSource.kind === "polyline")
+        ? {
+            kind: "polyline",
+            shapeId: Number(lineSource.shape?.id),
+            segIndex: Number(lineSource.segIndex),
+            i1: Number(lineSource.i1),
+            i2: Number(lineSource.i2),
+            keepEnd: String(keepEnd || "p1"),
+        }
+        : {
+            kind: "line",
+            shapeId: Number(lineSource.shape?.id),
+            keepEnd: String(keepEnd || "p1"),
+        };
+    return {
+        kind: "line-circle",
+        line: lineMeta,
+        round: {
+            shapeId: Number(circleRef.id),
+            type: String(circleRef.type || "").toLowerCase(),
+        },
+        arcCutKey: (arcCutKey === "a1" || arcCutKey === "a2") ? arcCutKey : null,
+    };
+}
+
+function resolveLineLikeSourceFromMeta(state, meta) {
+    if (!state || !meta || !Number.isFinite(Number(meta.shapeId))) return null;
+    const shape = (state.shapes || []).find((s) => Number(s?.id) === Number(meta.shapeId));
+    if (!shape) return null;
+    if (String(meta.kind || "") === "line") {
+        if (String(shape.type || "") !== "line") return null;
+        return {
+            kind: "line",
+            shape,
+            keepEnd: normalizeKeepEndValue(meta.keepEnd) || undefined,
+            line: createVirtualLineFromLineLikeSource({ kind: "line", shape }),
+        };
+    }
+    if (String(meta.kind || "") === "polyline") {
+        if (String(shape.type || "") !== "polyline") return null;
+        const pts = Array.isArray(shape.points) ? shape.points : null;
+        const i1 = Number(meta.i1);
+        const i2 = Number(meta.i2);
+        if (!pts || !Number.isInteger(i1) || !Number.isInteger(i2) || i1 < 0 || i2 < 0 || i1 >= pts.length || i2 >= pts.length) return null;
+        const source = {
+            kind: "polyline",
+            shape,
+            segIndex: Number(meta.segIndex),
+            i1,
+            i2,
+            keepEnd: normalizeKeepEndValue(meta.keepEnd) || undefined,
+        };
+        source.line = createVirtualLineFromLineLikeSource(source);
+        return source.line ? source : null;
+    }
+    return null;
 }
 
 function applyFilletSourceStyle(state, targetArc, sources) {
@@ -304,7 +560,7 @@ export function computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, ke
         okLine: false,
         okArc: (circleRef?.type !== "arc"),
         okAll: false,
-        effectiveKeepEnd: String(sol?.desiredKeepEnd || keepEnd || sol?.keepEnd || "p1"),
+        effectiveKeepEnd: resolveEffectiveKeepEnd(keepEnd, sol),
         lineCandidate: null,
         arcCandidate: null,
         cutKey: null,
@@ -587,18 +843,65 @@ export function applyCircleInput(state, helpers, r) {
         if (![cx, cy, rr, a].every(Number.isFinite)) return null;
         return { x: cx + Math.cos(a) * rr, y: cy + Math.sin(a) * rr };
     };
-    const findConnectedLineAtPoint = (pt, excludeId = null) => {
+    const lineSourceRefKey = (source) => {
+        if (!source) return "";
+        if (source.kind === "polyline") return `polyline:${Number(source.shape?.id)}:${Number(source.segIndex)}`;
+        return `line:${Number(source.shape?.id ?? source.line?.id)}`;
+    };
+    const materializeLineLikeSource = (shape, segIndex = null) => {
+        if (!shape) return null;
+        if (shape.type === "line") {
+            return {
+                kind: "line",
+                shape,
+                line: createVirtualLineFromLineLikeSource({ kind: "line", shape }),
+            };
+        }
+        if (shape.type === "polyline") {
+            const pts = Array.isArray(shape.points) ? shape.points : null;
+            const si = Number(segIndex);
+            if (!pts || !Number.isInteger(si)) return null;
+            const segCount = Math.max(0, pts.length - 1) + (shape.closed ? 1 : 0);
+            if (si < 0 || si >= segCount) return null;
+            const i1 = si;
+            const i2 = (si + 1) % pts.length;
+            const source = { kind: "polyline", shape, segIndex: si, i1, i2 };
+            source.line = createVirtualLineFromLineLikeSource(source);
+            return source.line ? source : null;
+        }
+        return null;
+    };
+    const findConnectedLineLikeAtPoint = (pt, excludeRefs = new Set()) => {
         let best = null;
         let bestD = Infinity;
         for (const s of (state.shapes || [])) {
-            if (!s || s.type !== "line") continue;
-            if (excludeId != null && Number(s.id) === Number(excludeId)) continue;
-            const p1 = { x: Number(s.x1), y: Number(s.y1) };
-            const p2 = { x: Number(s.x2), y: Number(s.y2) };
-            const d1 = Math.hypot(pt.x - p1.x, pt.y - p1.y);
-            const d2 = Math.hypot(pt.x - p2.x, pt.y - p2.y);
-            if (d1 <= eps && d1 < bestD) { bestD = d1; best = { line: s, key: "p1" }; }
-            if (d2 <= eps && d2 < bestD) { bestD = d2; best = { line: s, key: "p2" }; }
+            if (!s || (s.type !== "line" && s.type !== "polyline")) continue;
+            if (s.type === "line") {
+                const source = materializeLineLikeSource(s, null);
+                const refKey = lineSourceRefKey(source);
+                if (excludeRefs && excludeRefs.has(refKey)) continue;
+                const p1 = { x: Number(s.x1), y: Number(s.y1) };
+                const p2 = { x: Number(s.x2), y: Number(s.y2) };
+                const d1 = Math.hypot(pt.x - p1.x, pt.y - p1.y);
+                const d2 = Math.hypot(pt.x - p2.x, pt.y - p2.y);
+                if (d1 <= eps && d1 < bestD) { bestD = d1; best = { source, key: "p1", refKey }; }
+                if (d2 <= eps && d2 < bestD) { bestD = d2; best = { source, key: "p2", refKey }; }
+                continue;
+            }
+            const pts = Array.isArray(s.points) ? s.points : [];
+            const segCount = Math.max(0, pts.length - 1) + (s.closed ? 1 : 0);
+            for (let si = 0; si < segCount; si++) {
+                const source = materializeLineLikeSource(s, si);
+                if (!source || !source.line) continue;
+                const refKey = lineSourceRefKey(source);
+                if (excludeRefs && excludeRefs.has(refKey)) continue;
+                const p1 = { x: Number(source.line.x1), y: Number(source.line.y1) };
+                const p2 = { x: Number(source.line.x2), y: Number(source.line.y2) };
+                const d1 = Math.hypot(pt.x - p1.x, pt.y - p1.y);
+                const d2 = Math.hypot(pt.x - p2.x, pt.y - p2.y);
+                if (d1 <= eps && d1 < bestD) { bestD = d1; best = { source, key: "p1", refKey }; }
+                if (d2 <= eps && d2 < bestD) { bestD = d2; best = { source, key: "p2", refKey }; }
+            }
         }
         return best;
     };
@@ -661,16 +964,16 @@ export function applyCircleInput(state, helpers, r) {
         const end1 = getArcEndPoint(arcShape, "a1");
         const end2 = getArcEndPoint(arcShape, "a2");
         if (!end1 || !end2) return false;
-        const c1 = findConnectedLineAtPoint(end1, null);
-        const c2 = findConnectedLineAtPoint(end2, c1?.line?.id);
-        if (!c1 || !c2 || !c1.line || !c2.line) return false;
+        const c1 = findConnectedLineLikeAtPoint(end1, new Set());
+        const c2 = findConnectedLineLikeAtPoint(end2, new Set([c1?.refKey].filter(Boolean)));
+        if (!c1 || !c2 || !c1.source?.line || !c2.source?.line) return false;
         const hint = arcMidHint(arcShape);
-        const sol = solveLineLineFillet(c1.line, c2.line, nextR, hint);
+        const sol = solveLineLineFillet(c1.source.line, c2.source.line, nextR, hint);
         if (!sol || !sol.ok || !sol.arc) return false;
         const t1 = sol.t1, t2 = sol.t2;
         if (!t1 || !t2) return false;
-        if (c1.key === "p1") { c1.line.x1 = Number(t1.x); c1.line.y1 = Number(t1.y); } else { c1.line.x2 = Number(t1.x); c1.line.y2 = Number(t1.y); }
-        if (c2.key === "p1") { c2.line.x1 = Number(t2.x); c2.line.y1 = Number(t2.y); } else { c2.line.x2 = Number(t2.x); c2.line.y2 = Number(t2.y); }
+        if (!applyLineLikeFilletTrim(c1.source, t1, c1.key === "p1" ? "p2" : "p1")) return false;
+        if (!applyLineLikeFilletTrim(c2.source, t2, c2.key === "p1" ? "p2" : "p1")) return false;
         arcShape.cx = Number(sol.arc.cx ?? sol.center?.x);
         arcShape.cy = Number(sol.arc.cy ?? sol.center?.y);
         arcShape.r = Number(sol.arc.r ?? sol.radius);
@@ -681,48 +984,61 @@ export function applyCircleInput(state, helpers, r) {
     };
     const fitArcAsLineRoundFillet = (arcShape) => {
         if (!arcShape || arcShape.type !== "arc") return false;
-        const end1 = getArcEndPoint(arcShape, "a1");
-        const end2 = getArcEndPoint(arcShape, "a2");
-        if (!end1 || !end2) return false;
-
-        const tryFit = (lineAtEnd, roundAtEnd, endLinePt, endRoundPt) => {
-            const lineConn = findConnectedLineAtPoint(endLinePt, null);
-            if (!lineConn || !lineConn.line) return false;
-            const exclude = new Set([Number(arcShape.id), Number(lineConn.line.id)]);
-            const roundConn = findConnectedRoundAtPoint(endRoundPt, exclude);
-            if (!roundConn) return false;
-            const hint = arcMidHint(arcShape);
-            const sol = solveLineCircleFillet(lineConn.line, roundConn, nextR, hint);
+        const hint = arcMidHint(arcShape);
+        const applySolved = (lineSource, roundConn, forcedCutKey = null) => {
+            const workingLine = createVirtualLineFromLineLikeSource(lineSource);
+            if (!workingLine || !roundConn) return false;
+            const sol = solveLineCircleFilletForSource(lineSource, roundConn, nextR, hint);
             if (!sol || !sol.ok || !sol.arc || !sol.tLine || !sol.tCircle) return false;
+            const effectiveKeepEnd = resolveEffectiveKeepEnd(lineSource?.keepEnd, sol);
             const lineBeforeTrim = {
                 type: "line",
-                x1: Number(lineConn.line.x1), y1: Number(lineConn.line.y1),
-                x2: Number(lineConn.line.x2), y2: Number(lineConn.line.y2),
+                x1: Number(workingLine.x1), y1: Number(workingLine.y1),
+                x2: Number(workingLine.x2), y2: Number(workingLine.y2),
             };
-
             if (roundConn.type === "arc") {
-                const okArcTrim = (sol.arcCutKey === "a1" || sol.arcCutKey === "a2")
-                    ? trimArcEndpointForFilletByKey(roundConn, sol.tCircle, sol.arcCutKey)
+                const cutKey = (forcedCutKey === "a1" || forcedCutKey === "a2") ? forcedCutKey : sol.arcCutKey;
+                const okArcTrim = (cutKey === "a1" || cutKey === "a2")
+                    ? trimArcEndpointForFilletByKey(roundConn, sol.tCircle, cutKey)
                     : trimArcEndpointForFilletTowardPoint(roundConn, sol.tCircle, sol.sharedIntersection || sol.arcMid || null, lineBeforeTrim);
                 if (!okArcTrim) return false;
             }
-
-            if (lineConn.key === "p1") { lineConn.line.x1 = Number(sol.tLine.x); lineConn.line.y1 = Number(sol.tLine.y); }
-            else { lineConn.line.x2 = Number(sol.tLine.x); lineConn.line.y2 = Number(sol.tLine.y); }
-
+            if (!trimVirtualLineForFillet(workingLine, sol.tLine, effectiveKeepEnd)) return false;
+            if (!writeVirtualLineBackToSource(lineSource, workingLine)) return false;
             arcShape.cx = Number(sol.arc.cx ?? sol.center?.x);
             arcShape.cy = Number(sol.arc.cy ?? sol.center?.y);
             arcShape.r = Number(sol.arc.r ?? sol.radius);
             arcShape.a1 = Number(sol.arc.a1);
             arcShape.a2 = Number(sol.arc.a2);
             arcShape.ccw = sol.arc.ccw !== false;
+            arcShape.filletSource = buildLineCircleFilletMeta(lineSource, roundConn, effectiveKeepEnd, (forcedCutKey === "a1" || forcedCutKey === "a2") ? forcedCutKey : sol.arcCutKey);
             return [arcShape.cx, arcShape.cy, arcShape.r, arcShape.a1, arcShape.a2].every(Number.isFinite);
         };
 
-        // Try both endpoint assignments:
-        // a1 -> line / a2 -> round, then reverse.
-        if (tryFit("a1", "a2", end1, end2)) return true;
-        if (tryFit("a2", "a1", end2, end1)) return true;
+        const meta = arcShape.filletSource;
+        if (meta && meta.kind === "line-circle") {
+            const lineSource = resolveLineLikeSourceFromMeta(state, meta.line);
+            const roundConn = (state.shapes || []).find((s) => Number(s?.id) === Number(meta.round?.shapeId));
+            if (lineSource && roundConn) return applySolved(lineSource, roundConn, meta.arcCutKey || null);
+        }
+
+        const end1 = getArcEndPoint(arcShape, "a1");
+        const end2 = getArcEndPoint(arcShape, "a2");
+        if (!end1 || !end2) return false;
+        const tryFit = (endLinePt, endRoundPt) => {
+            const lineConn = findConnectedLineLikeAtPoint(endLinePt, new Set());
+            if (!lineConn || !lineConn.source?.line) return false;
+            const exclude = new Set([Number(arcShape.id)]);
+            const roundConn = findConnectedRoundAtPoint(endRoundPt, exclude);
+            if (!roundConn) return false;
+            const lineSource = {
+                ...lineConn.source,
+                keepEnd: lineConn.key === "p1" ? "p2" : "p1",
+            };
+            return applySolved(lineSource, roundConn, null);
+        };
+        if (tryFit(end1, end2)) return true;
+        if (tryFit(end2, end1)) return true;
         return false;
     };
     const fitArcAsArcArcFillet = (arcShape) => {
@@ -791,20 +1107,20 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
     const ff = state.input.filletFlow;
     if (!ff || !ff.sol) return;
     const sol = ff.sol;
-    const lineSource = ff.lineSource || null;
+    const lineSource = normalizeFilletLineSource(state, { nextShapeId }, ff.lineSource || null);
     const lineShape = lineSource?.shape || state.shapes.find(s => Number(s.id) === Number(ff.line?.id));
     const circleRef = state.shapes.find(s => Number(s.id) === Number(ff.circle?.id));
-    if (!lineShape || !circleRef || !lineSource?.line) {
+    const lineRef = createVirtualLineFromLineLikeSource(lineSource);
+    if (!lineShape || !circleRef || !lineRef) {
         if (setStatus) setStatus("Fillet failed: target object was not found");
         state.input.filletFlow = null;
         if (draw) draw();
         return;
     }
-    const lineRef = lineSource.line;
     const mode = state.filletSettings.lineMode || "trim";
     const doTrim = (mode === "trim");
+    const effectiveKeepEnd = resolveEffectiveKeepEnd(keepEnd, sol);
     let trimWarning = false;
-    pushHistory(state);
     const arcSpan = (() => {
         const a1 = Number(sol.arc?.a1);
         const a2 = Number(sol.arc?.a2);
@@ -822,7 +1138,18 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
     }
     const arc = { id: nextShapeId(), type: "arc", cx: sol.center.x, cy: sol.center.y, r: sol.radius, a1: sol.arc.a1, a2: sol.arc.a2, ccw: sol.arc.ccw, layerId: state.activeLayerId };
     applyFilletSourceStyle(state, arc, [lineRef, circleRef]);
+    arc.filletSource = buildLineCircleFilletMeta(lineSource, circleRef, effectiveKeepEnd, sol.arcCutKey);
+    pushHistory(state);
+    if (!commitNormalizedLineSources(state, helpers, [lineSource])) {
+        if (setStatus) setStatus("Fillet failed: could not convert polyline target to lines.");
+        state.input.filletFlow = null;
+        if (draw) draw();
+        return;
+    }
+    const targetGroupId = resolvePreferredFilletGroupId([lineSource?.sourceGroupId, findShapeGroupId(state, circleRef)]);
+    if (Number.isFinite(Number(targetGroupId))) arc.groupId = Number(targetGroupId);
     addShape(arc);
+    if (Number.isFinite(Number(targetGroupId))) attachShapesToGroup(state, Number(targetGroupId), [arc]);
     if (doTrim) {
         const lineSnap = JSON.stringify(lineShape);
         const arcSnap = (circleRef.type === "arc")
@@ -832,9 +1159,10 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
         const trimTowardPoint = (circleRef.type === "arc")
             ? pickLineArcIntersectionTowardPoint(lineRef, circleRef, sol, clickTowardPoint)
             : clickTowardPoint;
-        const plan = computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, keepEnd, arc.id, trimTowardPoint);
+        const plan = computeLineCircleAutoTrimPlan(state, sol, lineRef, circleRef, effectiveKeepEnd, arc.id, trimTowardPoint);
         let okAll = !!plan?.okLine;
-        if (!applyLineLikeFilletTrim(lineSource, sol.tLine, keepEnd)) okAll = false;
+        if (!trimVirtualLineForFillet(lineRef, sol.tLine, effectiveKeepEnd)) okAll = false;
+        if (okAll && !writeVirtualLineBackToSource(lineSource, lineRef)) okAll = false;
         if (okAll && circleRef.type === "arc") {
             const B = { x: Number(sol?.tCircle?.x), y: Number(sol?.tCircle?.y) };
             const th = Math.atan2(Number(B.y) - Number(circleRef.cy), Number(B.x) - Number(circleRef.cx));
@@ -845,13 +1173,18 @@ export function applyPendingLineCircleFillet(state, helpers, keepEnd) {
                 if (!split) {
                     okAll = false;
                 } else {
-                    const A = pickLineArcIntersectionTowardPoint(lineRef, circleRef, sol, trimTowardPoint);
-                    const keepSeg = chooseKeepSegByIntersectionA(split, {
-                        cx: Number(circleRef.cx),
-                        cy: Number(circleRef.cy),
-                    }, A);
+                    let keepSeg = null;
+                    if (sol.arcCutKey === "a1") keepSeg = split.seg2;
+                    else if (sol.arcCutKey === "a2") keepSeg = split.seg1;
+                    else {
+                        const A = pickLineArcIntersectionTowardPoint(lineRef, circleRef, sol, trimTowardPoint);
+                        keepSeg = chooseKeepSegByIntersectionA(split, {
+                            cx: Number(circleRef.cx),
+                            cy: Number(circleRef.cy),
+                        }, A);
+                    }
                     const keepSpan = Number(keepSeg?.span);
-                    if (!A || !Number.isFinite(keepSpan) || !(keepSpan > 1e-5 && keepSpan < AUTO_TRIM_TAU - 1e-4)) {
+                    if (!Number.isFinite(keepSpan) || !(keepSpan > 1e-5 && keepSpan < AUTO_TRIM_TAU - 1e-4)) {
                         okAll = false;
                     } else {
                         circleRef.a1 = autoTrimNormTau(Number(keepSeg.a1));
@@ -899,7 +1232,11 @@ export function applyPendingArcArcFillet(state, helpers, keep1, keep2) {
     }
     const arc = { id: nextShapeId(), type: "arc", cx: sol.center.x, cy: sol.center.y, r: sol.radius, a1: sol.arc.a1, a2: sol.arc.a2, ccw: sol.arc.ccw, layerId: state.activeLayerId };
     applyFilletSourceStyle(state, arc, [arc1Ref, arc2Ref]);
+    const targetGroupId = resolvePreferredFilletGroupId([findShapeGroupId(state, arc1Ref), findShapeGroupId(state, arc2Ref)]);
+    if (Number.isFinite(Number(targetGroupId))) arc.groupId = Number(targetGroupId);
     addShape(arc);
+    if (Number.isFinite(Number(targetGroupId))) attachShapesToGroup(state, Number(targetGroupId), [arc]);
+    pruneEmptyGroups(state);
     state.input.filletFlow = null;
     if (setStatus) setStatus(trimWarning ? "Fillet created (trim skipped: arc would become full circle)" : "Fillet created");
     if (draw) draw();

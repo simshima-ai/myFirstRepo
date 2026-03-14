@@ -7,6 +7,7 @@
         toggleDebugConsole,
         getLineCreateMode,
         toggleAdsVisible,
+        setTouchMode,
         finalizeBsplineDraft,
         commitFilletFromHover,
         isTypingTarget,
@@ -41,6 +42,19 @@
         }
         if ((e.ctrlKey || e.metaKey) && e.shiftKey && !e.altKey && String(e.key).toLowerCase() === "a") {
             if (typeof toggleAdsVisible === "function") toggleAdsVisible();
+            e.preventDefault();
+            return;
+        }
+        if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.altKey && String(e.key).toLowerCase() === "m") {
+            const next = !state.ui?.touchMode;
+            if (typeof setTouchMode === "function") {
+                setTouchMode(next);
+            } else {
+                if (!state.ui) state.ui = {};
+                state.ui.touchMode = next;
+            }
+            if (setStatus) setStatus(next ? "Touch mode: ON" : "Touch mode: OFF");
+            if (draw) draw();
             e.preventDefault();
             return;
         }
@@ -183,11 +197,14 @@
             return;
         }
         if (isEnterKey(e) && state.tool === "fillet") {
-            if (state.selection.ids.length === 2) {
+            const targetCount = Array.isArray(state.input?.filletTargets) ? state.input.filletTargets.filter(Boolean).length : 0;
+            const canCommit = targetCount === 2 || state.selection.ids.length === 2;
+            if (canCommit) {
                 const committed = commitFilletFromHover(state.input?.hover?.world || null);
                 if (committed) {
                     clearSelection();
                     state.activeGroupId = null;
+                    state.input.filletTargets = [];
                     state.input.filletFlow = null;
                     if (setStatus) setStatus("Fillet created");
                     if (draw) draw();
@@ -200,6 +217,15 @@
             const ok = !!helpers.executeDoubleLine?.();
             if (!ok && setStatus) {
                 setStatus("Double line: select source lines first");
+            }
+            if (draw) draw();
+            e.preventDefault();
+            return;
+        }
+        if (isEnterKey(e) && state.tool === "hatch") {
+            const ok = !!helpers.executeHatch?.();
+            if (!ok && setStatus) {
+                setStatus("Hatch: select boundary objects first");
             }
             if (draw) draw();
             e.preventDefault();

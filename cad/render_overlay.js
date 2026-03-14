@@ -20,7 +20,7 @@ export function createRenderOverlayOps(deps) {
     ctx.save();
     if (leftToRight) {
       ctx.fillStyle = "rgba(14,165,233,0.15)";
-      ctx.strokeStyle = "#0ea5e9";
+      ctx.strokeStyle = "#f59e0b";
       ctx.setLineDash([]);
     } else {
       ctx.fillStyle = "rgba(34,197,94,0.15)";
@@ -260,7 +260,50 @@ export function createRenderOverlayOps(deps) {
     ctx.restore();
   }
 
+  function drawFilletTargetSegments(ctx, state) {
+    if (state.tool !== "fillet") return;
+    const targets = Array.isArray(state.input?.filletTargets) ? state.input.filletTargets.filter(Boolean) : [];
+    if (!targets.length) return;
+    ctx.save();
+    ctx.strokeStyle = "#f59e0b";
+    ctx.lineWidth = 4;
+    ctx.setLineDash([]);
+    for (const target of targets) {
+      const sid = Number(target?.shapeId);
+      if (!Number.isFinite(sid)) continue;
+      const shape = (state.shapes || []).find((s) => Number(s?.id) === sid);
+      if (!shape) continue;
+      const type = String(target?.type || shape.type || "").toLowerCase();
+      if (type === "polyline") {
+        const pts = Array.isArray(shape.points) ? shape.points : [];
+        const i1 = Number(target?.i1);
+        const i2 = Number(target?.i2);
+        if (!(Number.isInteger(i1) && Number.isInteger(i2)) || i1 < 0 || i2 < 0 || i1 >= pts.length || i2 >= pts.length) continue;
+        const a = pts[i1];
+        const b = pts[i2];
+        const ax = Number(a?.x), ay = Number(a?.y), bx = Number(b?.x), by = Number(b?.y);
+        if (![ax, ay, bx, by].every(Number.isFinite)) continue;
+        const p1 = worldToScreen(state.view, { x: ax, y: ay });
+        const p2 = worldToScreen(state.view, { x: bx, y: by });
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      } else if (type === "line") {
+        const p1 = worldToScreen(state.view, { x: Number(shape.x1), y: Number(shape.y1) });
+        const p2 = worldToScreen(state.view, { x: Number(shape.x2), y: Number(shape.y2) });
+        if (![p1.x, p1.y, p2.x, p2.y].every(Number.isFinite)) continue;
+        ctx.beginPath();
+        ctx.moveTo(p1.x, p1.y);
+        ctx.lineTo(p2.x, p2.y);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+  }
+
   function drawFilletHover(ctx, state) {
+    drawFilletTargetSegments(ctx, state);
     const fh = state.input?.filletHover;
     if (!fh || !fh.arc) return;
     const arc = fh.arc;

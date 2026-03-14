@@ -87,6 +87,8 @@ import { createLayerGroupOps } from "./app_layer_group_ops.js";
 import { createDomRefs } from "./app_dom.js";
 import { DEFAULT_PANEL_VISIBILITY, ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
 import { DISPLAY_MODES, applyDisplayModePreset, normalizeDisplayMode } from "./ui_display_mode_presets.js";
+import { finalizeBsplineDraftState } from "./app_input_bspline.js";
+import { localizeStatusText } from "./ui_text.js";
 
 const state = createState();
 let resetViewFlashTimer = null;
@@ -205,8 +207,11 @@ async function probeDebugLogSink() {
 }
 
 function setStatus(text) {
-  if (dom.statusText) dom.statusText.textContent = text;
-  appendDebugConsole(`status: ${text}`, "info");
+  const localized = localizeStatusText(state, text);
+  if (dom.statusText) dom.statusText.textContent = localized;
+  if (!state.ui) state.ui = {};
+  state.ui.statusText = localized;
+  appendDebugConsole(`status: ${localized}`, "info");
 }
 
 function getDisplayModeFromUrl() {
@@ -666,6 +671,7 @@ const helpers = {
   beginOrExtendPolyline: (w) => beginOrExtendPolyline(state, w),
   updatePolylineHover: (w) => updatePolylineHover(state, w),
   finalizePolylineDraft: () => finalizePolylineDraft(state, helpers),
+  finalizeBsplineDraft: () => finalizeBsplineDraftState(state, helpers),
   executeHatch: () => executeHatch(state, helpers),
   validateHatchBoundary: () => validateHatchBoundary(state, helpers),
   trimateFillet: (r, h) => trimateFillet(state, helpers, r, h),
@@ -759,6 +765,7 @@ const helpers = {
   setActiveGroupParent: (pid) => groupStructureOps.setActiveGroupParent(pid),
   setActiveGroupScaleOptions: (options) => groupStructureOps.setActiveGroupScaleOptions(options),
   setActiveGroupScaleFactor: (value) => groupStructureOps.setActiveGroupScaleFactor(value),
+  setActiveGroupScaleFactors: (sx, sy) => groupStructureOps.setActiveGroupScaleFactors(sx, sy),
   moveShapeToGroup: (sid, gid) => groupStructureOps.moveShapeToGroup(sid, gid),
   moveShapesToGroup: (shapeIds, gid) => groupStructureOps.moveShapesToGroup(shapeIds, gid),
   createGroupFromSelection: (name) => { pushHistory(state); const g = createGroupFromSelection(state, name); draw(); return g; },
@@ -1200,11 +1207,14 @@ setupInputListeners(state, dom, helpers);
 
 ensureUngroupedShapesHaveGroups(state);
 const autoBackupPrompt = (urlDisplayMode === "viewer") ? "" : getAutoBackupStartupPromptMessage();
-const shouldRestoreAutoBackup = !!autoBackupPrompt && (
-  typeof window === "undefined"
-  || typeof window.confirm !== "function"
-  || window.confirm(autoBackupPrompt)
-);
+const autoRestoreWithoutPrompt = (urlDisplayMode === "cad" || urlDisplayMode === "easy");
+const shouldRestoreAutoBackup = autoRestoreWithoutPrompt
+  ? !!autoBackupPrompt
+  : (!!autoBackupPrompt && (
+      typeof window === "undefined"
+      || typeof window.confirm !== "function"
+      || window.confirm(autoBackupPrompt)
+    ));
 const restoredFromAutoBackup = shouldRestoreAutoBackup ? restoreAutoBackupAtStartup() : false;
 if (urlDisplayMode) applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode));
 resizeCanvas();
@@ -1247,6 +1257,7 @@ window.cadApp = {
   togglePanelVisible: (panel) => helpers.togglePanelVisible(panel),
   setPanelVisibility: (patch) => helpers.setPanelVisibility(patch),
   setDisplayMode: (mode) => helpers.setDisplayMode(mode),
+  importDroppedFiles: (files) => fileOps.importDroppedFiles(files),
 };
 
 

@@ -14,6 +14,7 @@ import { refreshGroupListPanel } from "./ui_group_list_panel.js";
 import { refreshSelectionAndGroupPanels } from "./ui_refresh_selection_group.js";
 import { refreshLayerPanels } from "./ui_refresh_layers.js";
 import { isLeftMenuItemVisible, getViewportSizeForUi } from "./ui_left_menu_core.js";
+import { getPanelText } from "./ui_text.js";
 import {
   clampGridAutoTiming,
   gridAutoTimingFromThreshold50,
@@ -25,7 +26,7 @@ import {
   normalizeGridPreset,
 } from "./ui_numeric.js";
 export function refreshUiMain(state, dom) {
-  dom.buildBadge.textContent = `Build ${state.buildVersion}`;
+  if (dom.buildBadge) dom.buildBadge.textContent = `Build ${state.buildVersion}`;
   dom.statusText.textContent = state.ui.statusText || "";
   applyLanguageUi(state, dom);
   const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
@@ -62,33 +63,7 @@ export function refreshUiMain(state, dom) {
     });
   }
   const panelLang = getUiLanguage(state);
-  const panelText = (panelLang === "en")
-    ? {
-      hiddenSuffix: " (hidden)",
-      setAsCurrentLayerTitle: "Double-click to set as current layer",
-      toggleLayerModeTitle: "Toggle ON / OFF / LOCK",
-      moveObjectsToLayer: "Move Objects",
-      noObjects: "No objects",
-      active: "Active",
-      clickToSelect: "Click to select",
-      ungrouped: "Ungrouped",
-      clickToSelectObject: "Click to select object",
-      movingOrigin: "Moving origin...",
-      moveOrigin: "Move Origin",
-    }
-    : {
-      hiddenSuffix: " (hidden)",
-      setAsCurrentLayerTitle: "Double-click to set as current layer",
-      toggleLayerModeTitle: "Toggle ON / OFF / LOCK",
-      moveObjectsToLayer: "Move Objects",
-      noObjects: "No objects",
-      active: "Active",
-      clickToSelect: "Click to select",
-      ungrouped: "Ungrouped",
-      clickToSelectObject: "Click to select object",
-      movingOrigin: "Moving origin...",
-      moveOrigin: "Move Origin",
-    };
+  const panelText = getPanelText(panelLang);
   const tool = String(state.tool || "");
   const { getMaxGroupPanelHeight } = setupLayoutAndTopContext(state, tool, {
     getUiLanguage,

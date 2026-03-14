@@ -102,7 +102,7 @@ export function bindToolParameterEvents(params) {
       if (mode === "continuous") {
         actions.finalizePolylineDraft?.();
       } else if (mode === "freehand") {
-        actions.finalizePolylineDraft?.();
+        actions.finalizeBsplineDraft?.();
       }
     });
   }

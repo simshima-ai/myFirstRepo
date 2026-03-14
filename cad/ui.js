@@ -14,7 +14,7 @@ export function createToolRegistry() {
     { id: "dim", label: "Dim" },
     { id: "trim", label: "Trim" },
     { id: "fillet", label: "Fillet" },
-    { id: "hatch", label: "Hatching" },
+    { id: "hatch", label: "Hatch" },
     { id: "doubleline", label: "Double Line" },
   ];
 }

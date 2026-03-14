@@ -18,7 +18,9 @@ import {
 import { refreshUiMain } from "./ui_refresh_main.js";
 import { bindInitTailEvents } from "./ui_init_tail_events.js";
 import { bindGroupListInitEvents } from "./ui_init_group_list_events.js";
+import { getStatusBarText } from "./ui_text.js";
 export function initUiMain(state, dom, actions, deps = {}) {
+  const uiText = getStatusBarText(state);
   const createToolRegistry = (typeof deps?.createToolRegistry === 'function') ? deps.createToolRegistry : (() => []);
   const refreshUi = (s, d) => refreshUiMain(s, d);
   bindSnapItemsToLeftMenuVisibility(dom);
@@ -438,7 +440,7 @@ export function initUiMain(state, dom, actions, deps = {}) {
           });
         } else {
           optBtn.disabled = true;
-          if (opt.implemented === false) optBtn.title = "Not implemented";
+          if (opt.implemented === false) optBtn.title = (String(state.ui?.language || "en").toLowerCase().startsWith("ja") ? "未実装" : "Not implemented");
         }
         menu.appendChild(optBtn);
       }
@@ -490,7 +492,7 @@ export function initUiMain(state, dom, actions, deps = {}) {
         btn.addEventListener("click", () => fn());
       } else {
         btn.disabled = true;
-        if (item.implemented === false) btn.title = "Not implemented";
+        if (item.implemented === false) btn.title = (String(state.ui?.language || "en").toLowerCase().startsWith("ja") ? "未実装" : "Not implemented");
       }
     }
     target?.appendChild(btn);
@@ -684,7 +686,9 @@ export function initUiMain(state, dom, actions, deps = {}) {
       const th = gridThresholdsFromTiming(timing);
       actions.setGridAutoThresholds?.(th.th50, th.th10, th.th5, th.th1, timing);
       if (dom.gridAutoTimingLabel) dom.gridAutoTimingLabel.textContent = gridAutoTimingLabelText(timing);
-      if (dom.gridAutoTimingHint) dom.gridAutoTimingHint.textContent = `Thresholds: 50=${th.th50}% / 10=${th.th10}% / 5=${th.th5}% / 1=${th.th1}%`;
+      if (dom.gridAutoTimingHint) dom.gridAutoTimingHint.textContent = String(state.ui?.language || "en").toLowerCase().startsWith("ja")
+        ? `閾値: 50=${th.th50}% / 10=${th.th10}% / 5=${th.th5}% / 1=${th.th1}%`
+        : `Thresholds: 50=${th.th50}% / 10=${th.th10}% / 5=${th.th5}% / 1=${th.th1}%`;
     };
     dom.gridAutoTimingSlider.addEventListener("input", onGridAutoTimingChange);
     onGridAutoTimingChange();

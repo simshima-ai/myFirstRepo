@@ -208,14 +208,19 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
       treeBtn.style.background = "transparent";
       treeBtn.style.boxShadow = "none";
       treeBtn.style.color = "#64748b";
-      treeBtn.style.fontSize = "18px";
-      treeBtn.style.fontWeight = "700";
+      treeBtn.style.display = "inline-flex";
+      treeBtn.style.alignItems = "center";
+      treeBtn.style.justifyContent = "center";
       treeBtn.style.lineHeight = "1";
       treeBtn.style.visibility = hasChildren ? "visible" : "hidden";
       const expanded = state.ui.groupTreeExpanded[Number(group.id)] !== false;
-      treeBtn.textContent = hasChildren ? (expanded ? "v" : ">") : "";
+      treeBtn.innerHTML = hasChildren
+        ? (expanded
+          ? '<svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M2 4h8L6 8z" fill="currentColor"/></svg>'
+          : '<svg width="14" height="14" viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2v8l4-4z" fill="currentColor"/></svg>')
+        : "";
       const name = document.createElement("div");
-      name.textContent = `${group.name} (${visibleShapeCount})`;
+      name.textContent = `${group.name}`;
       const groupHasSelectedObject = (!selectedGroupIdSet.size)
         && (group.shapeIds || []).some(sid => selectedShapeIdSet.has(Number(sid)));
       name.style.color = groupHasSelectedObject ? "#16a34a" : "var(--muted)";
@@ -234,7 +239,7 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
       visWrap.style.gap = "4px";
       visWrap.style.marginLeft = "auto";
       visWrap.style.cursor = "pointer";
-      visWrap.title = (group.visible === false) ? "Show group" : "Hide group";
+      visWrap.title = (group.visible === false) ? panelText.showGroup : panelText.hideGroup;
       visWrap.addEventListener("click", (ev) => ev.stopPropagation());
       visWrap.addEventListener("mousedown", (ev) => ev.stopPropagation());
       const visCb = document.createElement("input");
@@ -384,20 +389,36 @@ export function refreshGroupListPanel(state, dom, panelText, getUiLanguage, getM
     bullet.style.lineHeight = "1";
 
     const label = document.createElement("div");
-    const typeEnMap = {
-      line: "Line",
-      rect: "Rect",
-      circle: "Circle",
-      arc: "Arc",
-      dim: "Dim",
-      dimchain: "DimChain",
-      dimangle: "DimAngle",
-      position: "Position",
-      text: "Text",
-      hatch: "Hatching",
-      dline: "DLine",
-    };
-    label.textContent = `${typeEnMap[s.type] || s.type} #${s.id}`;
+    const lang = typeof getUiLanguage === "function" ? getUiLanguage(state) : String(state.ui?.language || "en");
+    const isJa = String(lang || "en").toLowerCase().startsWith("ja");
+    const typeLabelMap = isJa
+      ? {
+          line: "\u30e9\u30a4\u30f3",
+          rect: "\u77e9\u5f62",
+          circle: "\u5186",
+          arc: "\u5186\u5f27",
+          dim: "\u5bf8\u6cd5",
+          dimchain: "\u9023\u7d9a\u5bf8\u6cd5",
+          dimangle: "\u89d2\u5ea6\u5bf8\u6cd5",
+          position: "\u4f4d\u7f6e",
+          text: "\u6587\u5b57",
+          hatch: "\u30cf\u30c3\u30c1\u30f3\u30b0",
+          dline: "\u8907\u7dda",
+        }
+      : {
+          line: "Line",
+          rect: "Rect",
+          circle: "Circle",
+          arc: "Arc",
+          dim: "Dim",
+          dimchain: "DimChain",
+          dimangle: "DimAngle",
+          position: "Position",
+          text: "Text",
+          hatch: "Hatching",
+          dline: "DLine",
+        };
+    label.textContent = `${typeLabelMap[s.type] || s.type} #${s.id}`;
     label.style.fontSize = "11px";
     label.style.color = inActiveGroupSelection ? "#16a34a" : (isShapeSelected ? "var(--ink)" : "var(--muted)");
 

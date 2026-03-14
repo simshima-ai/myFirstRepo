@@ -1,4 +1,4 @@
-import {
+﻿import {
     clearSelection, setSelection, getGroup, pushHistorySnapshot
 } from "./state.js";
 import {
@@ -181,7 +181,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
     const syncFilletSelectionFromTargets = (targets) => {
         const arr = Array.isArray(targets) ? targets.filter(Boolean) : [];
         state.input.filletTargets = arr;
-        setSelection(Array.from(new Set(arr.map((t) => Number(t?.shapeId)).filter(Number.isFinite))));
+        setSelection(Array.from(new Set(arr.filter((t) => String(t?.type || "").toLowerCase() !== "polyline").map((t) => Number(t?.shapeId)).filter(Number.isFinite))));
     };
     const filletTargetKey = (target) => {
         if (!target) return "";
@@ -190,13 +190,22 @@ export function setupInputListenersImpl(state, dom, helpers) {
         if (type === "polyline") return `${sid}:seg:${Number(target.segIndex)}`;
         return `${sid}:${type}`;
     };
-    const commitFilletFromHover = (worldRawHint = null) => commitFilletFromHoverImpl(state, helpers, {
-        nextShapeId,
-        pushHistory,
-        addShape,
-        setSelection,
-        setStatus
-    }, worldRawHint);
+    const commitFilletFromHover = (worldRawHint = null) => {
+        if (!state.input?.filletHover) {
+            const hoverHint = worldRawHint || state.input?.hover?.world || state.input?.hoverWorld || null;
+            if (hoverHint && (Array.isArray(state.input?.filletTargets) ? state.input.filletTargets.filter(Boolean).length : 0) === 2) {
+                state.input.filletHover = getFilletHoverCandidate(state, hoverHint);
+            }
+        }
+        return commitFilletFromHoverImpl(state, helpers, {
+            nextShapeId,
+            pushHistory,
+            addShape,
+            removeShapeById: helpers.removeShapeById,
+            setSelection,
+            setStatus
+        }, worldRawHint);
+    };
     const resolvePolylineDraftEndpointSnap = (worldRaw, baseSnap = null) =>
         resolvePolylineDraftEndpointSnapImpl(state, getLineCreateMode, worldRaw, baseSnap);
 
@@ -507,8 +516,18 @@ export function setupInputListenersImpl(state, dom, helpers) {
 
         if (state.tool === "trim") {
             if (e.button !== 0) return;
-            const ok = trimClickedLineAtNearestIntersection(state, worldRaw, helpers);
-            if (!ok && setStatus) setStatus("Trim: Click a line near an intersection");
+            const trimHover = state.input.modifierKeys.alt
+                ? getTrimDeleteOnlyHoverCandidate(state, worldRaw, dom)
+                : getTrimHoverCandidate(state, worldRaw, dom, { fast: true });
+            const hit = hitTestShapes(state, worldRaw, dom);
+            const trimClickableTypes = new Set(["line", "circle", "arc", "polyline", "bspline"]);
+            const hasDirectTrimTarget = !!trimHover || trimClickableTypes.has(String(hit?.type || "").toLowerCase());
+            if (hasDirectTrimTarget) {
+                const ok = trimClickedLineAtNearestIntersection(state, worldRaw, helpers);
+                if (!ok && setStatus) setStatus("Trim: Click a line near an intersection");
+            } else {
+                beginSelectionBox(state, screen, false);
+            }
             if (draw) draw();
             return;
         }
@@ -1031,8 +1050,30 @@ export function setupInputListenersImpl(state, dom, helpers) {
             }
         }
         if (state.selection.box.active) {
-            if (state.tool === "vertex" && String(state.vertexEdit?.mode || "move").toLowerCase() !== "insert") endVertexSelectionBox(state, helpers);
-            else endSelectionBox(state, helpers);
+            if (state.tool === "vertex" && String(state.vertexEdit?.mode || "move").toLowerCase() !== "insert") {
+                endVertexSelectionBox(state, helpers);
+            } else {
+                const dragged = endSelectionBox(state, helpers);
+                if (state.tool === "trim" && dragged) {
+                    const trimDeleteTypes = new Set(["line", "circle", "arc", "polyline", "bspline"]);
+                    const targetIds = (state.selection?.ids || [])
+                        .map(Number)
+                        .filter((id) => {
+                            const shape = (state.shapes || []).find((s) => Number(s.id) === id);
+                            return trimDeleteTypes.has(String(shape?.type || "").toLowerCase());
+                        });
+                    if (targetIds.length > 0) {
+                        if (state.trimSettings?.noDelete) {
+                            if (setStatus) setStatus("Trim: drag delete is unavailable in split-only mode");
+                        } else {
+                            pushHistory();
+                            for (const id of targetIds) removeShapeById(id);
+                            clearSelection();
+                            if (setStatus) setStatus(`Trim deleted ${targetIds.length} object(s)`);
+                        }
+                    }
+                }
+            }
         }
         if (state.tool === "dim" && state.input.dimLineDrag.active) {
             if (state.dimDraft?.p1 && state.dimDraft?.p2 && state.dimDraft?.place) {
@@ -1070,6 +1111,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
         toggleDebugConsole: helpers.toggleDebugConsole,
         getLineCreateMode,
         toggleAdsVisible: helpers.toggleAdsVisible,
+        setTouchMode: helpers.setTouchMode,
         finalizeBsplineDraft,
         commitFilletFromHover,
         isTypingTarget,
@@ -1077,6 +1119,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
     });
     bindViewportResize(helpers, draw);
 }
+
 
 
 

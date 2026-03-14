@@ -1,6 +1,9 @@
+import { getStatusBarText } from "./ui_text.js";
+
 export function refreshStatusBar(state, dom) {
   if (!dom?.statusText) return;
-  const toolText = `Tool: ${state.tool ? state.tool.toUpperCase() : "NONE"}`;
+  const t = getStatusBarText(state);
+  const toolText = `${t.tool}: ${state.tool ? state.tool.toUpperCase() : t.none}`;
   const zoomScale = Math.max(0, Number(state.view?.scale) || 0);
   const fps = Number(state.ui?.perfStats?.fps || 0);
   const objects = Array.isArray(state.shapes) ? state.shapes.length : 0;
@@ -28,7 +31,7 @@ export function refreshStatusBar(state, dom) {
     if (dom.gridAutoDebugText) {
       const stage = `${level}%`;
       dom.gridAutoDebugText.textContent =
-        `AutoGrid: ON` +
+        `${t.autoGridOn}` +
         `\nBaseGrid: ${Number(baseGrid.toFixed(4)).toString()}` +
         `\nZoom: ${(zoomScale * 100).toFixed(1)}%` +
         `\nCurrentPx: ${currentPx.toFixed(3)} px` +
@@ -42,7 +45,7 @@ export function refreshStatusBar(state, dom) {
     }
   } else if (dom.gridAutoDebugText) {
     dom.gridAutoDebugText.textContent =
-      `AutoGrid: OFF` +
+      `${t.autoGridOff}` +
       `\nBaseGrid: ${Number(baseGrid.toFixed(4)).toString()}` +
       `\nZoom: ${(zoomScale * 100).toFixed(1)}%` +
       `\nEffectiveGrid: ${Number(baseGrid.toFixed(4)).toString()}`;
@@ -51,9 +54,9 @@ export function refreshStatusBar(state, dom) {
   const unitLabel = (unit === "in") ? "inch" : unit;
   const gridModelText = Number.isFinite(effGrid) ? Number(effGrid.toFixed(3)).toString() : "-";
   if (displayMode === "viewer" && objects === 0) {
-    dom.statusText.textContent = "Viewer mode | Drop a DXF or SVG file here";
+    dom.statusText.textContent = t.viewerEmpty;
   } else {
-    dom.statusText.textContent = `${toolText} | FPS: ${fps.toFixed(1)} | Objects: ${objects} | Zoom: ${(zoomScale * 100).toFixed(0)}% | 1 grid = ${gridModelText} ${unitLabel}`;
+    dom.statusText.textContent = `${toolText} | ${t.fps}: ${fps.toFixed(1)} | ${t.objects}: ${objects} | ${t.zoom}: ${(zoomScale * 100).toFixed(0)}% | ${t.grid} = ${gridModelText} ${unitLabel}`;
   }
 
   if (dom.gridScaleIndicator && dom.gridScaleBar && dom.gridScaleText) {
@@ -70,6 +73,6 @@ export function refreshStatusBar(state, dom) {
     dom.gridScaleBar.style.width = `${barPx.toFixed(1)}px`;
     const unitLabel = (unit === "in") ? "inch" : unit;
     const modelTxt = Number.isFinite(gridModelUnit) ? Number(gridModelUnit.toFixed(3)).toString() : "-";
-    dom.gridScaleText.textContent = `1 grid = ${modelTxt} ${unitLabel}`;
+    dom.gridScaleText.textContent = `${t.grid} = ${modelTxt} ${unitLabel}`;
   }
 }

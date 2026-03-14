@@ -24,6 +24,14 @@ export function createPersistenceRuntime(config) {
   let settingsSaveTimer = null;
   let projectDirHandle = null;
 
+  function normalizeAdZones(raw) {
+    return {
+      topRight: raw?.topRight === true,
+      bottomLeft: raw?.bottomLeft === true,
+      bottomCenter: raw?.bottomCenter === true,
+    };
+  }
+
   function ensureProjectFolderState() {
     if (!state.ui) state.ui = {};
     if (!state.ui.projectFolder || typeof state.ui.projectFolder !== "object") {
@@ -94,11 +102,7 @@ export function createPersistenceRuntime(config) {
       state.ui.panelVisibility = (data.ui.panelVisibility && typeof data.ui.panelVisibility === "object")
         ? { ...(state.ui.panelVisibility || {}), ...data.ui.panelVisibility }
         : (state.ui.panelVisibility || {});
-      state.ui.adZones = {
-        topRight: data.ui?.adZones?.topRight !== false,
-        bottomLeft: data.ui?.adZones?.bottomLeft !== false,
-        bottomCenter: data.ui?.adZones?.bottomCenter !== false,
-      };
+      state.ui.adZones = normalizeAdZones(data.ui?.adZones);
       state.ui.autoBackupEnabled = data.ui.autoBackupEnabled !== false;
       state.ui.autoBackupIntervalSec = Math.max(60, Math.min(600, Math.round(Number(data.ui.autoBackupIntervalSec ?? state.ui.autoBackupIntervalSec ?? 60) || 60)));
       state.ui.toolShortcuts = sanitizeToolShortcuts(data.ui.toolShortcuts ?? state.ui.toolShortcuts);
@@ -160,11 +164,7 @@ export function createPersistenceRuntime(config) {
         panelVisibility: (state.ui?.panelVisibility && typeof state.ui.panelVisibility === "object")
           ? { ...state.ui.panelVisibility }
           : {},
-        adZones: {
-          topRight: state.ui?.adZones?.topRight !== false,
-          bottomLeft: state.ui?.adZones?.bottomLeft !== false,
-          bottomCenter: state.ui?.adZones?.bottomCenter !== false,
-        },
+        adZones: normalizeAdZones(state.ui?.adZones),
         autoBackupEnabled: state.ui?.autoBackupEnabled !== false,
         autoBackupIntervalSec: Number(state.ui?.autoBackupIntervalSec ?? 60),
         toolShortcuts: sanitizeToolShortcuts(state.ui?.toolShortcuts),

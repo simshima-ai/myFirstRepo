@@ -168,9 +168,9 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     : 0;
 
   const visible = {
-    topRight: !!topRightBox && state.ui.adZones.topRight !== false,
-    bottomLeft: !!bottomLeftBox && state.ui.adZones.bottomLeft !== false,
-    bottomCenter: !!bottomCenterBox && state.ui.adZones.bottomCenter !== false,
+    topRight: !!topRightBox && state.ui.adZones.topRight === true,
+    bottomLeft: !!bottomLeftBox && state.ui.adZones.bottomLeft === true,
+    bottomCenter: !!bottomCenterBox && state.ui.adZones.bottomCenter === true,
   };
   if (mode === "small" || mode === "medium") {
     visible.bottomLeft = false;

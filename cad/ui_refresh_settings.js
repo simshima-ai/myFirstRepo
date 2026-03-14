@@ -140,9 +140,9 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
   if (dom.touchModeToggle) {
     dom.touchModeToggle.checked = !!state.ui?.touchMode;
   }
-  if (dom.topRightAdZoneToggle) dom.topRightAdZoneToggle.checked = state.ui?.adZones?.topRight !== false;
-  if (dom.bottomLeftAdZoneToggle) dom.bottomLeftAdZoneToggle.checked = state.ui?.adZones?.bottomLeft !== false;
-  if (dom.bottomCenterAdZoneToggle) dom.bottomCenterAdZoneToggle.checked = state.ui?.adZones?.bottomCenter !== false;
+  if (dom.topRightAdZoneToggle) dom.topRightAdZoneToggle.checked = state.ui?.adZones?.topRight === true;
+  if (dom.bottomLeftAdZoneToggle) dom.bottomLeftAdZoneToggle.checked = state.ui?.adZones?.bottomLeft === true;
+  if (dom.bottomCenterAdZoneToggle) dom.bottomCenterAdZoneToggle.checked = state.ui?.adZones?.bottomCenter === true;
   if (dom.touchConfirmOverlay && dom.touchConfirmBtn) {
     const touchMode = !!state.ui?.touchMode;
     const tool = String(state.tool || "");

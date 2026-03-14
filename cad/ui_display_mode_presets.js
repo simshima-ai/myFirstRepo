@@ -113,7 +113,7 @@ export function getDisplayModePreset(mode) {
         layersPanel: false,
       }),
       adZones: {
-        topRight: true,
+        topRight: false,
         bottomLeft: false,
         bottomCenter: false,
       },
@@ -156,6 +156,11 @@ export function getDisplayModePreset(mode) {
   return {
     mode: "cad",
     panelVisibility: buildPanelVisibility(),
+    adZones: {
+      topRight: false,
+      bottomLeft: false,
+      bottomCenter: false,
+    },
     leftMenuVisibility: null,
     objectSnap: {
       enabled: true,
@@ -181,7 +186,7 @@ export function applyDisplayModePreset(state, mode) {
   state.ui.panelVisibility = { ...preset.panelVisibility };
   state.ui.adZones = (preset.adZones && typeof preset.adZones === "object")
     ? { ...preset.adZones }
-    : { topRight: true, bottomLeft: true, bottomCenter: true };
+    : { topRight: false, bottomLeft: false, bottomCenter: false };
   if (preset.leftMenuVisibility) {
     state.ui.leftMenuVisibility = { ...preset.leftMenuVisibility };
   } else {

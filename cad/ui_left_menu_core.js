@@ -74,8 +74,8 @@ export function isLeftMenuItemVisible(state, key) {
 export function bindSnapItemsToLeftMenuVisibility(dom) {
   const defs = [
     ["gridSnapToggle", "grid"],
-    ["objSnapToggle", "onCurve"],
     ["objSnapEndpointToggle", "endpoint"],
+    ["objSnapToggle", "onCurve"],
     ["objSnapMidpointToggle", "midpoint"],
     ["objSnapCenterToggle", "center"],
     ["objSnapIntersectionToggle", "intersection"],

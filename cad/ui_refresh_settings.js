@@ -300,6 +300,20 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     syncInputValue(dom.autoBackupIntervalSelect, sec);
     dom.autoBackupIntervalSelect.disabled = !autoBackupAvailable;
   }
+  if (dom.selectProjectFolderBtn || dom.clearProjectFolderBtn || dom.projectFolderStatus) {
+    const info = state.ui?.projectFolder || {};
+    const supported = info.supported !== false;
+    const linked = !!info.linked;
+    if (dom.selectProjectFolderBtn) dom.selectProjectFolderBtn.disabled = !supported;
+    if (dom.clearProjectFolderBtn) dom.clearProjectFolderBtn.disabled = !linked;
+    if (dom.projectFolderStatus) {
+      let text = "Using browser storage only";
+      if (!supported) text = "Project folder save is not supported in this browser";
+      else if (linked && info.source === "file") text = `Linked: ${String(info.name || "")}`;
+      else if (linked) text = `Linked: ${String(info.name || "")} (browser fallback)`;
+      dom.projectFolderStatus.textContent = text;
+    }
+  }
   if (dom.pageUnitSelect) {
     const v = String(state.pageSetup?.unit || "mm");
     if (dom.pageUnitSelect.value !== v) dom.pageUnitSelect.value = v;

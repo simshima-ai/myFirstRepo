@@ -1125,6 +1125,9 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("objectCountDisplayToggle", t.objectCount);
   setLabelByControl("autoBackupToggle", t.autoBackup);
   setLabelByControl("autoBackupIntervalSelect", t.backupInterval);
+  setText("#projectFolderLabel", t.projectFolder || "Project Folder");
+  setButtonById("selectProjectFolderBtn", t.chooseFolder || "Choose Folder");
+  setButtonById("clearProjectFolderBtn", t.unlinkFolder || "Unlink");
   setLabelByControl("pageUnitSelect", t.unit);
   setText("#adSettingsLabel", t.adDisplay);
   const rightAdLabel = document.querySelector("#rightAdSlot .ad-zone-label");

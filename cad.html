@@ -1598,8 +1598,8 @@
           <button class="section-title panel-toggle" type="button">Snap</button>
           <div class="snap-grid">
             <label><input id="gridSnapToggle" type="checkbox" checked><span>Grid</span></label>
-            <label><input id="objSnapToggle" type="checkbox" checked><span>On Curve</span></label>
             <label><input id="objSnapEndpointToggle" type="checkbox" checked><span>Endpoint</span></label>
+            <label><input id="objSnapToggle" type="checkbox" checked><span>On Curve</span></label>
             <label><input id="objSnapMidpointToggle" type="checkbox"><span>Midpoint</span></label>
             <label><input id="objSnapCenterToggle" type="checkbox" checked><span>Center</span></label>
             <label><input id="objSnapIntersectionToggle" type="checkbox" checked><span>Intersection</span></label>
@@ -2605,6 +2605,14 @@
                     <option value="600">10 min</option>
                   </select>
                 </label>
+                <div class="settings-wide" style="display:flex; flex-direction:column; gap:6px;">
+                  <div id="projectFolderLabel" style="font-size:12px; color:var(--muted);">Project Folder</div>
+                  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                    <button id="selectProjectFolderBtn" type="button">Choose Folder</button>
+                    <button id="clearProjectFolderBtn" type="button">Unlink</button>
+                    <div id="projectFolderStatus" style="font-size:11px; color:#64748b;"></div>
+                  </div>
+                </div>
             </div>
           </div>
       </div>

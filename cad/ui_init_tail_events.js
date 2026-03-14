@@ -301,6 +301,16 @@ export function bindInitTailEvents(params) {
       actions.setTouchMode?.(!!dom.touchModeToggle.checked);
     });
   }
+  if (dom.selectProjectFolderBtn) {
+    dom.selectProjectFolderBtn.addEventListener("click", () => {
+      void actions.chooseProjectFolder?.();
+    });
+  }
+  if (dom.clearProjectFolderBtn) {
+    dom.clearProjectFolderBtn.addEventListener("click", () => {
+      void actions.clearProjectFolder?.();
+    });
+  }
   const bindAdToggle = (el, zoneKey) => {
     if (!el) return;
     el.addEventListener("change", () => {

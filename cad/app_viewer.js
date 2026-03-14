@@ -19,11 +19,6 @@ const persistence = createViewerPersistenceRuntime({
   state,
   appSettingsKey: APP_SETTINGS_KEY,
 });
-persistence.loadAppSettingsAtStartup();
-applyDisplayModePreset(state, "viewer");
-if (!state.ui) state.ui = {};
-state.ui.autoBackupEnabled = false;
-state.tool = "select";
 
 function draw() {
   renderViewer(ctx, dom.canvas, state);
@@ -134,11 +129,20 @@ function setDisplayMode(mode) {
 }
 
 
-bindViewerImportControls();
-bindViewerNavigation();
-viewRuntime.resizeCanvas();
-viewRuntime.resetView();
-draw();
+async function initViewer() {
+  await persistence.loadAppSettingsAtStartup();
+  applyDisplayModePreset(state, "viewer");
+  if (!state.ui) state.ui = {};
+  state.ui.autoBackupEnabled = false;
+  state.tool = "select";
+  bindViewerImportControls();
+  bindViewerNavigation();
+  viewRuntime.resizeCanvas();
+  viewRuntime.resetView();
+  draw();
+}
+
+void initViewer();
 
 window.cadApp = {
   __mode: "viewer-lite",

@@ -1022,6 +1022,21 @@ const helpers = {
   setAutoBackupIntervalSec: (sec) => uiPrefsOps.setAutoBackupIntervalSec(sec),
   setTouchMode: (on) => uiPrefsOps.setTouchMode(on),
   setTouchMultiSelect: (on) => uiPrefsOps.setTouchMultiSelect(on),
+  chooseProjectFolder: async () => {
+    const result = await persistence.chooseProjectFolder();
+    if (result?.ok) setStatus(`Project folder linked: ${String(result.name || "")}`);
+    else if (result?.reason === "unsupported") setStatus("Project folder save is not supported in this browser");
+    else if (result?.reason === "denied") setStatus("Project folder access was denied");
+    else if (result?.reason !== "canceled") setStatus("Project folder link failed");
+    draw();
+    return result;
+  },
+  clearProjectFolder: async () => {
+    const ok = await persistence.clearProjectFolder();
+    setStatus(ok ? "Project folder unlinked" : "Project folder unlink failed");
+    draw();
+    return ok;
+  },
   setImportSourceUnit: (u) => {
     uiPrefsOps.setImportSourceUnit(u);
     fileOps.onImportSourceUnitChanged?.();
@@ -1191,56 +1206,59 @@ const fileOps = createFileOpsRuntime({
   helpers
 });
 
-// Initialize UI
-const loadedAppSettings = loadAppSettingsAtStartup();
-if (!loadedAppSettings) {
+async function initApp() {
+  const loadedAppSettings = await loadAppSettingsAtStartup();
+  if (!loadedAppSettings) {
+    if (!state.ui) state.ui = {};
+    state.ui.language = detectInitialUiLanguage();
+    void saveAppSettingsNow();
+  }
+  const urlDisplayMode = getDisplayModeFromUrl();
+  applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode || state.ui?.displayMode || "cad"));
+  initUi(state, dom, helpers);
+
+  // setupInputListeners
+  setupInputListeners(state, dom, helpers);
+
+  ensureUngroupedShapesHaveGroups(state);
+  const autoBackupPrompt = (urlDisplayMode === "viewer") ? "" : getAutoBackupStartupPromptMessage();
+  const autoRestoreWithoutPrompt = (urlDisplayMode === "cad" || urlDisplayMode === "easy");
+  const shouldRestoreAutoBackup = autoRestoreWithoutPrompt
+    ? !!autoBackupPrompt
+    : (!!autoBackupPrompt && (
+        typeof window === "undefined"
+        || typeof window.confirm !== "function"
+        || window.confirm(autoBackupPrompt)
+      ));
+  const restoredFromAutoBackup = shouldRestoreAutoBackup ? restoreAutoBackupAtStartup() : false;
+  if (urlDisplayMode) applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode));
+  resizeCanvas();
+  if (!restoredFromAutoBackup) resetView();
   if (!state.ui) state.ui = {};
-  state.ui.language = detectInitialUiLanguage();
-  saveAppSettingsNow();
+  state.ui._needsTangentResolve = true;
+  draw();
+
+  if (typeof state.ui.autoBackupEnabled !== "boolean") state.ui.autoBackupEnabled = true;
+  state.ui.toolShortcuts = sanitizeToolShortcuts(state.ui.toolShortcuts);
+  if (!Number.isFinite(Number(state.ui.autoBackupIntervalSec))) {
+    state.ui.autoBackupIntervalSec = Math.round(AUTO_BACKUP_INTERVAL_MS / 1000);
+  }
+  refreshAutoBackupTimer();
+
+  window.addEventListener("beforeunload", () => {
+    void saveAppSettingsNow();
+    saveAutoBackup();
+  });
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") saveAutoBackup();
+  });
+
+  fileOps.bindJsonFileInputChange();
+  fileOps.bindDropImport();
 }
-const urlDisplayMode = getDisplayModeFromUrl();
-applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode || state.ui?.displayMode || "cad"));
-initUi(state, dom, helpers);
 
-// setupInputListeners
-setupInputListeners(state, dom, helpers);
-
-ensureUngroupedShapesHaveGroups(state);
-const autoBackupPrompt = (urlDisplayMode === "viewer") ? "" : getAutoBackupStartupPromptMessage();
-const autoRestoreWithoutPrompt = (urlDisplayMode === "cad" || urlDisplayMode === "easy");
-const shouldRestoreAutoBackup = autoRestoreWithoutPrompt
-  ? !!autoBackupPrompt
-  : (!!autoBackupPrompt && (
-      typeof window === "undefined"
-      || typeof window.confirm !== "function"
-      || window.confirm(autoBackupPrompt)
-    ));
-const restoredFromAutoBackup = shouldRestoreAutoBackup ? restoreAutoBackupAtStartup() : false;
-if (urlDisplayMode) applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode));
-resizeCanvas();
-if (!restoredFromAutoBackup) resetView();
-if (!state.ui) state.ui = {};
-state.ui._needsTangentResolve = true;
-draw();
-
-if (typeof state.ui.autoBackupEnabled !== "boolean") state.ui.autoBackupEnabled = true;
-state.ui.toolShortcuts = sanitizeToolShortcuts(state.ui.toolShortcuts);
-if (!Number.isFinite(Number(state.ui.autoBackupIntervalSec))) {
-  state.ui.autoBackupIntervalSec = Math.round(AUTO_BACKUP_INTERVAL_MS / 1000);
-}
-refreshAutoBackupTimer();
-
-window.addEventListener("beforeunload", () => {
-  saveAppSettingsNow();
-  saveAutoBackup();
-});
-
-document.addEventListener("visibilitychange", () => {
-  if (document.visibilityState === "hidden") saveAutoBackup();
-});
-
-fileOps.bindJsonFileInputChange();
-fileOps.bindDropImport();
+void initApp();
 
 // Handle exports for manual access if needed
 window.cadApp = {

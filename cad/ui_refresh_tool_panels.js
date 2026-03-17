@@ -286,28 +286,46 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
   const selectedShapes = _selIdSet.size > 0 ? (state.shapes || []).filter(s => _selIdSet.has(Number(s.id))) : [];
   refreshAttrPanel(state, dom, selectedShapes);
   const firstText = selectedShapes.find(s => s.type === "text");
+  const firstLeader = selectedShapes.find(s => s.type === "dimleader");
+  const firstTextLike = firstText || firstLeader || null;
   if (dom.selectionTextEdit) {
-    dom.selectionTextEdit.style.display = firstText ? "flex" : "none";
+    dom.selectionTextEdit.style.display = firstTextLike ? "flex" : "none";
   }
-  if (firstText && dom.selectionTextContentInput && document.activeElement !== dom.selectionTextContentInput) {
-    dom.selectionTextContentInput.value = firstText.text || "";
+  if (dom.selectionLeaderStyleEdit) {
+    dom.selectionLeaderStyleEdit.style.display = firstLeader ? "flex" : "none";
   }
-  if (firstText && dom.selectionTextSizePtInput && document.activeElement !== dom.selectionTextSizePtInput) {
-    dom.selectionTextSizePtInput.value = String(firstText.textSizePt || 12);
+  if (firstTextLike && dom.selectionTextContentInput && document.activeElement !== dom.selectionTextContentInput) {
+    dom.selectionTextContentInput.value = firstText ? (firstText.text || "") : (firstLeader.leaderText || "");
   }
-  if (firstText && dom.selectionTextRotateInput && document.activeElement !== dom.selectionTextRotateInput) {
-    dom.selectionTextRotateInput.value = String(firstText.textRotate || 0);
+  if (firstTextLike && dom.selectionTextSizePtInput && document.activeElement !== dom.selectionTextSizePtInput) {
+    dom.selectionTextSizePtInput.value = String(firstText ? (firstText.textSizePt || 12) : (firstLeader.fontSize || 12));
   }
-  if (firstText && dom.selectionTextFontFamilyInput && document.activeElement !== dom.selectionTextFontFamilyInput) {
-    dom.selectionTextFontFamilyInput.value = firstText.textFontFamily || "Yu Gothic UI";
+  if (firstTextLike && dom.selectionTextRotateInput && document.activeElement !== dom.selectionTextRotateInput) {
+    const rotateVal = firstText ? firstText.textRotate : firstLeader.textRotate;
+    dom.selectionTextRotateInput.value = String(rotateVal === "auto" ? 0 : (rotateVal || 0));
   }
-  if (firstText && dom.selectionTextBoldInput) {
-    dom.selectionTextBoldInput.checked = !!firstText.textBold;
+  if (firstTextLike && dom.selectionTextFontFamilyInput && document.activeElement !== dom.selectionTextFontFamilyInput) {
+    dom.selectionTextFontFamilyInput.value = firstTextLike.textFontFamily || "Yu Gothic UI";
   }
-  if (firstText && dom.selectionTextItalicInput) {
-    dom.selectionTextItalicInput.checked = !!firstText.textItalic;
+  if (firstTextLike && dom.selectionTextBoldInput) {
+    dom.selectionTextBoldInput.checked = !!firstTextLike.textBold;
   }
-  if (firstText && dom.selectionTextColorInput) {
-    dom.selectionTextColorInput.value = firstText.textColor || state.textSettings.color;
+  if (firstTextLike && dom.selectionTextItalicInput) {
+    dom.selectionTextItalicInput.checked = !!firstTextLike.textItalic;
+  }
+  if (firstTextLike && dom.selectionTextColorInput) {
+    dom.selectionTextColorInput.value = firstText ? (firstText.textColor || state.textSettings.color) : (firstLeader.textColor || firstLeader.color || state.textSettings.color);
+  }
+  if (firstLeader && dom.selectionLeaderArrowTypeSelect && document.activeElement !== dom.selectionLeaderArrowTypeSelect) {
+    dom.selectionLeaderArrowTypeSelect.value = String(firstLeader.dimArrowType || "open");
+  }
+  if (firstLeader && dom.selectionLeaderArrowSizeInput && document.activeElement !== dom.selectionLeaderArrowSizeInput) {
+    dom.selectionLeaderArrowSizeInput.value = String(Math.max(1, Number(firstLeader.dimArrowSizePt || 10) || 10));
+  }
+  if (firstLeader && dom.selectionLeaderLineWidthInput && document.activeElement !== dom.selectionLeaderLineWidthInput) {
+    dom.selectionLeaderLineWidthInput.value = String(Number(firstLeader.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+  }
+  if (firstLeader && dom.selectionLeaderColorInput) {
+    dom.selectionLeaderColorInput.value = firstLeader.color || "#0f172a";
   }
 }

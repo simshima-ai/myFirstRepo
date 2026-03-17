@@ -130,7 +130,6 @@ function drawTextLabel(ctx, state, dim, g, textVal, selected, groupActive, norma
 
   const textPos = worldToScreen(state.view, textWorld);
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = selected ? "#b45309" : groupActive ? "#1d4ed8" : normalColor;
   ctx.font = `${dm.fontPx}px sans-serif`;
   ctx.textAlign = "center";
@@ -143,6 +142,30 @@ function drawTextLabel(ctx, state, dim, g, textVal, selected, groupActive, norma
     rotDeg = Number(dim.textRotate) || 0;
   }
   const rot = (rotDeg * Math.PI) / 180;
+  if (rot) {
+    ctx.translate(textPos.x, textPos.y);
+    ctx.rotate(rot);
+    ctx.fillText(textVal, 0, 0);
+  } else {
+    ctx.fillText(textVal, textPos.x, textPos.y);
+  }
+  ctx.restore();
+}
+
+function drawLeaderTextLabel(ctx, state, dim, geom, textVal, selected, groupActive, normalColor = "#0f172a") {
+  const dm = getDimRenderMetrics(state, dim);
+  const textPos = worldToScreen(state.view, { x: Number(geom.tx), y: Number(geom.ty) });
+  const fontFamily = String(dim.textFontFamily || "Yu Gothic UI");
+  const fontStyle = dim.textItalic ? "italic " : "";
+  const fontWeight = dim.textBold ? "bold " : "";
+  const fillColor = String(dim.textColor || normalColor);
+  const rotDeg = (dim.textRotate === "auto" || dim.textRotate == null) ? 0 : (Number(dim.textRotate) || 0);
+  const rot = (rotDeg * Math.PI) / 180;
+  ctx.save();
+  ctx.fillStyle = selected ? "#b45309" : groupActive ? "#1d4ed8" : fillColor;
+  ctx.font = `${fontStyle}${fontWeight}${dm.fontPx}px "${fontFamily}"`;
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
   if (rot) {
     ctx.translate(textPos.x, textPos.y);
     ctx.rotate(rot);
@@ -201,7 +224,6 @@ export function createRenderDimensionOps(deps) {
             };
         const textPos = worldToScreen(state.view, textWorld);
         ctx.save();
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
         ctx.fillStyle = selected ? "#b45309" : normalColor;
         ctx.font = `${dm.fontPx}px sans-serif`;
         ctx.textAlign = "center";
@@ -239,6 +261,19 @@ export function createRenderDimensionOps(deps) {
         const textVal = (geom.len / dimComp).toFixed(dim.precision ?? 1);
         drawTextLabel(ctx, state, dim, geom, textVal, selected, groupActive, normalColor);
       }
+    } else if (dim.type === "dimleader") {
+      const p1s = worldToScreen(state.view, geom.p1);
+      const p2s = worldToScreen(state.view, geom.p2);
+      const p3s = worldToScreen(state.view, geom.p3);
+      ctx.beginPath();
+      ctx.moveTo(p1s.x, p1s.y);
+      ctx.lineTo(p2s.x, p2s.y);
+      ctx.lineTo(p3s.x, p3s.y);
+      ctx.stroke();
+      const dir = { x: (Number(geom.p1.x) - Number(geom.p2.x)), y: (Number(geom.p1.y) - Number(geom.p2.y)) };
+      const len = Math.hypot(Number(dir.x), Number(dir.y)) || 1;
+      drawArrow(ctx, p1s, { x: Number(dir.x) / len, y: Number(dir.y) / len }, scale, baseStroke, arrowType, arrowSize);
+      drawLeaderTextLabel(ctx, state, dim, geom, String(dim.leaderText || "NOTE"), selected, groupActive, normalColor);
     } else if (dim.type === "circleDim") {
       const g = geom;
       const p1s = worldToScreen(state.view, g.p1);

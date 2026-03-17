@@ -1,5 +1,6 @@
 import { createRenderBoundsOps } from "./render_bounds.js";
 import { sampleBSplinePoints } from "./bspline_utils.js";
+import { applyViewTarget, computeViewFitToBoundsTarget, computeViewFitToPageTarget, resetGridAutoScale, updateAdaptiveViewScaleBounds } from "./view_fit.js";
 
 export function createViewRuntime(config) {
   const {
@@ -10,6 +11,7 @@ export function createViewRuntime(config) {
     draw
   } = config || {};
   const boundsOps = createRenderBoundsOps({ sampleBSplinePoints });
+  let resetViewRafId = 0;
 
   function getPanelInsets(rect) {
     const vw = Math.max(1, Number(rect?.width) || 1);
@@ -143,43 +145,89 @@ export function createViewRuntime(config) {
     draw();
   }
 
-  function resetView() {
+  function stopResetViewAnimation() {
+    if (resetViewRafId && typeof cancelAnimationFrame === "function") {
+      cancelAnimationFrame(resetViewRafId);
+    }
+    resetViewRafId = 0;
+  }
+
+  function animateToTarget(target, durationMs = 1000) {
+    if (!target) return false;
+    stopResetViewAnimation();
+    if (typeof requestAnimationFrame !== "function") {
+      applyViewTarget(state, target);
+      resetGridAutoScale(state);
+      draw();
+      return true;
+    }
+    const start = {
+      scale: Number(state.view?.scale) || 1,
+      offsetX: Number(state.view?.offsetX) || 0,
+      offsetY: Number(state.view?.offsetY) || 0,
+    };
+    const begunAt = performance.now();
+    const tick = (now) => {
+      const t = Math.max(0, Math.min(1, (now - begunAt) / Math.max(1, durationMs)));
+      const eased = 1 - Math.pow(1 - t, 3);
+      applyViewTarget(state, {
+        scale: start.scale + (Number(target.scale) - start.scale) * eased,
+        offsetX: start.offsetX + (Number(target.offsetX) - start.offsetX) * eased,
+        offsetY: start.offsetY + (Number(target.offsetY) - start.offsetY) * eased,
+      });
+      resetGridAutoScale(state);
+      draw();
+      if (t >= 1) {
+        resetViewRafId = 0;
+        return;
+      }
+      resetViewRafId = requestAnimationFrame(tick);
+    };
+    resetViewRafId = requestAnimationFrame(tick);
+    return true;
+  }
+
+  function resetView(options = {}) {
     const rect = dom.canvas.getBoundingClientRect();
     const vw = Math.max(1, rect?.width || 0);
     const vh = Math.max(1, rect?.height || 0);
     const { leftInset, rightInset } = getPanelInsets(rect);
-    const fitW = Math.max(1, vw - leftInset - rightInset);
     const selBounds = collectSelectionBounds();
+    let target = null;
     if (selBounds) {
-      const padPx = 28;
-      const availW = Math.max(1, fitW - padPx * 2);
-      const availH = Math.max(1, vh - padPx * 2);
-      const bw = Math.max(1e-9, Number(selBounds.maxX) - Number(selBounds.minX));
-      const bh = Math.max(1e-9, Number(selBounds.maxY) - Number(selBounds.minY));
-      const fitScale = Math.max(
-        Number(state.view?.minScale ?? 0.0001),
-        Math.min(
-          Number(state.view?.maxScale ?? 192),
-          Math.min(availW / bw, availH / bh)
-        )
-      );
-      state.view.scale = fitScale;
-      const cx = (Number(selBounds.minX) + Number(selBounds.maxX)) * 0.5;
-      const cy = (Number(selBounds.minY) + Number(selBounds.maxY)) * 0.5;
-      state.view.offsetX = leftInset + (fitW * 0.5) - cx * fitScale;
-      state.view.offsetY = (vh * 0.5) - cy * fitScale;
+      if (String(state.ui?.displayMode || "").toLowerCase() === "viewer") {
+        updateAdaptiveViewScaleBounds(state, selBounds, {
+          viewportWidth: vw,
+          viewportHeight: vh,
+          leftInset,
+          rightInset,
+          paddingPx: 28,
+          minFactor: 200,
+          maxFactor: 2000,
+        });
+      }
+      target = computeViewFitToBoundsTarget(state, selBounds, {
+        viewportWidth: vw,
+        viewportHeight: vh,
+        leftInset,
+        rightInset,
+        paddingPx: 28,
+      });
     } else {
-      const { cadW, cadH } = getPageFrameWorldSize(state.pageSetup);
-      const fitScale = Math.max(0.0001, Math.min(fitW / Math.max(1e-9, cadW), vh / Math.max(1e-9, cadH)));
-      state.view.scale = fitScale;
-      // Center page within visible canvas area excluding side panels.
-      state.view.offsetX = leftInset + (fitW * 0.5);
-      state.view.offsetY = vh * 0.5;
+      target = computeViewFitToPageTarget(state, getPageFrameWorldSize(state.pageSetup), {
+        viewportWidth: vw,
+        viewportHeight: vh,
+        leftInset,
+        rightInset,
+      });
     }
-    state.grid.autoBasePxAtReset = Math.max(1e-9, (Number(state.grid?.size) || 100) * state.view.scale);
-    state.grid.autoLevel = 100;
+    if (options?.animate) return animateToTarget(target, Number(options.durationMs) || 1000);
+    stopResetViewAnimation();
+    applyViewTarget(state, target);
+    resetGridAutoScale(state);
     draw();
+    return true;
   }
 
-  return { resizeCanvas, resetView };
+  return { resizeCanvas, resetView, animateResetView: (options = {}) => resetView({ ...options, animate: true }) };
 }

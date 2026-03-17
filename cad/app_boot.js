@@ -26,10 +26,11 @@ function hideEl(el) {
 
 function initViewerShell() {
   const lang = getUiLanguage();
+  const sidebarEl = document.querySelector(".sidebar");
+  if (sidebarEl) sidebarEl.style.display = "flex";
   hideEl(document.querySelector(".left-aux-stack"));
   hideEl(document.querySelector(".right-stack"));
   hideEl(document.querySelector(".top-context"));
-  hideEl(document.querySelector(".bottom-left-overlay"));
   hideEl(document.querySelector(".bottom-scale-overlay"));
   hideEl(document.querySelector("#debugConsolePanel"));
   hideEl(document.getElementById("rightAdSlot"));
@@ -51,18 +52,13 @@ function initViewerShell() {
     homeMenu.classList.remove("is-open");
     homeLink?.setAttribute?.("aria-expanded", "false");
   };
-  const toggleMenu = () => {
-    if (!homeMenu) return;
-    const nextOpen = !homeMenu.classList.contains("is-open");
-    homeMenu.classList.toggle("is-open", nextOpen);
-    homeLink?.setAttribute?.("aria-expanded", nextOpen ? "true" : "false");
-  };
   if (homeLink) {
     homeLink.setAttribute("aria-expanded", "false");
     homeLink.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
-      toggleMenu();
+      if (typeof e.stopImmediatePropagation === "function") e.stopImmediatePropagation();
+      void switchMode("easy");
     });
   }
   document.addEventListener("click", (e) => {
@@ -73,18 +69,97 @@ function initViewerShell() {
   });
 
   let fullAppPromise = null;
-  let viewerAppPromise = null;
   const loadFullApp = async () => {
     if (!fullAppPromise) fullAppPromise = import("./app.js").then(() => window.cadApp);
     return fullAppPromise;
   };
-  const loadViewerApp = async () => {
-    if (!viewerAppPromise) viewerAppPromise = import("./app_viewer.js").then(() => window.cadApp);
-    return viewerAppPromise;
+  const saveViewerModeTransferSnapshot = async () => {
+    try {
+      const liveApp = window.cadApp;
+      if (liveApp?.helpers?.saveModeTransferSnapshot?.()) return true;
+    } catch (_) {
+      // noop
+    }
+    try {
+      const app = await ensureViewerFullApp();
+      return !!app?.helpers?.saveModeTransferSnapshot?.();
+    } catch (_) {
+      return false;
+    }
   };
   const switchMode = async (mode) => {
     closeMenu();
+    await saveViewerModeTransferSnapshot();
     window.location.href = `./cad.html?mode=${mode}`;
+  };
+  const createViewerSidebarButton = (label, onClick) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.textContent = label;
+    btn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      onClick();
+    });
+    return btn;
+  };
+  const applyViewerFullAppCustomizations = (app) => {
+    if (!app?.state || !app?.dom) return;
+    const state = app.state;
+    const dom = app.dom;
+    if (!state.ui) state.ui = {};
+    state.ui.panelVisibility = {
+      ...(state.ui.panelVisibility || {}),
+      snapPanel: false,
+      attrPanel: false,
+      createToolsPanel: false,
+      editToolsPanel: false,
+      fileToolsPanel: true,
+      topContext: false,
+      rightPanels: false,
+      groupsPanel: false,
+      layersPanel: false,
+      statusOverlay: true,
+      scaleOverlay: false,
+      debugConsole: false,
+    };
+    const createSection = dom.toolButtons?.closest?.(".section");
+    const editSection = dom.editToolButtons?.closest?.(".section");
+    const fileSection = dom.fileToolButtons?.closest?.(".section");
+    const manualLink = document.getElementById("openManualBtn");
+    const bottomLeftOverlay = document.querySelector(".bottom-left-overlay");
+    if (sidebarEl) sidebarEl.style.display = "flex";
+    if (createSection) createSection.style.display = "none";
+    if (editSection) editSection.style.display = "none";
+    if (fileSection) fileSection.style.display = "";
+    if (manualLink) manualLink.style.display = "none";
+    if (bottomLeftOverlay) bottomLeftOverlay.style.display = "";
+    if (dom.fileToolButtons && !dom.fileToolButtons.dataset.viewerCustomized) {
+      dom.fileToolButtons.dataset.viewerCustomized = "1";
+      dom.fileToolButtons.textContent = "";
+      dom.fileToolButtons.appendChild(createViewerSidebarButton("New", () => app.helpers?.newFile?.()));
+      dom.fileToolButtons.appendChild(createViewerSidebarButton("Import", () => app.helpers?.importJson?.()));
+    }
+    if (dom.viewerImportMeta && !dom.viewerImportMeta.dataset.viewerBound) {
+      dom.viewerImportMeta.dataset.viewerBound = "1";
+      [dom.viewerImportScaleBtn1, dom.viewerImportScaleBtn2, dom.viewerImportScaleBtn3].forEach((btn) => {
+        btn?.addEventListener("click", () => {
+          const scale = Number(btn.dataset.scale);
+          if (!(Number.isFinite(scale) && scale > 0)) return;
+          const ok = app.helpers?.applySuggestedImportScale?.(scale);
+          if (ok) app.helpers?.animateResetView?.();
+        });
+      });
+      dom.viewerImportResetViewBtn?.addEventListener("click", () => app.helpers?.animateResetView?.());
+    }
+  };
+  const ensureViewerFullApp = async () => {
+    const app = await loadFullApp();
+    applyViewerFullAppCustomizations(app);
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => applyViewerFullAppCustomizations(app));
+    }
+    return app;
   };
   modeEasyBtn?.addEventListener("click", (e) => { e.preventDefault(); void switchMode("easy"); });
   modeCadBtn?.addEventListener("click", (e) => { e.preventDefault(); void switchMode("cad"); });
@@ -127,17 +202,41 @@ function initViewerShell() {
     if (e.cancelable) e.preventDefault();
     if (stopProp && typeof e.stopPropagation === "function") e.stopPropagation();
   };
-  document.addEventListener("dragover", (e) => {
+  const onDragOver = (e) => {
     stopNative(e);
+    if (!canHandle(e)) return;
     if (e.dataTransfer) e.dataTransfer.dropEffect = "copy";
-  }, true);
-  document.addEventListener("drop", async (e) => {
+  };
+  const onDrop = async (e) => {
     stopNative(e);
+    if (!canHandle(e)) return;
     const files = extractFiles(e.dataTransfer);
     if (!files.length) return;
-    const app = await loadViewerApp();
-    await app?.importDroppedFiles?.(files);
-  }, true);
+    try {
+      const app = await ensureViewerFullApp();
+      await app?.importDroppedFiles?.(files, { replaceAll: true, clearFirst: true });
+      applyViewerFullAppCustomizations(app);
+    } catch (err) {
+      console.error("Viewer drop import failed", err);
+    }
+  };
+  const onWindowDragEnter = (e) => {
+    stopNative(e, false);
+  };
+  const onWindowDragOver = (e) => {
+    stopNative(e, false);
+  };
+  const onWindowDrop = (e) => {
+    stopNative(e, false);
+  };
+  document.addEventListener("dragenter", onWindowDragEnter, true);
+  document.addEventListener("dragover", onDragOver, true);
+  document.addEventListener("drop", onDrop, true);
+  window.addEventListener("dragenter", onWindowDragEnter, true);
+  window.addEventListener("dragover", onWindowDragOver, true);
+  window.addEventListener("drop", onWindowDrop, true);
+
+  void ensureViewerFullApp();
 }
 
 const mode = getUrlMode();

@@ -1,6 +1,6 @@
 ﻿import { isLayerVisible } from "./state.js";
 import { mmPerUnit, getHatchPitchWorld, getHatchLineShiftWorld, getHatchPaddingWorld, getHatchDashWorld, getHatchGapWorld } from "./geom.js";
-import { getDimGeometry, getDimChainGeometry, getDimAngleGeometry, getSpecialDimGeometry, getCircleDimGeometry } from "./dim_geom.js";
+import { getDimGeometry, getDimChainGeometry, getDimAngleGeometry, getLeaderDimGeometry, getSpecialDimGeometry, getCircleDimGeometry } from "./dim_geom.js";
 import { buildHatchLoopsFromBoundaryIds } from "./hatch_geom.js";
 export function exportPdf(state, helpers) {
     const { setStatus } = helpers;
@@ -386,6 +386,27 @@ export function exportSvg(state, helpers) {
                 }
             }
             parts.push(`</g>`);
+            continue;
+        }
+
+        if (s.type === "dimleader") {
+            const g = getLeaderDimGeometry(s);
+            if (!g) continue;
+            const baseStroke = esc(String(s.color || "#0f172a"));
+            const arrowType = s.dimArrowType || "open";
+            const arrowSize = dimPtToWorld(Math.max(1, Number(s.dimArrowSizePt ?? 10) || 10));
+            parts.push(`<line x1="${fmt(g.p1.x)}" y1="${fmt(g.p1.y)}" x2="${fmt(g.p2.x)}" y2="${fmt(g.p2.y)}" stroke="${baseStroke}"/>`);
+            parts.push(`<line x1="${fmt(g.p2.x)}" y1="${fmt(g.p2.y)}" x2="${fmt(g.p3.x)}" y2="${fmt(g.p3.y)}" stroke="${baseStroke}"/>`);
+            const dir = { x: Number(g.p1.x) - Number(g.p2.x), y: Number(g.p1.y) - Number(g.p2.y) };
+            parts.push(arrowSvg(g.p1, dir, arrowSize, baseStroke, arrowType));
+            const label = esc(String(s.leaderText || "NOTE"));
+            const fontWorld = dimPtToWorld(Number(s.fontSize ?? 12) || 12);
+            const fill = esc(String(s.textColor || s.color || "#0f172a"));
+            const family = esc(String(s.textFontFamily || "Yu Gothic UI"));
+            const weight = s.textBold ? "700" : "400";
+            const style = s.textItalic ? "italic" : "normal";
+            const rot = (s.textRotate === "auto" || s.textRotate == null) ? 0 : (Number(s.textRotate) || 0);
+            parts.push(`<text x="${fmt(g.tx)}" y="${fmt(g.ty)}" transform="rotate(${fmt(rot)} ${fmt(g.tx)} ${fmt(g.ty)})" font-size="${fmt(fontWorld)}" fill="${fill}" font-style="${style}" font-weight="${weight}" font-family="${family}" dominant-baseline="middle" text-anchor="middle">${label}</text>`);
             continue;
         }
 

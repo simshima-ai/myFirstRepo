@@ -135,7 +135,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     const selIds = new Set((state.selection?.ids || []).map(Number));
     const selectedShapes = selIds.size > 0 ? (state.shapes || []).filter(s => selIds.has(Number(s.id))) : [];
     const hasOnlyDims = selectedShapes.length > 0
-      && selectedShapes.every(s => s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "circleDim");
+      && selectedShapes.every(s => s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "dimleader" || s.type === "circleDim");
     dom.dimMergeGroupsBtn.disabled = !(state.tool === "select" && (state.selection?.ids?.length > 1) && state.activeGroupId == null && hasOnlyDims);
   }
   const selIdsForObjMove = new Set((state.selection?.ids || []).map(Number));
@@ -327,7 +327,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     const selected = [];
     for (const s of (state.shapes || [])) {
       if (!ids.has(Number(s.id))) continue;
-      if (s.type !== "line" && s.type !== "polyline" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
+      if (s.type !== "line" && s.type !== "polyline" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "dimleader" && s.type !== "circleDim") continue;
       selected.push(s);
     }
     const first = selected[0] || null;
@@ -340,7 +340,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     let first = null;
     for (const s of (state.shapes || [])) {
       if (!ids.has(Number(s.id))) continue;
-      if (s.type !== "line" && s.type !== "polyline" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
+      if (s.type !== "line" && s.type !== "polyline" && s.type !== "circle" && s.type !== "arc" && s.type !== "position" && s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "dimleader" && s.type !== "circleDim") continue;
       first = s;
       break;
     }
@@ -369,7 +369,7 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
     let firstDim = null;
     for (const s of (state.shapes || [])) {
       if (!ids.has(Number(s.id))) continue;
-      if (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim") continue;
+      if (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "dimleader" && s.type !== "circleDim") continue;
       firstDim = s;
       break;
     }

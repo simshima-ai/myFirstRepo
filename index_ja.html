@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>S-CAD - &#x30B7;&#x30F3;&#x30D7;&#x30EB;&#x306A;2D CAD&#x30C4;&#x30FC;&#x30EB;</title>
+<meta name="description" content="S-CAD&#x306F;&#x30D6;&#x30E9;&#x30A6;&#x30B6;&#x3067;&#x4F7F;&#x3048;&#x308B;&#x7121;&#x6599;&#x306E;2D CAD&#x30C4;&#x30FC;&#x30EB;&#x3067;&#x3059;&#x3002;&#x30A4;&#x30F3;&#x30B9;&#x30C8;&#x30FC;&#x30EB;&#x4E0D;&#x8981;&#x3067;&#x3001;DXF&#x30FB;SVG&#x306E;&#x8AAD;&#x307F;&#x8FBC;&#x307F;&#x3084;&#x56F3;&#x5F62;&#x4F5C;&#x6210;&#x3092;&#x884C;&#x3048;&#x307E;&#x3059;&#x3002;">
+<link rel="stylesheet" href="./site.css">
+<style>
+body { justify-content: unset; align-items: unset; }
+
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  min-height: calc(100vh - 56px - 73px);
+  padding: 60px 24px;
+}
+
+.home-hero h1 {
+  font-size: clamp(48px, 10vw, 96px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  line-height: 1;
+  margin-bottom: 16px;
+}
+
+.home-hero h1 span { color: #00aadd; }
+
+.tagline {
+  font-size: 16px;
+  color: #888;
+  margin-bottom: 48px;
+  letter-spacing: 0.04em;
+}
+
+.btn-open {
+  display: inline-block;
+  padding: 16px 40px;
+  background: #00aadd;
+  color: #fff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 2px;
+  transition: background 0.2s, transform 0.15s;
+}
+
+.btn-open:hover { background: #0088bb; transform: translateY(-1px); }
+
+.sub-links {
+  margin-top: 32px;
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.sub-links a {
+  font-size: 12px;
+  color: #555;
+  text-decoration: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  transition: color 0.2s;
+}
+
+.sub-links a:hover { color: #aaa; }
+
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lang-switch a {
+  color: #777;
+  text-decoration: none;
+}
+
+.lang-switch a.active {
+  color: #fff;
+}
+
+.lang-switch .sep {
+  color: #555;
+}
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="./index.html"><span>S-</span>CAD</a>
+  <ul class="nav-links">
+    <li><a href="./tutorial.html">&#x30C1;&#x30E5;&#x30FC;&#x30C8;&#x30EA;&#x30A2;&#x30EB;</a></li>
+    <li><a href="./about.html">About</a></li>
+    <li><a href="./contact.html">Contact</a></li>
+  </ul>
+  <div class="lang-switch" aria-label="Language switch">
+    <a href="./index_ja.html" class="active" lang="ja" data-site-lang="ja">JP</a>
+    <span class="sep">/</span>
+    <a href="./index_en.html" lang="en" data-site-lang="en">EN</a>
+  </div>
+  <a href="./cad.html" class="nav-cta">&#x30A2;&#x30D7;&#x30EA;&#x3092;&#x958B;&#x304F;</a>
+</nav>
+
+<main>
+  <div class="home-hero">
+    <h1><span>S-</span>CAD</h1>
+    <p class="tagline">Simple &amp; Smart 2D CAD</p>
+    <a href="./cad.html" class="btn-open">&#x30A2;&#x30D7;&#x30EA;&#x3092;&#x958B;&#x304F;</a>
+    <div class="sub-links">
+      <a href="./tutorial.html">&#x30C1;&#x30E5;&#x30FC;&#x30C8;&#x30EA;&#x30A2;&#x30EB;</a>
+      <a href="./manual.html">&#x4F7F;&#x3044;&#x65B9;&#x30AC;&#x30A4;&#x30C9;</a>
+      <a href="./about.html">About</a>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="footer-copy">&copy; 2026 S-CAD</span>
+  <nav class="footer-links">
+    <a href="./privacy.html">&#x30D7;&#x30E9;&#x30A4;&#x30D0;&#x30B7;&#x30FC;&#x30DD;&#x30EA;&#x30B7;&#x30FC;</a>
+    <a href="./contact.html">&#x304A;&#x554F;&#x3044;&#x5408;&#x308F;&#x305B;</a>
+    <a href="./about.html">About</a>
+  </nav>
+</footer>
+
+<script>
+(function () {
+  var KEY = "scad-site-lang";
+  document.querySelectorAll("[data-site-lang]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      try { localStorage.setItem(KEY, String(el.getAttribute("data-site-lang") || "")); } catch (_) {}
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

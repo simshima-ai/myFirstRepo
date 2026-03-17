@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Privacy Policy | S-CAD</title>
+<meta name="description" content="Privacy Policy for S-CAD.">
+<link rel="stylesheet" href="./site.css">
+<style>
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lang-switch a {
+  color: #777;
+  text-decoration: none;
+}
+
+.lang-switch a.active {
+  color: #fff;
+}
+
+.lang-switch .sep {
+  color: #555;
+}
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="./index.html"><span>S-</span>CAD</a>
+  <ul class="nav-links">
+    <li><a href="./tutorial_en.html">Tutorial</a></li>
+    <li><a href="./about_en.html">About</a></li>
+    <li><a href="./contact_en.html">Contact</a></li>
+  </ul>
+  <div class="lang-switch" aria-label="Language switch">
+    <a href="./privacy.html" lang="ja" data-site-lang="ja">JP</a>
+    <span class="sep">/</span>
+    <a href="./privacy_en.html" class="active" lang="en" data-site-lang="en">EN</a>
+  </div>
+  <a href="./cad.html" class="nav-cta">Open App</a>
+</nav>
+
+<main>
+  <div class="page-hero">
+    <h1>Privacy Policy</h1>
+    <p class="sub">Last updated: March 15, 2026&nbsp;|&nbsp;simplecad.work</p>
+  </div>
+
+  <div class="content">
+
+    <div class="section">
+      <h2>Basic Policy</h2>
+      <p>
+        S-CAD (the "Service") recognizes the importance of protecting personal information and handles user information appropriately
+        in connection with operation, use, and improvement of the Service.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Information We Collect</h2>
+      <h3>Information submitted through the contact form</h3>
+      <p>
+        When you use the contact form, we may receive information such as your name, email address, and inquiry details.
+        This information is used only to respond to your inquiry and for related communication.
+      </p>
+      <h3>Information collected automatically</h3>
+      <p>
+        The Service may use cookies and similar technologies to understand access conditions, usage trends, referrers, browser types,
+        and access dates. This information is not intended to identify specific individuals by itself.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>About Cookies</h2>
+      <p>
+        The Service may use cookies. Cookies are small text files stored in your browser. They help maintain convenient behavior
+        and may also be used for analytics or advertising settings.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Advertising (Google AdSense)</h2>
+      <p>
+        The Service may use Google AdSense to display advertisements. Google may use cookies to show ads based on past visits to this
+        and other websites.
+      </p>
+      <ul>
+        <li>Google may use this information to display ads tailored to user interests.</li>
+        <li>You can disable personalized ads from Google's <a href="https://adssettings.google.com/" target="_blank" rel="noopener">Ad Settings</a>.</li>
+        <li>You can also opt out through <a href="https://www.aboutads.info/" target="_blank" rel="noopener">www.aboutads.info</a>.</li>
+      </ul>
+      <p>
+        For more information, please see the <a href="https://policies.google.com/privacy" target="_blank" rel="noopener">Google Privacy Policy</a>.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Analytics</h2>
+      <p>
+        The Service may use Google Analytics or similar tools to analyze usage trends. These tools may use cookies or similar technologies,
+        and the collected data is handled according to each provider's privacy policy.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Third-Party Services</h2>
+      <p>The Service may use the following third-party services:</p>
+      <ul>
+        <li><strong>Google AdSense</strong> for advertising</li>
+        <li><strong>Google Analytics</strong> for usage analytics</li>
+        <li><strong>Google Forms</strong> for inquiry forms</li>
+        <li><strong>YouTube</strong> for embedded tutorial videos</li>
+        <li><strong>Cloudflare</strong> for hosting infrastructure and CDN services</li>
+      </ul>
+      <p>Please refer to each provider's privacy policy for details on how they handle information.</p>
+    </div>
+
+    <div class="section">
+      <h2>Disclaimer</h2>
+      <p>
+        While we take reasonable care in operating the Service, we do not guarantee complete security or uninterrupted availability.
+        We are not responsible for damages arising from the use of the Service except where required by law.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Changes to This Policy</h2>
+      <p>
+        This policy may be updated in response to legal requirements, service improvements, or operational changes.
+        The updated version becomes effective once published on this page.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Contact</h2>
+      <p>
+        If you have questions about this policy, please use the <a href="./contact_en.html">contact form</a>.
+      </p>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="footer-copy">&copy; 2026 S-CAD</span>
+  <nav class="footer-links">
+    <a href="./privacy_en.html">Privacy Policy</a>
+    <a href="./contact_en.html">Contact</a>
+    <a href="./about_en.html">About</a>
+  </nav>
+</footer>
+
+<script>
+(function () {
+  var KEY = "scad-site-lang";
+  document.querySelectorAll("[data-site-lang]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      try { localStorage.setItem(KEY, String(el.getAttribute("data-site-lang") || "")); } catch (_) {}
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

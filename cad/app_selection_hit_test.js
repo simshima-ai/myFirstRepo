@@ -166,6 +166,18 @@ export function createHitTestOps(config) {
           if (Math.hypot(world.x - Number(g.tx), world.y - Number(g.ty)) <= textPickTol) return s;
         }
       }
+      if (s.type === "dimleader") {
+        const p1 = { x: Number(s.x1), y: Number(s.y1) };
+        const p2 = { x: Number(s.x2), y: Number(s.y2) };
+        const dir = Number(s.lineDir) < 0 ? -1 : 1;
+        const lineLen = Math.max(1e-6, Math.abs(Number(s.lineLen) || 0));
+        const p3 = { x: Number(s.x2) + dir * lineLen, y: Number(s.y2) };
+        if (hitTestLine(world, { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y }, tol)) return s;
+        if (hitTestLine(world, { x1: p2.x, y1: p2.y, x2: p3.x, y2: p3.y }, tol)) return s;
+        const tx = Number.isFinite(Number(s.tx)) ? Number(s.tx) : ((p2.x + p3.x) * 0.5);
+        const ty = Number.isFinite(Number(s.ty)) ? Number(s.ty) : Number(s.y2);
+        if (Math.hypot(world.x - tx, world.y - ty) <= textPickTol) return s;
+      }
       if (s.type === "circleDim") {
         const g = getCircleDimGeometry(s, state.shapes);
         if (g) {

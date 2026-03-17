@@ -111,9 +111,13 @@ export function moveSelectedShapes(state, helpers, dx, dy) {
     if (sel.length === 0) return;
     helpers.pushHistory();
     for (const s of sel) {
-        if (s.type === 'line' || s.type === 'rect' || s.type === 'dim') {
+        if (s.type === 'line' || s.type === 'rect' || s.type === 'dim' || s.type === 'dimleader') {
             s.x1 += dx; s.y1 += dy; s.x2 += dx; s.y2 += dy;
             if (s.type === 'dim' && s.px != null) { s.px += dx; s.py += dy; }
+            if (s.type === 'dimleader') {
+                if (Number.isFinite(Number(s.tx))) s.tx += dx;
+                if (Number.isFinite(Number(s.ty))) s.ty += dy;
+            }
         } else if (s.type === 'polyline') {
             if (Array.isArray(s.points)) {
                 for (const p of s.points) {
@@ -567,12 +571,18 @@ export function moveActiveGroup(state, helpers, dx, dy) {
 }
 
 export function updateSelectedTextSettings(state, helpers, settings) {
-    const sel = getSelectedShapes(state).filter(s => s.type === "text");
+    const sel = getSelectedShapes(state).filter(s => s.type === "text" || s.type === "dimleader");
     if (sel.length === 0) return;
     helpers.pushHistory();
     for (const s of sel) {
-        if (settings.text !== undefined) s.text = settings.text;
-        if (settings.textSizePt !== undefined) s.textSizePt = settings.textSizePt;
+        if (settings.text !== undefined) {
+            if (s.type === "dimleader") s.leaderText = settings.text;
+            else s.text = settings.text;
+        }
+        if (settings.textSizePt !== undefined) {
+            if (s.type === "dimleader") s.fontSize = settings.textSizePt;
+            else s.textSizePt = settings.textSizePt;
+        }
         if (settings.textRotate !== undefined) s.textRotate = settings.textRotate;
         if (settings.textFontFamily !== undefined) s.textFontFamily = settings.textFontFamily;
         if (settings.textBold !== undefined) s.textBold = settings.textBold;

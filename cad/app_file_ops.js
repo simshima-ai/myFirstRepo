@@ -1,4 +1,11 @@
 ﻿import { parseSvgToCadShapes, parseDxfToCadShapes } from "./app_vector_import.js";
+import {
+  buildImportMeta,
+  computeShapesBounds,
+  resolveImportSourceUnit as resolveSharedImportSourceUnit,
+  resolveUnitScale,
+  suggestGridSizeFromBounds,
+} from "./import_analysis.js";
 
 export function createFileOpsRuntime(config) {
   const {
@@ -64,52 +71,12 @@ export function createFileOpsRuntime(config) {
     return /\.(png|jpe?g|webp|gif|bmp)$/i.test(name);
   }
 
-  function unitMm(unitRaw) {
-    const u = String(unitRaw || "").toLowerCase();
-    if (u === "mm") return 1;
-    if (u === "cm") return 10;
-    if (u === "m") return 1000;
-    if (u === "inch" || u === "in") return 25.4;
-    if (u === "px") return 25.4 / 96; // CSS px
-    if (u === "pt") return 25.4 / 72;
-    return NaN;
-  }
-
-  function detectDxfInsunits(text) {
-    const pairs = String(text || "").replace(/\r\n/g, "\n").replace(/\r/g, "\n").split("\n");
-    for (let i = 0; i + 3 < pairs.length; i++) {
-      const c0 = String(pairs[i] || "").trim();
-      const v0 = String(pairs[i + 1] || "").trim();
-      const c1 = String(pairs[i + 2] || "").trim();
-      const v1 = String(pairs[i + 3] || "").trim();
-      if (c0 === "9" && v0.toUpperCase() === "$INSUNITS" && c1 === "70") {
-        const n = Number(v1);
-        if (n === 4) return "mm";
-        if (n === 5) return "cm";
-        if (n === 6) return "m";
-        if (n === 1) return "inch";
-        return "unitless";
-      }
-    }
-    return null;
-  }
-
-  function detectSvgUnit(text) {
-    const m = String(text || "").match(/<svg\b[^>]*\b(?:width|height)\s*=\s*["']\s*[-+]?(?:\d+\.?\d*|\.\d+)\s*([a-z%]+)?\s*["']/i);
-    const u = String(m?.[1] || "").toLowerCase();
-    if (u === "mm" || u === "cm" || u === "m" || u === "in" || u === "inch" || u === "px" || u === "pt") {
-      return (u === "in") ? "inch" : u;
-    }
-    if (!u) return "px";
-    return null;
-  }
-
   function resolveImportSourceUnit(kind, text) {
-    const manual = String(state.ui?.importSourceUnit || "auto").toLowerCase();
-    if (manual && manual !== "auto") return manual;
-    if (kind === "dxf") return detectDxfInsunits(text) || "unitless";
-    if (kind === "svg") return detectSvgUnit(text) || "px";
-    return "unitless";
+    return resolveSharedImportSourceUnit({
+      manualUnit: state.ui?.importSourceUnit || "auto",
+      sourceKind: kind,
+      text,
+    });
   }
 
   function scaleImportedShapes(shapes, factor) {
@@ -850,10 +817,19 @@ export function createFileOpsRuntime(config) {
       state.shapes = [];
       state.groups = [];
       state.activeGroupId = null;
+      state.importMeta = null;
       state.selection.ids = [];
       state.selection.groupIds = [];
       state.selection.box.active = false;
       state.selection.drag.active = false;
+      if (!state.ui) state.ui = {};
+      state.ui.importAdjust = {
+        active: false,
+        groupId: null,
+        shapeIds: [],
+        originalShapes: [],
+        params: { scale: 1, dx: 0, dy: 0, flipX: false, flipY: false },
+      };
     }
 
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -914,8 +890,25 @@ export function createFileOpsRuntime(config) {
     });
     setSelection(state, imported.map((s) => Number(s.id)));
     state.activeGroupId = gid;
+    storeImportMeta(buildImportMeta({
+      sourceKind: importMeta?.sourceKind || "",
+      sourceName,
+      detectedUnit: importMeta?.detectedSourceUnit || "unitless",
+      effectiveUnit: getEffectiveSourceUnitForImport(
+        String(importMeta?.sourceKind || ""),
+        String(importMeta?.detectedSourceUnit || "")
+      ),
+      targetUnit: state.pageSetup?.unit || "mm",
+      unitConfidence: importMeta?.detectedSourceUnit ? "high" : "low",
+      unitScale: importMeta?.baseUnitScale,
+      originalUnitScale: importMeta?.baseUnitScale,
+      originalBounds: importMeta?.originalBounds || null,
+      lastImportMode: mode,
+    }));
     setStatus(`Imported ${imported.length} objects from ${sourceName}`);
     beginImportAdjustSession(gid, imported.map((s) => Number(s.id)), importMeta || null);
+    updateImportMetaForActiveGroup(Number(importMeta?.baseUnitScale) || 1);
+    applyViewerGridPresetFromBounds(getLiveImportBounds());
     draw();
     return true;
   }
@@ -952,31 +945,6 @@ export function createFileOpsRuntime(config) {
     return out;
   }
 
-  function computeShapesBounds(shapes) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    const addPt = (x, y) => {
-      const nx = Number(x), ny = Number(y);
-      if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;
-      minX = Math.min(minX, nx); minY = Math.min(minY, ny);
-      maxX = Math.max(maxX, nx); maxY = Math.max(maxY, ny);
-    };
-    for (const s of (shapes || [])) {
-      if (!s) continue;
-      const t = String(s.type || "");
-      if (t === "line" || t === "rect") {
-        addPt(s.x1, s.y1); addPt(s.x2, s.y2);
-      } else if (t === "polyline") {
-        const pts = Array.isArray(s.points) ? s.points : [];
-        for (const pt of pts) addPt(pt?.x, pt?.y);
-      } else if (t === "circle" || t === "arc") {
-        const cx = Number(s.cx), cy = Number(s.cy), r = Math.abs(Number(s.r) || 0);
-        addPt(cx - r, cy - r); addPt(cx + r, cy + r);
-      }
-    }
-    if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null;
-    return { minX, minY, maxX, maxY };
-  }
-
   function beginImportAdjustSession(groupId, shapeIds, meta = null) {
     const ids = (shapeIds || []).map(Number).filter(Number.isFinite);
     if (!ids.length) return;
@@ -993,6 +961,9 @@ export function createFileOpsRuntime(config) {
     // Keep preview unit-scaled from the start; manual Scale works as additional multiplier.
     ia.params.scale = ia.baseUnitScale;
     applyImportAdjustPreview();
+    // Rebase the session to the currently displayed import size so x1 always means "current imported size".
+    ia.originalShapes = snapshotShapesByIds(ids);
+    ia.params = { scale: 1, dx: 0, dy: 0, flipX: false, flipY: false };
     if (state.tool === "settings") state.tool = "select";
   }
 
@@ -1007,10 +978,109 @@ export function createFileOpsRuntime(config) {
   function resolveUnitScaleForImport(sourceKind, detectedSourceUnit) {
     const srcUnit = getEffectiveSourceUnitForImport(sourceKind, detectedSourceUnit);
     const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
-    const srcMm = unitMm(srcUnit);
-    const dstMm = unitMm(dstUnit);
-    if (!(Number.isFinite(srcMm) && Number.isFinite(dstMm) && dstMm > 0)) return 1;
-    return srcMm / dstMm;
+    return resolveUnitScale(srcUnit, dstUnit);
+  }
+
+  function storeImportMeta(meta) {
+    state.importMeta = meta && typeof meta === "object" ? { ...meta } : null;
+  }
+
+  function resetImportedModelState() {
+    state.shapes = [];
+    state.groups = [];
+    state.activeGroupId = null;
+    state.importMeta = null;
+    if (!state.selection || typeof state.selection !== "object") state.selection = {};
+    state.selection.ids = [];
+    state.selection.groupIds = [];
+    if (!state.selection.box || typeof state.selection.box !== "object") state.selection.box = {};
+    if (!state.selection.drag || typeof state.selection.drag !== "object") state.selection.drag = {};
+    state.selection.box.active = false;
+    state.selection.drag.active = false;
+    if (!state.ui) state.ui = {};
+    state.ui.importAdjust = {
+      active: false,
+      groupId: null,
+      shapeIds: [],
+      originalShapes: [],
+      params: { scale: 1, dx: 0, dy: 0, flipX: false, flipY: false },
+    };
+  }
+
+  function applyViewerGridPresetFromBounds(bounds) {
+    if (String(state.ui?.displayMode || "").toLowerCase() !== "viewer") return false;
+    const size = suggestGridSizeFromBounds(bounds, { targetMinorLines: 50 });
+    if (!(Number.isFinite(size) && size > 0)) return false;
+    if (!state.grid || typeof state.grid !== "object") state.grid = {};
+    state.grid.size = size;
+    state.grid.presetSize = size;
+    state.grid.customSize = size;
+    state.grid.customSizeEnabled = false;
+    state.grid.show = true;
+    state.grid.auto = true;
+    return true;
+  }
+
+  function getLiveImportBounds() {
+    const ia = getImportAdjustState();
+    const liveIds = Array.isArray(ia?.shapeIds) ? ia.shapeIds.map(Number).filter(Number.isFinite) : [];
+    if (liveIds.length) {
+      const idSet = new Set(liveIds);
+      const liveShapes = (state.shapes || []).filter((s) => idSet.has(Number(s?.id)));
+      const liveBounds = computeShapesBounds(liveShapes);
+      if (liveBounds) return liveBounds;
+    }
+    const gid = Number(state.activeGroupId);
+    if (Number.isFinite(gid)) {
+      const groupShapes = (state.shapes || []).filter((s) => Number(s?.groupId) === gid);
+      const groupBounds = computeShapesBounds(groupShapes);
+      if (groupBounds) return groupBounds;
+    }
+    return computeShapesBounds(state.shapes || []);
+  }
+
+  function ensureImportAdjustSessionForActiveGroup() {
+    const gid = Number(state.activeGroupId);
+    if (!Number.isFinite(gid)) return false;
+    const group = (state.groups || []).find((g) => Number(g?.id) === gid);
+    const ids = Array.isArray(group?.shapeIds) ? group.shapeIds.map(Number).filter(Number.isFinite) : [];
+    if (!ids.length) return false;
+    beginImportAdjustSession(gid, ids, {
+      sourceKind: String(state.importMeta?.sourceKind || ""),
+      detectedSourceUnit: String(state.importMeta?.detectedUnit || "unitless"),
+      baseUnitScale: 1,
+    });
+    return true;
+  }
+
+  function updateImportMetaForActiveGroup(unitScale = null) {
+    if (!state.importMeta || typeof state.importMeta !== "object") return false;
+    state.importMeta = {
+      ...state.importMeta,
+      unitScale: Number.isFinite(Number(unitScale)) ? Number(unitScale) : Number(state.importMeta.unitScale) || 1,
+    };
+    return true;
+  }
+
+  function applySuggestedImportScale(multiplier) {
+    const factor = Number(multiplier);
+    if (!(Number.isFinite(factor) && factor > 0)) return false;
+    const ia = getImportAdjustState();
+    if (!ia.active && !ensureImportAdjustSessionForActiveGroup()) return false;
+    const currentUnitScale = Math.max(1e-6, Number(state.importMeta?.unitScale) || 1);
+    const originalUnitScale = Math.max(1e-6, Number(state.importMeta?.originalUnitScale) || currentUnitScale);
+    const targetUnitScale = originalUnitScale * factor;
+    const relativeScale = targetUnitScale / currentUnitScale;
+    const ok = setImportAdjustParam({ scale: relativeScale, dx: 0, dy: 0 });
+    if (!ok) return false;
+    ia.originalShapes = snapshotShapesByIds(ia.shapeIds);
+    ia.params = { scale: 1, dx: 0, dy: 0, flipX: false, flipY: false };
+    ia.baseUnitScale = targetUnitScale;
+    updateImportMetaForActiveGroup(targetUnitScale);
+    applyViewerGridPresetFromBounds(getLiveImportBounds());
+    setStatus("Import scale updated");
+    draw();
+    return true;
   }
 
   function onImportSourceUnitChanged() {
@@ -1164,6 +1234,7 @@ export function createFileOpsRuntime(config) {
     }
     ia.active = false;
     ia.originalShapes = [];
+    updateImportMetaForActiveGroup(Number(ia.params?.scale) || Number(ia.baseUnitScale) || 1);
     setStatus("Import transform applied");
     draw();
     return true;
@@ -1215,20 +1286,19 @@ export function createFileOpsRuntime(config) {
       const text = await file.text();
       const srcUnit = resolveImportSourceUnit("dxf", text);
       const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
-      const srcMm = unitMm(srcUnit);
-      const dstMm = unitMm(dstUnit);
-      const unitScale = (Number.isFinite(srcMm) && Number.isFinite(dstMm) && dstMm > 0) ? (srcMm / dstMm) : 1;
+      const unitScale = resolveUnitScale(srcUnit, dstUnit);
       const parsed = parseDxfToCadShapes(text, {
         polylineize: false
       });
       const shapes = parsed.shapes;
       const polyCount = shapes.filter((s) => String(s?.type || "").toLowerCase() === "polyline").length;
       if (!shapes.length) throw new Error(parsed.warnings?.[0] || "DXF import failed");
-      importVectorShapes(shapes, String(file.name || "DXF"), mode, {
-        sourceKind: "dxf",
-        detectedSourceUnit: srcUnit,
-        baseUnitScale: unitScale,
-      });
+        importVectorShapes(shapes, String(file.name || "DXF"), mode, {
+          sourceKind: "dxf",
+          detectedSourceUnit: srcUnit,
+          baseUnitScale: unitScale,
+          originalBounds: computeShapesBounds(shapes),
+        });
       const unitNote = (srcUnit && srcUnit !== "unitless")
         ? `unit=${srcUnit}->${dstUnit} (x${unitScale.toFixed(6)})`
         : `unit=${srcUnit || "unitless"} (x1)`;
@@ -1243,9 +1313,7 @@ export function createFileOpsRuntime(config) {
       const text = await file.text();
       const srcUnit = resolveImportSourceUnit("svg", text);
       const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
-      const srcMm = unitMm(srcUnit);
-      const dstMm = unitMm(dstUnit);
-      const unitScale = (Number.isFinite(srcMm) && Number.isFinite(dstMm) && dstMm > 0) ? (srcMm / dstMm) : 1;
+      const unitScale = resolveUnitScale(srcUnit, dstUnit);
       const parsed = parseSvgToCadShapes(text);
       if (parsed.shapes.length) {
         const shapes = parsed.shapes;
@@ -1253,6 +1321,7 @@ export function createFileOpsRuntime(config) {
           sourceKind: "svg",
           detectedSourceUnit: srcUnit,
           baseUnitScale: unitScale,
+          originalBounds: computeShapesBounds(shapes),
         });
         const unitNote = (srcUnit && srcUnit !== "unitless")
           ? `unit=${srcUnit}->${dstUnit} (x${unitScale.toFixed(6)})`
@@ -1286,13 +1355,15 @@ export function createFileOpsRuntime(config) {
     throw new Error("Unsupported file type");
   }
 
-  async function importDroppedFiles(files) {
+  async function importDroppedFiles(files, options = null) {
     const list = Array.from(files || []).filter(Boolean);
     if (!list.length) return false;
     const isViewerMode = String(state.ui?.displayMode || "cad").toLowerCase() === "viewer";
+    const forceReplaceAll = !!options?.replaceAll;
+    if (options?.clearFirst) resetImportedModelState();
     for (let i = 0; i < list.length; i++) {
       const file = list[i];
-      const importMode = isViewerMode ? (i === 0 ? "replace" : "import") : "import";
+      const importMode = (isViewerMode || forceReplaceAll) ? (i === 0 ? "replace" : "import") : "import";
       await importAnyFile(file, importMode);
     }
     if (!state.ui) state.ui = {};
@@ -1387,7 +1458,8 @@ export function createFileOpsRuntime(config) {
     onImportSourceUnitChanged,
     setImportAdjustParam,
     applyImportAdjust,
-    cancelImportAdjust
+    cancelImportAdjust,
+    applySuggestedImportScale
   };
 }
 

@@ -26,7 +26,7 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     if (!ids.size) return null;
     for (const s of (state.shapes || [])) {
       if (!ids.has(Number(s.id))) continue;
-      if (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "circleDim") {
+      if (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "dimleader" || s.type === "circleDim") {
         return s;
       }
     }
@@ -52,6 +52,9 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
   }
   if (dom.dimFontSizeInput) {
     syncInputValue(dom.dimFontSizeInput, Math.max(1, Number(dimUiSource.fontSize ?? state.dimSettings?.fontSize ?? 12)));
+  }
+  if (dom.dimLabelTextInput) {
+    dom.dimLabelTextInput.value = String(dimUiSource.leaderText || state.dimSettings?.labelText || "NOTE");
   }
   if (dom.dimTextRotateInput) {
     const tv = (dimUiSource.textRotate ?? state.dimSettings?.textRotate);
@@ -94,7 +97,7 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     let hasDim = false;
     for (const s of (state.shapes || [])) {
       if (!ids.has(Number(s.id))) continue;
-      if (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "circleDim") { hasDim = true; break; }
+      if (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "dimleader" || s.type === "circleDim") { hasDim = true; break; }
     }
     dom.applyDimSettingsBtn.disabled = !hasDim;
   }

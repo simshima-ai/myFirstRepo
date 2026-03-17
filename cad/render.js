@@ -2,7 +2,7 @@ import {
   worldToScreen, screenToWorld, getEffectiveGridSize, mmPerUnit,
   getHatchPitchWorld, getHatchLineShiftWorld, getHatchPaddingWorld, getHatchDashWorld, getHatchGapWorld
 } from "./geom.js";
-import { getDimGeometry, getDimChainGeometry, getDimAngleGeometry, getSpecialDimGeometry, getCircleDimGeometry, circleDimHasCenterFollowAttribute } from "./dim_geom.js";
+import { getDimGeometry, getDimChainGeometry, getDimAngleGeometry, getLeaderDimGeometry, getSpecialDimGeometry, getCircleDimGeometry, circleDimHasCenterFollowAttribute } from "./dim_geom.js";
 import { buildHatchLoopsFromBoundaryIds } from "./hatch_geom.js";
 import { computeLineCircleAutoTrimPlan } from "./app_tools.js";
 import { drawGrid } from "./render_grid.js";
@@ -204,7 +204,11 @@ function lineWidthMmToScreenPx(state, lineWidthMm) {
   const pageScale = Math.max(0.0001, Number(state?.pageSetup?.scale ?? 1) || 1);
   const unitMm = mmPerUnit(state?.pageSetup?.unit || "mm");
   const world = (mm * pageScale) / Math.max(1e-9, unitMm);
-  return Math.max(0.5, world * Math.max(1e-9, Number(state?.view?.scale) || 1));
+  const screenPx = Math.max(0.5, world * Math.max(1e-9, Number(state?.view?.scale) || 1));
+  if (String(state?.ui?.displayMode || "cad").toLowerCase() === "viewer") {
+    return Math.max(0.75, Math.min(1.5, screenPx));
+  }
+  return screenPx;
 }
 
 const dimensionOps = createRenderDimensionOps({
@@ -471,7 +475,7 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
       ctx.stroke();
     }
   }
-  if (shape.type === "dim" || shape.type === "dimchain" || shape.type === "dimangle" || shape.type === "circleDim") {
+  if (shape.type === "dim" || shape.type === "dimchain" || shape.type === "dimangle" || shape.type === "dimleader" || shape.type === "circleDim") {
     // Determine geometry based on type
     let geom = null;
     if (shape.type === "dim") {
@@ -481,6 +485,8 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
       geom = getDimChainGeometry(shape);
     } else if (shape.type === "dimangle") {
       geom = getDimAngleGeometry(shape, state.shapes);
+    } else if (shape.type === "dimleader") {
+      geom = getLeaderDimGeometry(shape);
     } else if (shape.type === "circleDim") {
       geom = getCircleDimGeometry(shape, state.shapes);
     }
@@ -496,6 +502,7 @@ const previewOps = createRenderPreviewOps({
   drawShape,
   drawDimensionCommon,
   getCircleDimGeometry,
+  getLeaderDimGeometry,
   getSpecialDimGeometry,
   getDimChainGeometry,
   getDimGeometry,
@@ -565,6 +572,7 @@ const handlesOps = createRenderHandlesOps({
   isVisibleByCurrentLayerFilter,
   getDimChainGeometry,
   getDimAngleGeometry,
+  getLeaderDimGeometry,
   getCircleDimGeometry,
   circleDimHasCenterFollowAttribute,
   dimMmToWorld,

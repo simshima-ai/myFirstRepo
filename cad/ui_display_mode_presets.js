@@ -100,7 +100,7 @@ export function getDisplayModePreset(mode) {
         tangentKeep: false,
         keepAttributes: false,
       },
-      grid: { snap: true },
+      grid: { snap: true, show: true },
       tool: "select",
       selectPickMode: "object",
     };
@@ -123,12 +123,10 @@ export function getDisplayModePreset(mode) {
         "tool:line",
         "tool:rect",
         "tool:circle",
-        "tool:dim",
         "tool:text",
         "tool:vertex",
         "tool:trim",
         "action:undo",
-        "action:redo",
         "action:delete",
         "action:newFile",
         "action:saveJson",
@@ -199,6 +197,9 @@ export function applyDisplayModePreset(state, mode) {
   state.ui.selectPickMode = String(preset.selectPickMode || "object") === "group" ? "group" : "object";
   if (state.ui.selectPickMode !== "group") state.activeGroupId = null;
     state.grid.snap = !!preset.grid.snap;
+  }
+  if (preset.grid && Object.prototype.hasOwnProperty.call(preset.grid, "show")) {
+    state.grid.show = !!preset.grid.show;
   }
   if (preset.tool) state.tool = preset.tool;
   return preset;

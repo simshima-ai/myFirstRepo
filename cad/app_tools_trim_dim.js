@@ -538,6 +538,15 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
 
     if (!state.dimDraft) {
         const hit = hitTestShapes(state, worldRaw);
+        if (linearMode === "leader") {
+            state.dimDraft = {
+                type: "dimleader",
+                p1: { x: world.x, y: world.y },
+                hover: { x: world.x, y: world.y }
+            };
+            if (setStatus) setStatus("Leader dimension: click elbow point.");
+            return "p1";
+        }
         if (linearMode === "angle") {
             if (hit && hit.type === "line") {
                 state.dimDraft = {
@@ -657,6 +666,16 @@ export function beginOrAdvanceDim(state, worldRaw, helpers) {
             line2Id,
             ...solved
         };
+        return "place";
+    }
+
+    if (state.dimDraft.type === "dimleader") {
+        if (!state.dimDraft.p2) {
+            if (Math.hypot(world.x - state.dimDraft.p1.x, world.y - state.dimDraft.p1.y) < 1e-9) return "noop";
+            state.dimDraft.p2 = { x: world.x, y: world.y };
+            return "place";
+        }
+        state.dimDraft.p2 = { x: world.x, y: world.y };
         return "place";
     }
 
@@ -797,6 +816,14 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
         } else {
             state.dimDraft.hoverPoint = { x: world.x, y: world.y };
         }
+    } else if (state.dimDraft.type === "dimleader") {
+        state.input.objectSnapHover = null;
+        if (!state.dimDraft.p2) {
+            state.dimDraft.hover = { x: world.x, y: world.y };
+            if (setStatus) setStatus("Leader dimension: click elbow point.");
+        } else {
+            state.dimDraft.p2 = { x: world.x, y: world.y };
+        }
     } else if (state.dimDraft.dimRef) {
         state.dimDraft.x2 = world.x;
         state.dimDraft.y2 = world.y;
@@ -855,6 +882,28 @@ export function finalizeDimDraft(state, helpers) {
             tx: Number(d.tx), ty: Number(d.ty),
             layerId: state.activeLayerId
         });
+    } else if (d.type === "dimleader" && d.p1 && d.p2) {
+        const leaderText = String(state.dimSettings?.labelText || "NOTE").trim() || "NOTE";
+        const fontSize = Math.max(1, Number(state.dimSettings?.fontSize ?? 12) || 12);
+        const lineDir = (Number(d.p2.x) - Number(d.p1.x)) >= 0 ? 1 : -1;
+        const lineLen = estimateLeaderLineLengthWorld(state, leaderText, fontSize);
+        const textGap = dimMmToWorldInTools(state, Math.max(4, fontSize * 0.35));
+        dim = createDim({
+            type: "dimleader",
+            x1: Number(d.p1.x), y1: Number(d.p1.y),
+            x2: Number(d.p2.x), y2: Number(d.p2.y),
+            lineDir,
+            lineLen,
+            textGap,
+            tx: Number(d.p2.x) + lineDir * lineLen * 0.5,
+            ty: Number(d.p2.y) - textGap,
+            leaderText,
+            textFontFamily: String(state.textSettings?.fontFamily || "Yu Gothic UI"),
+            textBold: !!state.textSettings?.bold,
+            textItalic: !!state.textSettings?.italic,
+            textColor: String(state.textSettings?.color || state.dimSettings?.color || "#0f172a"),
+            layerId: state.activeLayerId
+        });
     } else if (d.points && d.points.length >= 2) {
         dim = createDim({
             type: 'dimchain',
@@ -905,6 +954,7 @@ export function finalizeDimDraft(state, helpers) {
         if (ds.extOffset !== undefined) dim.extOffset = ds.extOffset;
         if (ds.extOver !== undefined) dim.extOver = ds.extOver;
         if (ds.fontSize !== undefined) dim.fontSize = ds.fontSize;
+        if (ds.labelText !== undefined && dim.type === "dimleader") dim.leaderText = String(ds.labelText || "").trim() || "NOTE";
         if (ds.dimArrowType !== undefined) dim.dimArrowType = ds.dimArrowType;
         if (ds.dimArrowSize !== undefined) dim.dimArrowSizePt = ds.dimArrowSize;
         if (ds.dimArrowDirection !== undefined) dim.dimArrowDirection = (String(ds.dimArrowDirection) === "reverse" ? "reverse" : "normal");
@@ -1051,6 +1101,13 @@ function dimMmToWorldInTools(state, mm) {
     return (Math.max(0, Number(mm) || 0) * pageScale) / Math.max(1e-9, unitMm);
 }
 
+function estimateLeaderLineLengthWorld(state, labelText, fontSizePt) {
+    const text = String(labelText || "").trim() || "NOTE";
+    const fontPt = Math.max(1, Number(fontSizePt) || 12);
+    const lenMm = Math.max(18, 8 + text.length * 3 + fontPt * 0.7);
+    return dimMmToWorldInTools(state, lenMm);
+}
+
 function solveDimAngleFromLines(state, line1, line2, pick1, pick2) {
     const c = lineInfiniteIntersection(line1, line2);
     if (!c) return null;
@@ -1102,7 +1159,7 @@ export function popDimChainPoint(state, helpers) {
 export function applyDimSettingsToSelection(state, helpers, patch) {
     const { pushHistory, draw } = helpers;
     const selectedDimIds = (state.selection?.ids || []).map(Number);
-    const selectedDims = (state.shapes || []).filter(s => selectedDimIds.includes(Number(s.id)) && (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "circleDim"));
+    const selectedDims = (state.shapes || []).filter(s => selectedDimIds.includes(Number(s.id)) && (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "dimleader" || s.type === "circleDim"));
 
     if (selectedDims.length > 0) {
         if (pushHistory) pushHistory();

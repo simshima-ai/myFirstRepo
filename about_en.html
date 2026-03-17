@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>About | S-CAD</title>
+<meta name="description" content="About S-CAD, a simple browser-based 2D CAD tool that runs without installation.">
+<link rel="stylesheet" href="./site.css">
+<style>
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lang-switch a {
+  color: #777;
+  text-decoration: none;
+}
+
+.lang-switch a.active {
+  color: #fff;
+}
+
+.lang-switch .sep {
+  color: #555;
+}
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="./index.html"><span>S-</span>CAD</a>
+  <ul class="nav-links">
+    <li><a href="./tutorial_en.html">Tutorial</a></li>
+    <li><a href="./about_en.html" class="active">About</a></li>
+    <li><a href="./contact_en.html">Contact</a></li>
+  </ul>
+  <div class="lang-switch" aria-label="Language switch">
+    <a href="./about.html" lang="ja" data-site-lang="ja">JP</a>
+    <span class="sep">/</span>
+    <a href="./about_en.html" class="active" lang="en" data-site-lang="en">EN</a>
+  </div>
+  <a href="./cad.html" class="nav-cta">Open App</a>
+</nav>
+
+<main>
+  <div class="page-hero">
+    <h1>About</h1>
+    <p class="sub">About S-CAD</p>
+  </div>
+
+  <div class="content">
+
+    <div class="section">
+      <h2>What Is S-CAD?</h2>
+      <p>
+        S-CAD is a simple browser-based 2D CAD tool. It is designed to be easy to start and easy to continue using,
+        without installation or complicated setup.
+      </p>
+      <p>
+        It supports basic drafting workflows, geometry editing, and export to common formats such as DXF and SVG.
+        The goal is to provide a lightweight environment for everyday 2D drawing work directly in the browser.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Service Information</h2>
+      <dl>
+        <div class="card">
+          <dt>Service Name</dt>
+          <dd>S-CAD (S-CAD Easy)</dd>
+        </div>
+        <div class="card">
+          <dt>URL</dt>
+          <dd><a href="https://simplecad.work">simplecad.work</a></dd>
+        </div>
+        <div class="card">
+          <dt>Supported Browsers</dt>
+          <dd>Modern browsers such as Chrome, Firefox, Edge, and Safari</dd>
+        </div>
+        <div class="card">
+          <dt>Supported File Types</dt>
+          <dd>DXF and SVG import and export</dd>
+        </div>
+        <div class="card">
+          <dt>Pricing</dt>
+          <dd>Free plan available, with Pro features also available</dd>
+        </div>
+      </dl>
+    </div>
+
+    <div class="section">
+      <h2>Contact</h2>
+      <p>
+        For feedback, bug reports, or other questions, please use the <a href="./contact_en.html">contact form</a>.
+      </p>
+    </div>
+
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="footer-copy">&copy; 2026 S-CAD</span>
+  <nav class="footer-links">
+    <a href="./privacy_en.html">Privacy Policy</a>
+    <a href="./contact_en.html">Contact</a>
+    <a href="./about_en.html">About</a>
+  </nav>
+</footer>
+
+<script>
+(function () {
+  var KEY = "scad-site-lang";
+  document.querySelectorAll("[data-site-lang]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      try { localStorage.setItem(KEY, String(el.getAttribute("data-site-lang") || "")); } catch (_) {}
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

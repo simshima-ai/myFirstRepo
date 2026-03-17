@@ -5,6 +5,7 @@ export function createRenderHandlesOps(deps) {
     isVisibleByCurrentLayerFilter,
     getDimChainGeometry,
     getDimAngleGeometry,
+    getLeaderDimGeometry,
     getCircleDimGeometry,
     circleDimHasCenterFollowAttribute,
     dimMmToWorld,
@@ -112,7 +113,7 @@ export function createRenderHandlesOps(deps) {
     ctx.save();
     for (const s of (state.shapes || [])) {
       if (!selectedIds.has(Number(s.id))) continue;
-      if (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle") continue;
+      if (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "dimleader") continue;
       if (!isLayerVisible(state, s.layerId)) continue;
       if (!isVisibleByCurrentLayerFilter(state, s)) continue;
 
@@ -202,6 +203,41 @@ export function createRenderHandlesOps(deps) {
           ctx.fill();
           ctx.stroke();
         }
+        continue;
+      }
+
+      if (s.type === "dimleader") {
+        const g = getLeaderDimGeometry(s);
+        if (!g) continue;
+        const p1s = worldToScreen(state.view, g.p1);
+        const p2s = worldToScreen(state.view, g.p2);
+        const p3s = worldToScreen(state.view, g.p3);
+        const allS = worldToScreen(state.view, { x: (Number(g.p1.x) + Number(g.p2.x) + Number(g.p3.x)) / 3, y: (Number(g.p1.y) + Number(g.p2.y) + Number(g.p3.y)) / 3 });
+        const ts = worldToScreen(state.view, { x: Number(g.tx), y: Number(g.ty) });
+        ctx.lineWidth = 1.5;
+        const drawCircle = (sp, fill, stroke) => {
+          ctx.beginPath();
+          ctx.arc(sp.x, sp.y, 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = fill;
+          ctx.strokeStyle = stroke;
+          ctx.fill();
+          ctx.stroke();
+        };
+        drawCircle(p1s, "#dcfce7", "#16a34a");
+        drawCircle(p2s, "#dcfce7", "#16a34a");
+        drawCircle(p3s, "#dcfce7", "#16a34a");
+        ctx.beginPath();
+        ctx.rect(allS.x - 5, allS.y - 5, 10, 10);
+        ctx.fillStyle = "#dbeafe";
+        ctx.strokeStyle = "#1d4ed8";
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.rect(ts.x - 6, ts.y - 6, 12, 12);
+        ctx.fillStyle = "#fecaca";
+        ctx.strokeStyle = "#dc2626";
+        ctx.fill();
+        ctx.stroke();
         continue;
       }
 

@@ -14,10 +14,15 @@
   --accent:#0082b4;
 }
 *{box-sizing:border-box}
-body{margin:0;font-family:"Segoe UI","Noto Sans",sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
+body{margin:0;font-family:"Segoe UI","Helvetica Neue",Arial,sans-serif;background:var(--bg);color:var(--text);line-height:1.7}
 header{position:sticky;top:0;background:rgba(255,255,255,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--line);z-index:10}
 .top{max-width:1100px;margin:0 auto;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px}
 .brand{font-weight:800;color:var(--accent);text-decoration:none}
+.top-actions{display:flex;align-items:center;gap:10px}
+.lang-switch{display:inline-flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.lang-switch a{color:var(--muted);text-decoration:none}
+.lang-switch a.active{color:var(--accent);font-weight:700}
+.lang-switch .sep{color:#90a4b8}
 .links{display:flex;gap:10px}
 .links a{font-size:13px;color:var(--muted);text-decoration:none;padding:7px 10px;border:1px solid var(--line);border-radius:999px;background:#fff}
 main{max-width:1100px;margin:20px auto;padding:0 16px 40px;display:grid;grid-template-columns:260px 1fr;gap:16px}
@@ -30,20 +35,25 @@ h1{margin:0 0 8px;font-size:28px}
 section{padding-top:8px;margin-top:18px;border-top:1px solid var(--line)}
 section:first-of-type{border-top:none;margin-top:0}
 h2{margin:0 0 8px;font-size:20px;color:#16324a}
-ul{margin:8px 0 0 20px}
-ol{margin:8px 0 0 20px}
+ul,ol{margin:8px 0 0 20px}
 code{background:#eef5fb;padding:1px 6px;border-radius:6px}
-#sec2 p,#sec7 p,#sec8 p,#sec11 p{margin-left:1em}
-@media (max-width:900px){main{grid-template-columns:1fr}nav{position:static}}
+@media (max-width:900px){main{grid-template-columns:1fr}nav{position:static}.top{align-items:flex-start;flex-direction:column}.top-actions{width:100%;justify-content:space-between;flex-wrap:wrap}}
 </style>
 </head>
 <body>
 <header>
   <div class="top">
     <a class="brand" href="./index.html">S-CAD / User Manual</a>
-    <div class="links">
-      <a href="./cad.html">Open CAD</a>
-      <a href="./index.html">Back to Home</a>
+    <div class="top-actions">
+      <div class="lang-switch" aria-label="Language switch">
+        <a href="./manual.html" lang="ja" data-site-lang="ja">JP</a>
+        <span class="sep">/</span>
+        <a href="./manual_en.html" class="active" lang="en" data-site-lang="en">EN</a>
+      </div>
+      <div class="links">
+        <a href="./cad.html">Open CAD</a>
+        <a href="./index.html">Back to Home</a>
+      </div>
     </div>
   </div>
 </header>
@@ -52,13 +62,13 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
     <a href="#sec1">1. Overview</a>
     <a href="#sec2">2. Features</a>
     <a href="#sec3">3. Quick Start</a>
-    <a href="#sec4">4. Core Operations</a>
+    <a href="#sec4">4. Main Controls</a>
     <a href="#sec5">5. Selection Tool</a>
     <a href="#sec6">6. Edit Tools</a>
     <a href="#sec7">7. Layers and Groups</a>
     <a href="#sec8">8. Trim and Fillet</a>
     <a href="#sec9">9. Settings</a>
-    <a href="#sec10">10. Save / Load / Export</a>
+    <a href="#sec10">10. Save, Load, Export</a>
     <a href="#sec11">11. Attributes</a>
   </nav>
   <article>
@@ -68,82 +78,91 @@ code{background:#eef5fb;padding:1px 6px;border-radius:6px}
     <section id="sec1"><h2>1. Overview</h2>
       <ul>
         <li>S-CAD is a browser-based 2D CAD tool.</li>
-        <li>No installation or registration is required.</li>
-        <li>You can save/load drawing data and export to PDF/SVG.</li>
+        <li>No installation or account registration is required.</li>
+        <li>You can save drawing data and export to PDF or SVG.</li>
       </ul>
     </section>
 
     <section id="sec2"><h2>2. Features</h2>
-      <p>S-CAD is easy to operate, but understanding the concepts of objects, groups, and layers will make your workflow much smoother.</p>
-      <p>With a few exceptions, you can think of S-CAD geometry as being built from line segments and arcs. For example, a rectangle is a group made of four line-segment objects. Each corner of the rectangle actually has two vertices, but you can handle them as if they were a single vertex. You can also handle them separately when needed.</p>
+      <p>S-CAD is designed to be easy to use, but understanding the concepts of objects, groups, and layers will make editing much smoother.</p>
+      <p>With only a few exceptions, you can think of everything in S-CAD as being built from lines and arcs. For example, a rectangle is a group made from four line objects. The corners can behave like a single point during editing, while still remaining editable as separate geometry when needed.</p>
     </section>
 
     <section id="sec3"><h2>3. Quick Start</h2>
       <ol>
-        <li>Create a new drawing</li>
-        <li>In Settings, choose unit, scale, and paper size</li>
-        <li>Draw with tools such as Line, Circle, and Rectangle</li>
-        <li>Save (JSON) or export to PDF/SVG/DXF</li>
+        <li>Create a new drawing.</li>
+        <li>Set units, scale, and paper size in Settings.</li>
+        <li>Draw with tools such as line, circle, and rectangle.</li>
+        <li>Save as JSON or export to PDF, SVG, or DXF.</li>
       </ol>
     </section>
 
-    <section id="sec4"><h2>4. Core Operations</h2>
+    <section id="sec4"><h2>4. Main Controls</h2>
       <ul>
-        <li>Mouse wheel: zoom</li>
-        <li>Middle button or <code>Alt</code> + drag: pan</li>
-        <li>Click: select</li>
-        <li><code>Shift</code> + click: multi-select</li>
-        <li><code>Delete</code>: remove selection</li>
+        <li>Mouse wheel: Zoom</li>
+        <li>Middle mouse button or <code>Alt</code>+drag: Pan</li>
+        <li>Click: Select</li>
+        <li><code>Shift</code>+click: Multi-select</li>
+        <li><code>Delete</code>: Delete selected items</li>
       </ul>
     </section>
 
     <section id="sec5"><h2>5. Selection Tool</h2>
-      <p>The selection tool has Object Selection mode and Group Selection mode. You can switch between them with the Space key. Always keep in mind whether you are selecting objects or groups.</p>
+      <p>The selection tool has both object-selection mode and group-selection mode. You can switch between them with the space key. It is important to stay aware of whether you are selecting individual objects or whole groups.</p>
     </section>
 
     <section id="sec6"><h2>6. Edit Tools</h2>
       <ul>
         <li>Trim</li>
         <li>Fillet</li>
-        <li>Vertex editing</li>
-        <li>Pattern copy</li>
+        <li>Vertex Editing</li>
+        <li>Pattern Copy</li>
       </ul>
     </section>
 
     <section id="sec7"><h2>7. Layers and Groups</h2>
-      <p>Layers and groups are similar grouping mechanisms, and they make object management easier while increasing editing flexibility.</p>
-      <p>A group acts like a parent that bundles multiple objects. It can span across layers and can be moved or rotated. Groups can also have a hierarchy, allowing you to represent structural dependencies. This makes it possible to model articulated structures such as robot arms.</p>
-      <p>You can freely move objects and groups by dragging and dropping them in the Group panel. It is recommended to organize them periodically while working.</p>
+      <p>Layers and groups are similar organizational features. They make object management easier and increase editing flexibility.</p>
+      <p>Groups act like parents for their contained objects. A group can span multiple layers, can be moved or rotated, and can also contain nested groups. This makes it possible to build hierarchical structures such as robot arms or assemblies with multiple moving parts.</p>
+      <p>You can reorganize objects and groups freely with drag and drop inside the group panel. Keeping them organized as you work will save time later.</p>
     </section>
 
     <section id="sec8"><h2>8. Trim and Fillet</h2>
-      <p>S-CAD has a powerful Trim function. A practical approach is to draw intentionally intersecting lines first, then remove unnecessary parts with Trim. It is fine to adjust exact dimensions afterward. Of course, you can also draw everything to exact dimensions from the beginning.</p>
-      <p>Fillet creates a corner radius (R) between two touching objects.</p>
-      <p>There are two modes: "Trim" mode, which automatically removes unnecessary parts, and "No Trim" mode.</p>
-      <p>If Fillet removes a part you want to keep, create the corner radius in "No Trim" mode, then remove only the unwanted parts using the Trim tool.</p>
-      <p>You can change the radius of a created fillet later.</p>
+      <p>S-CAD has a strong trim workflow. It is often efficient to draw aggressively intersecting construction lines first, then remove the unnecessary parts with trim.</p>
+      <p>Fillet creates a corner radius between two touching objects.</p>
+      <p>There are both trim and no-trim modes. If the automatic trim result is not what you want, create the fillet in no-trim mode and remove the extra parts manually with the trim tool.</p>
+      <p>Fillets can be edited later, including the radius value.</p>
     </section>
 
     <section id="sec9"><h2>9. Settings</h2>
       <ul>
-        <li>Grid visibility and snap settings</li>
-        <li>Display quality, UI options, and helper overlays</li>
+        <li>Grid visibility and snap options</li>
+        <li>Display quality, UI visibility, and helper overlays</li>
       </ul>
     </section>
 
-    <section id="sec10"><h2>10. Save / Load / Export</h2>
+    <section id="sec10"><h2>10. Save, Load, Export</h2>
       <ul>
-        <li>JSON save/load</li>
-        <li>SVG/PDF export</li>
+        <li>Save and load JSON project data</li>
+        <li>Export to SVG or PDF</li>
       </ul>
     </section>
 
     <section id="sec11"><h2>11. Attributes</h2>
-      <p>There is a "Keep Attribute" button in the Snap panel.</p>
-      <p>When this is enabled, snapping a vertex in Vertex Edit mode can assign an attribute to that vertex, so it follows even if the snapped target object moves.</p>
-      <p>When an object with attributes is selected, the Attributes panel appears and you can remove attributes there.</p>
+      <p>The snap panel contains an option called <strong>Keep Attributes</strong>.</p>
+      <p>When it is enabled, snapped vertex edits can keep attribute links, allowing them to follow the source object when that object moves.</p>
+      <p>When an object with attributes is selected, the attributes panel appears and lets you remove those links.</p>
     </section>
   </article>
 </main>
+<script>
+(function () {
+  var KEY = "scad-site-lang";
+  document.querySelectorAll("[data-site-lang]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      try { localStorage.setItem(KEY, String(el.getAttribute("data-site-lang") || "")); } catch (_) {}
+    });
+  });
+})();
+</script>
 </body>
 </html>

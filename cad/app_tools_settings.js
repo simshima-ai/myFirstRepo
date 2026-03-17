@@ -300,6 +300,7 @@ export function setSelectedLineWidthMm(state, helpers, v) {
             || s.type === "dim"
             || s.type === "dimchain"
             || s.type === "dimangle"
+            || s.type === "dimleader"
             || s.type === "circleDim";
     };
     const selected = (state.shapes || []).filter(s => selIds.has(Number(s.id)) && isStyleEditableShape(s));
@@ -332,6 +333,7 @@ export function setSelectedLineType(state, helpers, v) {
             || s.type === "dim"
             || s.type === "dimchain"
             || s.type === "dimangle"
+            || s.type === "dimleader"
             || s.type === "circleDim";
     });
     if (!selected.length) {

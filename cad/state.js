@@ -78,7 +78,7 @@ export function createState() {
     dimDraft: null,
     dimSettings: {
       precision: 1,
-      linearMode: "single", // "single" | "chain"
+      linearMode: "single", // "single" | "chain" | "leader" | "angle"
       snapMode: "endpoint",
       ignoreGridSnap: false,
       circleArrowSide: "outside", // "outside" | "inside"
@@ -86,6 +86,7 @@ export function createState() {
       extOffset: 2,
       extOver: 2,
       fontSize: 12,
+      labelText: "NOTE",
       dimArrowType: 'open',
       dimArrowSize: 10,
       dimArrowDirection: "normal",

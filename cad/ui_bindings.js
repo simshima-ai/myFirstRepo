@@ -86,6 +86,13 @@ export function bindDimSettingsEvents(state, dom, actions) {
       actions.applyDimSettingsToSelection({ fontSize: v });
     });
   }
+  if (dom.dimLabelTextInput) {
+    dom.dimLabelTextInput.addEventListener("input", () => {
+      const v = String(dom.dimLabelTextInput.value || "").trim();
+      actions.setDimSettings({ labelText: v || "NOTE" });
+      actions.applyDimSettingsToSelection({ leaderText: v || "NOTE" });
+    });
+  }
   if (dom.dimTextRotateInput) dom.dimTextRotateInput.addEventListener("change", () => {
     const val = dom.dimTextRotateInput.value;
     const tv = val === "auto" ? "auto" : (Number(val) || 0);
@@ -138,6 +145,7 @@ export function bindDimSettingsEvents(state, dom, actions) {
         precision: p,
         circleArrowSide: (dom.dimCircleArrowSide?.value === "inside") ? "inside" : "outside",
         fontSize: Math.max(1, Number(dom.dimFontSizeInput?.value) || 12),
+        leaderText: String(dom.dimLabelTextInput?.value || "").trim() || "NOTE",
         textRotate: tv === "auto" ? "auto" : (Number(tv) || 0),
         extOffset: Number(dom.dimExtOffsetInput?.value) || 0,
         extOver: Number(dom.dimExtOverInput?.value) || 0,

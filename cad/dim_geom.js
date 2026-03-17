@@ -87,6 +87,28 @@ export function getLinearDimTextHandleWorld(dim, geom, scale = 1.0) {
     };
 }
 
+export function getLeaderDimGeometry(dim) {
+    const x1 = Number(dim.x1), y1 = Number(dim.y1);
+    const x2 = Number(dim.x2), y2 = Number(dim.y2);
+    if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+    const lineDir = Number(dim.lineDir) < 0 ? -1 : 1;
+    const lineLen = Math.max(1e-6, Math.abs(Number(dim.lineLen) || 0));
+    const p1 = { x: x1, y: y1 };
+    const p2 = { x: x2, y: y2 };
+    const p3 = { x: x2 + lineDir * lineLen, y: y2 };
+    const tx = Number.isFinite(Number(dim.tx)) ? Number(dim.tx) : ((p2.x + p3.x) * 0.5);
+    const ty = Number.isFinite(Number(dim.ty)) ? Number(dim.ty) : Number(y2) - Math.max(1e-6, Number(dim.textGap) || 0);
+    return {
+        p1,
+        p2,
+        p3,
+        lineDir,
+        lineLen,
+        tx,
+        ty,
+    };
+}
+
 /**
  * Returns geometry for a chain dimension.
  * Returns { segments, nx, ny, off } where each segment has the same structure as getDimGeometry().
@@ -354,6 +376,17 @@ export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
         if (!g) return null;
         const rp = { x: Number(g.cx) + Number(g.ux) * Number(g.r), y: Number(g.cy) + Number(g.uy) * Number(g.r) };
         if (Math.hypot(worldX - rp.x, worldY - rp.y) < tol) return "radius";
+        if (Math.hypot(worldX - Number(g.tx), worldY - Number(g.ty)) < tol) return 'text';
+    } else if (dim.type === 'dimleader') {
+        const g = getLeaderDimGeometry(dim);
+        if (!g) return null;
+        if (Math.hypot(worldX - g.p1.x, worldY - g.p1.y) < tol) return 'p1';
+        if (Math.hypot(worldX - g.p2.x, worldY - g.p2.y) < tol) return 'p2';
+        if (Math.hypot(worldX - g.p3.x, worldY - g.p3.y) < tol) return 'p3';
+        const allCtrl = { x: (Number(g.p1.x) + Number(g.p2.x) + Number(g.p3.x)) / 3, y: (Number(g.p1.y) + Number(g.p2.y) + Number(g.p3.y)) / 3 };
+        if (Math.hypot(worldX - allCtrl.x, worldY - allCtrl.y) < tol) return 'all';
+        if (distToSegment(worldX, worldY, g.p1.x, g.p1.y, g.p2.x, g.p2.y) < tol) return 'leader';
+        if (distToSegment(worldX, worldY, g.p2.x, g.p2.y, g.p3.x, g.p3.y) < tol) return 'line';
         if (Math.hypot(worldX - Number(g.tx), worldY - Number(g.ty)) < tol) return 'text';
     } else if (dim.type === 'circleDim') {
         const g = getCircleDimGeometry(dim, shapes);

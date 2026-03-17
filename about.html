@@ -4,86 +4,125 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>About | S-CAD</title>
-<meta name="description" content="S-CADについて。ブラウザで動作するシンプルな2D CADツールです。">
+<meta name="description" content="S-CAD&#x306B;&#x3064;&#x3044;&#x3066;&#x3002;&#x30D6;&#x30E9;&#x30A6;&#x30B6;&#x3067;&#x4F7F;&#x3048;&#x308B;&#x30B7;&#x30F3;&#x30D7;&#x30EB;&#x306A;2D CAD&#x30C4;&#x30FC;&#x30EB;&#x306E;&#x6982;&#x8981;&#x3092;&#x7D39;&#x4ECB;&#x3057;&#x307E;&#x3059;&#x3002;">
 <link rel="stylesheet" href="./site.css">
+<style>
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lang-switch a {
+  color: #777;
+  text-decoration: none;
+}
+
+.lang-switch a.active {
+  color: #fff;
+}
+
+.lang-switch .sep {
+  color: #555;
+}
+</style>
 </head>
 <body>
 
 <nav class="site-nav">
   <a class="nav-logo" href="./index.html"><span>S-</span>CAD</a>
   <ul class="nav-links">
-    <li><a href="./pricing.html">料金</a></li>
-    <li><a href="./tutorial.html">チュートリアル</a></li>
+    <li><a href="./tutorial.html">&#x30C1;&#x30E5;&#x30FC;&#x30C8;&#x30EA;&#x30A2;&#x30EB;</a></li>
     <li><a href="./about.html" class="active">About</a></li>
     <li><a href="./contact.html">Contact</a></li>
   </ul>
-  <a href="./cad.html" class="nav-cta">アプリを開く</a>
+  <div class="lang-switch" aria-label="Language switch">
+    <a href="./about.html" class="active" lang="ja" data-site-lang="ja">JP</a>
+    <span class="sep">/</span>
+    <a href="./about_en.html" lang="en" data-site-lang="en">EN</a>
+  </div>
+  <a href="./cad.html" class="nav-cta">&#x30A2;&#x30D7;&#x30EA;&#x3092;&#x958B;&#x304F;</a>
 </nav>
 
 <main>
   <div class="page-hero">
     <h1>About</h1>
-    <p class="sub">S-CADについて</p>
+    <p class="sub">S-CAD&#x306B;&#x3064;&#x3044;&#x3066;</p>
   </div>
 
   <div class="content">
-
     <div class="section">
-      <h2>S-CADとは</h2>
+      <h2>S-CAD&#x3068;&#x306F;</h2>
       <p>
-        S-CADは、ブラウザ上で動作するシンプルな2D CADツールです。
-        インストール不要で、PCやタブレットのWebブラウザからすぐに利用できます。
+        S-CAD&#x306F;&#x3001;&#x30D6;&#x30E9;&#x30A6;&#x30B6;&#x4E0A;&#x3067;&#x52D5;&#x4F5C;&#x3059;&#x308B;&#x30B7;&#x30F3;&#x30D7;&#x30EB;&#x306A;2D CAD&#x30C4;&#x30FC;&#x30EB;&#x3067;&#x3059;&#x3002;
+        &#x30A4;&#x30F3;&#x30B9;&#x30C8;&#x30FC;&#x30EB;&#x4E0D;&#x8981;&#x3067;&#x3001;PC &#x3084;&#x30BF;&#x30D6;&#x30EC;&#x30C3;&#x30C8;&#x306E; Web &#x30D6;&#x30E9;&#x30A6;&#x30B6;&#x304B;&#x3089;&#x3059;&#x3050;&#x306B;&#x4F7F;&#x3044;&#x59CB;&#x3081;&#x3089;&#x308C;&#x307E;&#x3059;&#x3002;
       </p>
       <p>
-        線・円・矩形などの基本図形の作成から、DXF・SVG形式でのエクスポートまで、
-        日常的な2D作図作業をシンプルな操作で行えることを目指して開発しています。
+        &#x7DDA;&#x3001;&#x5186;&#x3001;&#x56DB;&#x89D2;&#x5F62;&#x306A;&#x3069;&#x306E;&#x57FA;&#x672C;&#x4F5C;&#x56F3;&#x304B;&#x3089;&#x3001;
+        DXF &#x3084; SVG &#x306E;&#x5165;&#x51FA;&#x529B;&#x307E;&#x3067;&#x5BFE;&#x5FDC;&#x3057;&#x3066;&#x304A;&#x308A;&#x3001;
+        &#x65E5;&#x5E38;&#x7684;&#x306A;2D &#x88FD;&#x56F3;&#x4F5C;&#x696D;&#x3092;&#x8EFD;&#x5FEB;&#x306B;&#x9032;&#x3081;&#x3089;&#x308C;&#x308B;&#x3088;&#x3046;&#x306B;&#x8A2D;&#x8A08;&#x3057;&#x3066;&#x3044;&#x307E;&#x3059;&#x3002;
       </p>
     </div>
 
     <div class="section">
-      <h2>開発について</h2>
+      <h2>&#x30B5;&#x30FC;&#x30D3;&#x30B9;&#x60C5;&#x5831;</h2>
       <dl>
         <div class="card">
-          <dt>サービス名</dt>
-          <dd>S-CAD（エスキャド）</dd>
+          <dt>&#x30B5;&#x30FC;&#x30D3;&#x30B9;&#x540D;</dt>
+          <dd>S-CAD&#xFF08;S-CAD Easy&#xFF09;</dd>
         </div>
         <div class="card">
           <dt>URL</dt>
           <dd><a href="https://simplecad.work">simplecad.work</a></dd>
         </div>
         <div class="card">
-          <dt>対応環境</dt>
-          <dd>モダンブラウザ（Chrome / Firefox / Edge / Safari）</dd>
+          <dt>&#x5BFE;&#x5FDC;&#x30D6;&#x30E9;&#x30A6;&#x30B6;</dt>
+          <dd>&#x30E2;&#x30C0;&#x30F3;&#x30D6;&#x30E9;&#x30A6;&#x30B6;&#xFF08;Chrome / Firefox / Edge / Safari &#x306A;&#x3069;&#xFF09;</dd>
         </div>
         <div class="card">
-          <dt>対応ファイル形式</dt>
-          <dd>DXF・SVG（インポート・エクスポート）</dd>
+          <dt>&#x5BFE;&#x5FDC;&#x30D5;&#x30A1;&#x30A4;&#x30EB;&#x5F62;&#x5F0F;</dt>
+          <dd>DXF&#x30FB;SVG &#x306E;&#x30A4;&#x30F3;&#x30DD;&#x30FC;&#x30C8;&#x304A;&#x3088;&#x3073;&#x30A8;&#x30AF;&#x30B9;&#x30DD;&#x30FC;&#x30C8;</dd>
         </div>
         <div class="card">
-          <dt>利用料金</dt>
-          <dd>無料プランあり・Proプランあり（<a href="./pricing.html">料金ページ</a>）</dd>
+          <dt>&#x5229;&#x7528;&#x6599;&#x91D1;</dt>
+          <dd>&#x7121;&#x6599;&#x30D7;&#x30E9;&#x30F3;&#x3042;&#x308A;&#x30FB;Pro&#x6A5F;&#x80FD;&#x3042;&#x308A;</dd>
         </div>
       </dl>
     </div>
 
     <div class="section">
-      <h2>お問い合わせ</h2>
+      <h2>&#x304A;&#x554F;&#x3044;&#x5408;&#x308F;&#x305B;</h2>
       <p>
-        ご意見・ご要望・不具合のご報告は<a href="./contact.html">お問い合わせフォーム</a>よりお送りください。
+        &#x611F;&#x60F3;&#x3001;&#x4E0D;&#x5177;&#x5408;&#x5831;&#x544A;&#x3001;&#x3054;&#x8981;&#x671B;&#x306A;&#x3069;&#x306F;<a href="./contact.html">&#x304A;&#x554F;&#x3044;&#x5408;&#x308F;&#x305B;&#x30D5;&#x30A9;&#x30FC;&#x30E0;</a>&#x3088;&#x308A;&#x3054;&#x9023;&#x7D61;&#x304F;&#x3060;&#x3055;&#x3044;&#x3002;
       </p>
     </div>
-
   </div>
 </main>
 
 <footer class="site-footer">
   <span class="footer-copy">&copy; 2026 S-CAD</span>
   <nav class="footer-links">
-    <a href="./privacy.html">プライバシーポリシー</a>
-    <a href="./contact.html">お問い合わせ</a>
+    <a href="./privacy.html">&#x30D7;&#x30E9;&#x30A4;&#x30D0;&#x30B7;&#x30FC;&#x30DD;&#x30EA;&#x30B7;&#x30FC;</a>
+    <a href="./contact.html">&#x304A;&#x554F;&#x3044;&#x5408;&#x308F;&#x305B;</a>
     <a href="./about.html">About</a>
   </nav>
 </footer>
+
+<script>
+(function () {
+  var KEY = "scad-site-lang";
+  document.querySelectorAll("[data-site-lang]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      try { localStorage.setItem(KEY, String(el.getAttribute("data-site-lang") || "")); } catch (_) {}
+    });
+  });
+})();
+</script>
 
 </body>
 </html>

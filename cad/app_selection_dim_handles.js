@@ -7,6 +7,7 @@ import {
   getDimChainGeometry,
   getCircleDimGeometry,
   getDimAngleGeometry,
+  getLeaderDimGeometry,
   getLinearDimTextHandleWorld
 } from "./dim_geom.js";
 
@@ -21,7 +22,7 @@ export function hitTestDimHandle(state, worldRaw) {
   const selectedIds = new Set((state.selection.ids || []).map(Number));
   for (let i = state.shapes.length - 1; i >= 0; i--) {
     const s = state.shapes[i];
-    if (!s || (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "circleDim")) continue;
+    if (!s || (s.type !== "dim" && s.type !== "dimchain" && s.type !== "dimangle" && s.type !== "dimleader" && s.type !== "circleDim")) continue;
     if (!selectedIds.has(Number(s.id))) continue;
     if (!isLayerVisible(state, s.layerId)) continue;
     const part = hitTestDimPart(s, worldRaw.x, worldRaw.y, state.shapes, state.view.scale);
@@ -274,6 +275,39 @@ export function applyDimHandleDrag(state, worldRaw) {
     }
     else if (dd.part === "line" || dd.part === "place") { dim.px = pSnap.x; dim.py = pSnap.y; }
     else { dim.px = pSnap.x; dim.py = pSnap.y; }
+  } else if (dim.type === "dimleader") {
+    const g = getLeaderDimGeometry(dim);
+    if (g) {
+      if (dd.part === "text") {
+        dim.tx = Number(pSnap.x);
+        dim.ty = Number(pSnap.y);
+      } else if (dd.part === "p1") {
+        dim.x1 = Number(pSnap.x);
+        dim.y1 = Number(pSnap.y);
+      } else if (dd.part === "p2") {
+        dim.x2 = Number(pSnap.x);
+        dim.y2 = Number(pSnap.y);
+        dim.lineDir = (Number(dim.x2) - Number(dim.x1)) < 0 ? -1 : 1;
+      } else if (dd.part === "p3") {
+        const dx = Number(pSnap.x) - Number(dim.x2);
+        dim.lineDir = dx < 0 ? -1 : 1;
+        dim.lineLen = Math.max(1e-6, Math.abs(dx));
+      } else if (dd.part === "all" || dd.part === "leader" || dd.part === "line") {
+        const prev = dd.lastWorld || pSnap;
+        const dx = Number(pSnap.x) - Number(prev.x || 0);
+        const dy = Number(pSnap.y) - Number(prev.y || 0);
+        if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+          dim.x1 = Number(dim.x1) + dx;
+          dim.y1 = Number(dim.y1) + dy;
+          dim.x2 = Number(dim.x2) + dx;
+          dim.y2 = Number(dim.y2) + dy;
+          if (Number.isFinite(Number(dim.tx)) && Number.isFinite(Number(dim.ty))) {
+            dim.tx = Number(dim.tx) + dx;
+            dim.ty = Number(dim.ty) + dy;
+          }
+        }
+      }
+    }
   } else if (dim.type === "dimangle") {
     const g = getDimAngleGeometry(dim, state.shapes);
     if (g) {

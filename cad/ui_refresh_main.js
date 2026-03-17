@@ -14,7 +14,8 @@ import { refreshGroupListPanel } from "./ui_group_list_panel.js";
 import { refreshSelectionAndGroupPanels } from "./ui_refresh_selection_group.js";
 import { refreshLayerPanels } from "./ui_refresh_layers.js";
 import { isLeftMenuItemVisible, getViewportSizeForUi } from "./ui_left_menu_core.js";
-import { getPanelText } from "./ui_text.js";
+import { getPanelText, getStatusBarText } from "./ui_text.js";
+import { computeShapesBounds } from "./import_analysis.js";
 import {
   clampGridAutoTiming,
   gridAutoTimingFromThreshold50,
@@ -106,6 +107,7 @@ export function refreshUiMain(state, dom) {
   }
   if (dom.undoBtn) dom.undoBtn.disabled = !(state.history?.past?.length > 0);
   if (dom.redoBtn) dom.redoBtn.disabled = !(state.history?.future?.length > 0);
+  refreshViewerImportMetaUi(state, dom);
   refreshToolPanels(state, dom, panelLang, {
     getUiLanguage,
     normalizeGridPreset,
@@ -138,5 +140,83 @@ export function refreshUiMain(state, dom) {
     normalizeLineWidthPreset,
     normalizeLineTypePreset,
   });
+}
+
+function refreshViewerImportMetaUi(state, dom) {
+  const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
+  const hasShapes = Array.isArray(state.shapes) && state.shapes.length > 0;
+  const importMeta = state.importMeta && typeof state.importMeta === "object" ? state.importMeta : null;
+  const liveBounds = getViewerLiveBounds(state);
+  const t = getStatusBarText(state);
+  const showImportMeta = displayMode === "viewer" && hasShapes && !!importMeta;
+  if (dom.viewerImportMeta) dom.viewerImportMeta.style.display = showImportMeta ? "flex" : "none";
+  if (dom.viewerImportUnitLabel) dom.viewerImportUnitLabel.textContent = t.detectedUnit;
+  if (dom.viewerImportUnitValue) {
+    dom.viewerImportUnitValue.textContent = String(importMeta?.effectiveUnit || importMeta?.detectedUnit || "unitless");
+  }
+  if (dom.viewerImportBoundsLabel) dom.viewerImportBoundsLabel.textContent = t.bounds;
+  if (dom.viewerImportBoundsValue) {
+    dom.viewerImportBoundsValue.textContent = formatViewerBounds(liveBounds, importMeta?.effectiveUnit || importMeta?.detectedUnit || "unitless");
+  }
+  const suggested = Array.isArray(importMeta?.suggestedScales) ? importMeta.suggestedScales.slice(0, 3) : [];
+  const buttons = [dom.viewerImportScaleBtn1, dom.viewerImportScaleBtn2, dom.viewerImportScaleBtn3];
+  for (let i = 0; i < buttons.length; i += 1) {
+    const btn = buttons[i];
+    if (!btn) continue;
+    const scale = Number(suggested[i]);
+    if (showImportMeta && Number.isFinite(scale) && scale > 0) {
+      btn.style.display = "";
+      btn.textContent = `x${scale}`;
+      btn.dataset.scale = String(scale);
+    } else {
+      btn.style.display = "none";
+      btn.textContent = "";
+      btn.dataset.scale = "";
+    }
+  }
+  if (dom.viewerImportResetViewBtn) dom.viewerImportResetViewBtn.textContent = t.resetView;
+}
+
+function getViewerLiveBounds(state) {
+  const importAdjustIds = Array.isArray(state.ui?.importAdjust?.shapeIds)
+    ? state.ui.importAdjust.shapeIds.map(Number).filter(Number.isFinite)
+    : [];
+  if (importAdjustIds.length > 0) {
+    const importAdjustIdSet = new Set(importAdjustIds);
+    const importAdjustShapes = (state.shapes || []).filter((s) => importAdjustIdSet.has(Number(s?.id)));
+    const importAdjustBounds = computeShapesBounds(importAdjustShapes);
+    if (importAdjustBounds) return importAdjustBounds;
+  }
+  const selectedIds = new Set((state.selection?.ids || []).map(Number).filter(Number.isFinite));
+  if (selectedIds.size > 0) {
+    const selectedShapes = (state.shapes || []).filter((s) => selectedIds.has(Number(s?.id)));
+    const selectedBounds = computeShapesBounds(selectedShapes);
+    if (selectedBounds) return selectedBounds;
+  }
+  const activeGroupId = Number(state.activeGroupId);
+  if (Number.isFinite(activeGroupId)) {
+    const groupShapes = (state.shapes || []).filter((s) => Number(s?.groupId) === activeGroupId);
+    const groupBounds = computeShapesBounds(groupShapes);
+    if (groupBounds) return groupBounds;
+  }
+  return computeShapesBounds(state.shapes || []);
+}
+
+function formatViewerBounds(bounds, unit) {
+  const width = Math.abs(Number(bounds?.maxX) - Number(bounds?.minX));
+  const height = Math.abs(Number(bounds?.maxY) - Number(bounds?.minY));
+  if (!(Number.isFinite(width) && Number.isFinite(height))) return "-";
+  const suffix = String(unit || "unitless").trim();
+  return `${formatViewerNumber(width)} x ${formatViewerNumber(height)} ${suffix}`.trim();
+}
+
+function formatViewerNumber(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "-";
+  const abs = Math.abs(n);
+  if (abs >= 1000) return Math.round(n).toLocaleString("en-US");
+  if (abs >= 10) return (Math.round(n * 10) / 10).toString();
+  if (abs >= 1) return (Math.round(n * 100) / 100).toString();
+  return (Math.round(n * 1000) / 1000).toString();
 }
 

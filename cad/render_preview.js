@@ -4,6 +4,7 @@ export function createRenderPreviewOps(config) {
     drawShape,
     drawDimensionCommon,
     getCircleDimGeometry,
+    getLeaderDimGeometry,
     getSpecialDimGeometry,
     getDimChainGeometry,
     getDimGeometry,
@@ -299,6 +300,29 @@ export function createRenderPreviewOps(config) {
         const hx = Number(state.input?.hoverWorld?.x);
         const hy = Number(state.input?.hoverWorld?.y);
         if (Number.isFinite(hx) && Number.isFinite(hy)) drawPurpleCandidate(hx, hy);
+      }
+    } else if (d.type === "dimleader" && d.p1) {
+      const p1s = worldToScreen(state.view, d.p1);
+      ctx.beginPath();
+      ctx.arc(p1s.x, p1s.y, 3, 0, Math.PI * 2);
+      ctx.stroke();
+      const target = d.p2 || d.hover || state.input?.hoverWorld;
+      if (target && Number.isFinite(Number(target.x)) && Number.isFinite(Number(target.y))) {
+        const lineDir = ((Number(target.x) - Number(d.p1.x)) >= 0) ? 1 : -1;
+        const lineLen = Math.max(1, Number(d.lineLen) || 24 / Math.max(1e-9, state.view.scale));
+        const textGap = Math.max(1, Number(d.textGap) || 12 / Math.max(1e-9, state.view.scale));
+        const geom = getLeaderDimGeometry({
+          type: "dimleader",
+          x1: Number(d.p1.x),
+          y1: Number(d.p1.y),
+          x2: Number(target.x),
+          y2: Number(target.y),
+          lineDir,
+          lineLen,
+          tx: Number(target.x) + lineDir * lineLen * 0.5,
+          ty: Number(target.y) - textGap,
+        });
+        if (geom) drawDimensionCommon(ctx, state, { type: "dimleader", leaderText: String(state.dimSettings?.labelText || "NOTE") }, geom, false, false);
       }
     } else if (d.points && d.points.length >= 1) {
       const lastPoint = d.points[d.points.length - 1];

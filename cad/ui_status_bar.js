@@ -56,7 +56,7 @@ export function refreshStatusBar(state, dom) {
   if (displayMode === "viewer" && objects === 0) {
     dom.statusText.textContent = t.viewerEmpty;
   } else {
-    dom.statusText.textContent = `${toolText} | ${t.fps}: ${fps.toFixed(1)} | ${t.objects}: ${objects} | ${t.zoom}: ${(zoomScale * 100).toFixed(0)}% | ${t.grid} = ${gridModelText} ${unitLabel}`;
+    dom.statusText.textContent = `${toolText} | ${t.fps}: ${fps.toFixed(1)} | ${t.objects}: ${objects}`;
   }
 
   if (dom.gridScaleIndicator && dom.gridScaleBar && dom.gridScaleText) {
@@ -64,15 +64,16 @@ export function refreshStatusBar(state, dom) {
     const unitMm = (unit === "cm") ? 10 : (unit === "m") ? 1000 : ((unit === "inch" || unit === "in") ? 25.4 : (unit === "ft" ? 304.8 : 1));
     const pageScale = Math.max(0.0001, Number(state.pageSetup?.scale ?? 1) || 1);
     const gridModelUnit = effGrid;
+    const gridModelMm = Number.isFinite(gridModelUnit) ? (gridModelUnit * unitMm) : NaN;
     const gridPaperMm = (effGrid * unitMm) / pageScale;
     const gridPx = effGrid * zoomScale;
     const viewportW = Math.max(1, Number(state.view?.viewportWidth) || 1);
     const maxBarPx = Math.max(120, Math.min(900, viewportW * 0.45));
     const barPx = Math.max(1, Math.min(maxBarPx, Number.isFinite(gridPx) ? gridPx : 1));
-    dom.gridScaleIndicator.style.display = "none";
+    dom.gridScaleIndicator.style.display = "block";
     dom.gridScaleBar.style.width = `${barPx.toFixed(1)}px`;
-    const unitLabel = (unit === "in") ? "inch" : unit;
-    const modelTxt = Number.isFinite(gridModelUnit) ? Number(gridModelUnit.toFixed(3)).toString() : "-";
-    dom.gridScaleText.textContent = `${t.grid} = ${modelTxt} ${unitLabel}`;
+    const modelTxt = Number.isFinite(gridModelMm) ? Number(gridModelMm.toFixed(3)).toString() : "-";
+    const paperTxt = Number.isFinite(gridPaperMm) ? Number(gridPaperMm.toFixed(3)).toString() : "-";
+    dom.gridScaleText.textContent = `${t.grid} = ${modelTxt}mm / ${paperTxt}mm`;
   }
 }

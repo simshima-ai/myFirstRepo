@@ -1,7 +1,9 @@
 import { getEffectiveGridSize } from "./geom.js";
 
 export function drawGrid(ctx, canvas, state) {
-  if (!state.grid.show) return;
+  const forceViewerGrid = String(state?.ui?.displayMode || "").toLowerCase() === "viewer"
+    && (!Array.isArray(state?.shapes) || state.shapes.length === 0);
+  if (!state.grid.show && !forceViewerGrid) return;
   const step = getEffectiveGridSize(state.grid, state.view, state.pageSetup);
   const viewW = Math.max(1, Number(state.view?.viewportWidth) || Number(canvas?.clientWidth) || Number(canvas?.width) || 1);
   const viewH = Math.max(1, Number(state.view?.viewportHeight) || Number(canvas?.clientHeight) || Number(canvas?.height) || 1);

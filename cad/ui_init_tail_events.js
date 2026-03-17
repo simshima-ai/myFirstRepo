@@ -169,6 +169,30 @@ export function bindInitTailEvents(params) {
       actions.updateSelectedTextSettings?.({ textItalic: !!e.target.checked });
     });
   }
+  if (dom.selectionLeaderArrowTypeSelect) {
+    dom.selectionLeaderArrowTypeSelect.addEventListener("change", (e) => {
+      const raw = String(e.target.value || "open").toLowerCase();
+      const v = (raw === "closed" || raw === "hollow" || raw === "circle" || raw === "circle_filled") ? raw : "open";
+      actions.applyDimSettingsToSelection?.({ dimArrowType: v });
+    });
+  }
+  if (dom.selectionLeaderArrowSizeInput) {
+    dom.selectionLeaderArrowSizeInput.addEventListener("change", (e) => {
+      const v = Math.max(1, Number(e.target.value) || 10);
+      e.target.value = String(v);
+      actions.applyDimSettingsToSelection?.({ dimArrowSizePt: v });
+    });
+  }
+  if (dom.selectionLeaderLineWidthInput) {
+    dom.selectionLeaderLineWidthInput.addEventListener("change", (e) => {
+      const v = Math.max(0.01, Number(e.target.value) || 0.25);
+      e.target.value = String(v);
+      actions.applyDimSettingsToSelection?.({ lineWidthMm: v });
+    });
+  }
+  bindColorInputPalette(dom.selectionLeaderColorInput, (c) => {
+    actions.applyDimSettingsToSelection?.({ color: c });
+  });
   bindToolParameterEvents({
     state,
     dom,

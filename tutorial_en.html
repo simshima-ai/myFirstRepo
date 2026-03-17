@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tutorial | S-CAD</title>
+<meta name="description" content="Learn the basics of S-CAD with a quick English tutorial covering navigation, drawing, editing, and export.">
+<link rel="stylesheet" href="./site.css">
+<style>
+.lang-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  margin-right: 12px;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.lang-switch a {
+  color: #777;
+  text-decoration: none;
+}
+
+.lang-switch a.active {
+  color: #fff;
+}
+
+.lang-switch .sep {
+  color: #555;
+}
+</style>
+</head>
+<body>
+
+<nav class="site-nav">
+  <a class="nav-logo" href="./index.html"><span>S-</span>CAD</a>
+  <ul class="nav-links">
+    <li><a href="./tutorial_en.html" class="active">Tutorial</a></li>
+    <li><a href="./about_en.html">About</a></li>
+    <li><a href="./contact_en.html">Contact</a></li>
+  </ul>
+  <div class="lang-switch" aria-label="Language switch">
+    <a href="./tutorial.html" lang="ja" data-site-lang="ja">JP</a>
+    <span class="sep">/</span>
+    <a href="./tutorial_en.html" class="active" lang="en" data-site-lang="en">EN</a>
+  </div>
+  <a href="./cad.html" class="nav-cta">Open App</a>
+</nav>
+
+<main>
+  <div class="page-hero">
+    <h1>Tutorial</h1>
+    <p class="sub">A quick guide to the basic workflow of S-CAD.</p>
+  </div>
+
+  <div class="content">
+    <div class="section">
+      <h2>Getting Started</h2>
+      <p>
+        S-CAD is a browser-based 2D CAD tool. You can start drawing immediately without installing software or creating an account.
+        Once the canvas opens, begin by setting your units, scale, and paper size in the settings panel.
+      </p>
+      <p>
+        The main flow is simple: set up the page, draw the base geometry, edit or group objects as needed, then export the result as JSON, SVG, PDF, or DXF.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>1. Navigate the Canvas</h2>
+      <p>
+        Use the mouse wheel to zoom in and out. Pan with the middle mouse button, or drag while holding <code>Alt</code>.
+        Switching smoothly between zoom and pan is the fastest way to work on both overall layout and detail areas.
+      </p>
+
+      <h3>Main Shortcuts</h3>
+      <table class="keytable">
+        <thead>
+          <tr><th>Key</th><th>Action</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Space + Drag</td><td>Pan the view</td></tr>
+          <tr><td>Mouse Wheel</td><td>Zoom in / out</td></tr>
+          <tr><td>Ctrl + Z</td><td>Undo</td></tr>
+          <tr><td>Ctrl + Y</td><td>Redo</td></tr>
+          <tr><td>Delete / Backspace</td><td>Delete selected objects</td></tr>
+          <tr><td>Escape</td><td>Cancel the current tool</td></tr>
+          <tr><td>Ctrl + A</td><td>Select all</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>2. Draw Basic Geometry</h2>
+      <p>
+        Start with simple tools such as line, circle, rectangle, arc, polyline, and text.
+        These are enough to build most sketches and construction geometry before refinement.
+      </p>
+
+      <h3>Common Drawing Tools</h3>
+      <table class="keytable">
+        <thead>
+          <tr><th>Tool</th><th>Description</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Line</td><td>Create a straight segment between two points</td></tr>
+          <tr><td>Circle</td><td>Create a circle from center and radius</td></tr>
+          <tr><td>Rect</td><td>Create a rectangle from two corner points</td></tr>
+          <tr><td>Polyline</td><td>Create connected line segments</td></tr>
+          <tr><td>Arc</td><td>Create an arc</td></tr>
+          <tr><td>Text</td><td>Place annotation text</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="section">
+      <h2>3. Select and Edit</h2>
+      <p>
+        Click to select objects. Hold <code>Shift</code> while clicking to add more items.
+        Many edits are faster after rough drawing, so do not worry about perfect geometry at the first pass.
+      </p>
+      <p>
+        Use trim, fillet, move, rotate, and pattern copy to refine the drawing. You can also reorganize objects into groups for easier management.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>4. Save and Export</h2>
+      <p>
+        Save your work in JSON when you want to reopen and continue editing later.
+        Export SVG or PDF for output, and DXF when you need to exchange data with other CAD software.
+      </p>
+    </div>
+
+    <div class="section">
+      <h2>Next Step</h2>
+      <p>
+        If you want a fuller reference, continue to the user manual. When you are ready, open the app and start drawing.
+      </p>
+      <p style="margin-top:24px;">
+        <a href="./cad.html" class="nav-cta" style="display:inline-block;padding:12px 28px;">Open App</a>
+      </p>
+      <p style="margin-top:20px;">
+        Need help or want to report a problem? Use the <a href="./contact_en.html">contact form</a>.
+      </p>
+    </div>
+  </div>
+</main>
+
+<footer class="site-footer">
+  <span class="footer-copy">&copy; 2026 S-CAD</span>
+  <nav class="footer-links">
+    <a href="./privacy_en.html">Privacy Policy</a>
+    <a href="./contact_en.html">Contact</a>
+    <a href="./about_en.html">About</a>
+  </nav>
+</footer>
+
+<script>
+(function () {
+  var KEY = "scad-site-lang";
+  document.querySelectorAll("[data-site-lang]").forEach(function (el) {
+    el.addEventListener("click", function () {
+      try { localStorage.setItem(KEY, String(el.getAttribute("data-site-lang") || "")); } catch (_) {}
+    });
+  });
+})();
+</script>
+
+</body>
+</html>

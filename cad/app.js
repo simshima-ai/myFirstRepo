@@ -43,6 +43,7 @@ import {
 import {
   setupInputListeners, panByScreenDelta, zoomAt
 } from "./app_input.js";
+import { consumeModeTransferSnapshot, saveModeTransferSnapshot as saveModeTransferSnapshotRaw } from "./mode_transfer.js";
 import { getEffectiveGridSize } from "./geom.js";
 import {
   clearDoubleLineTrimPendingState,
@@ -352,6 +353,9 @@ function resizeCanvas() {
 function resetView() {
   viewRuntime.resetView();
 }
+function animateResetView(options = null) {
+  viewRuntime.animateResetView(options || {});
+}
 
 function getPrimarySelectedShape() {
   const sel = new Set((state.selection?.ids || []).map(Number));
@@ -493,7 +497,7 @@ function getShapeDisplayColorHex(shape) {
   const t = String(shape.type || "");
   if (t === "text") return norm(shape.textColor) || norm(shape.color);
   if (t === "hatch") return norm(shape.lineColor) || norm(shape.color);
-  if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circleDim") {
+  if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "dimleader" || t === "circleDim") {
     return norm(shape.color) || norm(shape.lineColor);
   }
   return norm(shape.color) || norm(shape.lineColor) || norm(shape.textColor);
@@ -550,6 +554,7 @@ const uiPrefsOps = createUiPrefsOps({
   scheduleSaveAppSettings,
   refreshAutoBackupTimer,
   saveAutoBackup,
+  saveModeTransferSnapshot: () => saveModeTransferSnapshotRaw(exportJsonObject, state, helpers),
   sanitizeToolShortcuts,
   normalizeShortcutKey,
   toolOrder: TOOL_SHORTCUT_TOOL_ORDER,
@@ -613,7 +618,7 @@ const historyViewOps = createHistoryViewOps({
   stateUndo,
   stateRedo,
   setToolState: setTool,
-  resetView,
+  resetView: animateResetView,
   setStatus,
   draw,
   getResetViewFlashTimer: () => resetViewFlashTimer,
@@ -687,6 +692,7 @@ const helpers = {
   },
   deleteSelectedVertices: () => deleteSelectedPolylineVertices(state, helpers),
   resetView: () => historyViewOps.resetViewAction(),
+  animateResetView,
   refitViewToPage: () => historyViewOps.refitViewToPageAction(),
   loadJson: () => documentOps.loadJson(),
   newFile: () => documentOps.newFile(),
@@ -697,6 +703,7 @@ const helpers = {
   setImportAdjustParam: (patch) => fileOps.setImportAdjustParam(patch),
   applyImportAdjust: () => fileOps.applyImportAdjust(),
   cancelImportAdjust: () => fileOps.cancelImportAdjust(),
+  applySuggestedImportScale: (scale) => fileOps.applySuggestedImportScale(scale),
   setTraceParams: (patch) => {
     fileOps.setTraceParam(patch);
     scheduleSaveAppSettings();
@@ -704,6 +711,7 @@ const helpers = {
   },
   saveJson: () => saveJsonToFile(state, helpers),
   saveJsonAs: () => saveJsonAsToFile(state, helpers),
+  saveModeTransferSnapshot: () => saveModeTransferSnapshotRaw(exportJsonObject, state, helpers),
   pdf: () => exportPdf(state, helpers),
   svg: () => exportSvg(state, helpers),
   dxf: () => exportDxf(state, helpers),
@@ -1221,8 +1229,9 @@ async function initApp() {
   setupInputListeners(state, dom, helpers);
 
   ensureUngroupedShapesHaveGroups(state);
-  const autoBackupPrompt = (urlDisplayMode === "viewer") ? "" : getAutoBackupStartupPromptMessage();
-  const autoRestoreWithoutPrompt = (urlDisplayMode === "cad" || urlDisplayMode === "easy");
+  const effectiveDisplayMode = String(state.ui?.displayMode || urlDisplayMode || "cad").toLowerCase();
+  const autoBackupPrompt = (effectiveDisplayMode === "viewer") ? "" : getAutoBackupStartupPromptMessage();
+  const autoRestoreWithoutPrompt = (effectiveDisplayMode === "cad" || effectiveDisplayMode === "easy");
   const shouldRestoreAutoBackup = autoRestoreWithoutPrompt
     ? !!autoBackupPrompt
     : (!!autoBackupPrompt && (
@@ -1231,9 +1240,15 @@ async function initApp() {
         || window.confirm(autoBackupPrompt)
       ));
   const restoredFromAutoBackup = shouldRestoreAutoBackup ? restoreAutoBackupAtStartup() : false;
+  const restoredFromModeTransfer = restoredFromAutoBackup
+    ? false
+    : consumeModeTransferSnapshot(importJsonObject, state, helpers);
   if (urlDisplayMode) applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode));
+  if (!restoredFromAutoBackup && !restoredFromModeTransfer) {
+    resetViewerImportDefaultsIfEmpty();
+  }
   resizeCanvas();
-  if (!restoredFromAutoBackup) resetView();
+  if (!restoredFromAutoBackup && !restoredFromModeTransfer) resetView();
   if (!state.ui) state.ui = {};
   state.ui._needsTangentResolve = true;
   draw();
@@ -1258,6 +1273,27 @@ async function initApp() {
   fileOps.bindDropImport();
 }
 
+function resetViewerImportDefaultsIfEmpty() {
+  const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
+  if (displayMode !== "viewer") return false;
+  if ((state.shapes || []).length > 0) return false;
+  const fresh = createState();
+  state.pageSetup = {
+    ...state.pageSetup,
+    ...fresh.pageSetup,
+    unit: "mm",
+    scale: 1,
+    presetScale: 1,
+    customScaleEnabled: false,
+    customScale: 1,
+  };
+  state.lineWidthMm = Math.max(0.01, Number(fresh.lineWidthMm ?? 0.25) || 0.25);
+  state.importMeta = null;
+  if (!state.ui) state.ui = {};
+  state.ui.importSourceUnit = "auto";
+  return true;
+}
+
 void initApp();
 
 // Handle exports for manual access if needed
@@ -1275,7 +1311,8 @@ window.cadApp = {
   togglePanelVisible: (panel) => helpers.togglePanelVisible(panel),
   setPanelVisibility: (patch) => helpers.setPanelVisibility(patch),
   setDisplayMode: (mode) => helpers.setDisplayMode(mode),
-  importDroppedFiles: (files) => fileOps.importDroppedFiles(files),
+  importDroppedFiles: (files, options = null) => fileOps.importDroppedFiles(files, options),
+  saveModeTransferSnapshot: () => saveModeTransferSnapshotRaw(exportJsonObject, state, helpers),
 };
 
 

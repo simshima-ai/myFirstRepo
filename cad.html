@@ -375,6 +375,39 @@
       align-items: flex-end;
     }
 
+    .viewer-empty-state {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 90;
+      display: none;
+      width: min(520px, calc(100% - 32px));
+      padding: 18px 22px;
+      border: 1px solid rgba(148, 163, 184, 0.35);
+      border-radius: 18px;
+      background: rgba(255, 255, 255, 0.88);
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
+      backdrop-filter: blur(8px);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .viewer-empty-state-title {
+      font-size: 18px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: 0.02em;
+    }
+
+    .viewer-empty-state-text {
+      margin-top: 8px;
+      font-size: 13px;
+      line-height: 1.5;
+      color: #475569;
+      white-space: pre-line;
+    }
+
     .badge,
     .status {
       border: 1px solid var(--line);
@@ -400,10 +433,10 @@
       left: 50%;
       transform: translateX(-50%);
       z-index: 100;
-      pointer-events: none;
+      pointer-events: auto;
       display: flex;
-      flex-direction: column;
-      gap: 4px;
+      flex-direction: row;
+      gap: 8px;
       align-items: center;
     }
 
@@ -498,10 +531,11 @@
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.9);
       border-radius: 8px;
-      padding: 5px 7px 6px;
+      padding: 4px 8px;
       color: var(--muted);
       font-size: 11px;
       min-width: 180px;
+      pointer-events: none;
     }
 
     .grid-auto-debug {
@@ -588,6 +622,56 @@
       right: 0;
     }
 
+    .viewer-import-meta {
+      display: none;
+      flex-direction: column;
+      gap: 6px;
+      min-width: 180px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.92);
+      color: #334155;
+      box-shadow: var(--shadow-soft);
+      pointer-events: auto;
+    }
+
+    .viewer-import-meta-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+    }
+
+    .viewer-import-meta-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+
+    .viewer-import-meta-value {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .viewer-import-scale-buttons {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+
+    .viewer-import-scale-buttons button {
+      min-width: 52px;
+      min-height: 24px;
+      padding: 4px 8px;
+      font-size: 11px;
+      font-weight: 700;
+      pointer-events: auto;
+    }
+
     .top-context {
       position: absolute;
       top: 10px;
@@ -642,11 +726,62 @@
       gap: 4px 8px !important;
     }
 
-    /* Keep text edit block readable as a vertical form */
+    /* Keep text edit block compact but readable */
     #selectionTextEdit {
-      flex-direction: column !important;
-      align-items: stretch !important;
-      gap: 6px !important;
+      display: grid !important;
+      grid-template-columns: minmax(220px, 1.3fr) minmax(220px, 1fr);
+      align-items: start !important;
+      gap: 8px 12px !important;
+    }
+
+    #selectionTextEdit .section-title {
+      grid-column: 1 / -1;
+      margin-bottom: 0;
+    }
+
+    #selectionTextContentInput {
+      grid-column: 1 / -1;
+    }
+
+    #selectionTextEdit .selection-text-core {
+      display: grid;
+      grid-template-columns: auto minmax(72px, 1fr) auto minmax(72px, 1fr) auto auto auto;
+      gap: 6px;
+      align-items: center;
+    }
+
+    #selectionTextEdit .selection-text-style {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px 12px;
+      flex-wrap: wrap;
+    }
+
+    #selectionLeaderStyleEdit .leader-style-grid {
+      display: grid;
+      grid-template-columns: auto minmax(86px, 1fr) auto minmax(64px, 1fr) auto minmax(64px, 1fr) auto auto;
+      gap: 6px;
+      align-items: center;
+      justify-content: start;
+      justify-items: start;
+    }
+
+    #selectionLeaderStyleEdit {
+      grid-column: 1 / -1;
+      justify-self: start;
+      width: 100%;
+    }
+
+    @media (max-width: 980px) {
+      #selectionTextEdit {
+        grid-template-columns: 1fr;
+      }
+
+      #selectionTextEdit .selection-text-core,
+      #selectionLeaderStyleEdit .leader-style-grid {
+        grid-template-columns: auto 1fr;
+      }
     }
 
     .top-context .section-title {
@@ -1841,7 +1976,7 @@
           </div>
           <div class="section" data-context="group" style="font-size:12px;">
             <div class="section-title" id="groupCtxTitle">Groups</div>
-            <div id="groupCtxObjectOps" style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
+            <div id="groupCtxObjectOps" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, max-content)); gap:8px 12px; align-items:start; font-size:12px;">
               <div id="mergeGroupsRow" style="display:none; flex-wrap:wrap; gap:6px; align-items:center;">
                 <button id="mergeGroupsBtn" type="button">Group Selected Shapes</button>
               </div>
@@ -1919,12 +2054,15 @@
                 </label>
               </div>
               <div id="selectionTextEdit"
-                style="display:none; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:6px;">
+                style="display:none; border-top:1px solid var(--line); padding-top:6px;">
                 <span class="section-title">Edit Selected Text</span>
                 <input id="selectionTextContentInput" type="text" placeholder="Enter text" style="width:100%;">
-                <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
+                <div class="selection-text-core">
                   <span>Text Size (pt)</span><input id="selectionTextSizePtInput" type="number" min="1" step="1">
                   <span>Rotate</span><input id="selectionTextRotateInput" type="number" step="1">
+                  <label>Bold <input id="selectionTextBoldInput" type="checkbox"></label>
+                  <label>Italic <input id="selectionTextItalicInput" type="checkbox"></label>
+                  <input id="selectionTextColorInput" type="color">
                 </div>
                 <select id="selectionTextFontFamilyInput">
                   <option value="Yu Gothic UI">Yu Gothic UI</option>
@@ -1932,12 +2070,25 @@
                   <option value="Arial">Arial</option>
                   <option value="sans-serif">sans-serif</option>
                 </select>
-                <div style="display:flex; gap:10px; align-items:center; justify-content:space-between;">
-                  <div style="display:flex; gap:10px;">
-                    <label>Bold <input id="selectionTextBoldInput" type="checkbox"></label>
-                    <label>Italic <input id="selectionTextItalicInput" type="checkbox"></label>
+                <div id="selectionLeaderStyleEdit"
+                  style="display:none; flex-direction:column; gap:6px; border-top:1px dashed var(--line); padding-top:6px;">
+                  <span class="section-title">Leader Style</span>
+                  <div class="leader-style-grid">
+                    <span>Arrow Shape</span>
+                    <select id="selectionLeaderArrowTypeSelect">
+                      <option value="open">Open</option>
+                      <option value="closed">Closed</option>
+                      <option value="hollow">Hollow</option>
+                      <option value="circle">Circle</option>
+                      <option value="circle_filled">Filled Circle</option>
+                    </select>
+                    <span>Arrow Size</span>
+                    <input id="selectionLeaderArrowSizeInput" type="number" min="1" step="0.5">
+                    <span>Line Width (mm)</span>
+                    <input id="selectionLeaderLineWidthInput" type="number" min="0.1" step="0.05">
+                    <span>Line Color</span>
+                    <input id="selectionLeaderColorInput" type="color">
                   </div>
-                  <input id="selectionTextColorInput" type="color">
                 </div>
               </div>
             </div>
@@ -2154,6 +2305,7 @@
                   <select id="dimLinearMode" style="width:70px; font-size:12px; padding:2px;">
                     <option value="single" selected>Single</option>
                     <option value="chain">Chain</option>
+                    <option value="leader">Leader</option>
                     <option value="angle">Angle</option>
                   </select>
                 </label>
@@ -2203,6 +2355,10 @@
               <label style="display:inline-flex; align-items:center; gap:4px;">Text Size (pt)
                 <input id="dimFontSizeInput" type="number" value="12" step="0.5" min="1"
                   style="width:52px; font-size:12px; padding:2px;">
+              </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">Label
+                <input id="dimLabelTextInput" type="text" value="NOTE"
+                  style="width:110px; font-size:12px; padding:2px;">
               </label>
               <label style="display:inline-flex; align-items:center; gap:4px;">Text Rotate
                 <select id="dimTextRotateInput" style="width:60px; font-size:12px; padding:2px;">
@@ -2580,7 +2736,7 @@
                     <button id="resetToolShortcutsBtn" type="button">Reset to Defaults</button>
                   </div>
                 </div>
-                <label class="settings-item">Max Zoom
+                <label class="settings-item" style="display:none;">Max Zoom
                   <select id="maxZoomInput">
                     <option value="1">100%</option>
                     <option value="10">1000%</option>
@@ -2700,8 +2856,32 @@
         <div id="objectCountBadge" class="badge" style="display:none;"></div>
         <div id="autoBackupBadge" class="badge" style="display:none; opacity:0.85;"></div>
       </div>
+      <div id="viewerEmptyState" class="viewer-empty-state" aria-live="polite">
+        <div id="viewerEmptyStateTitle" class="viewer-empty-state-title"></div>
+        <div id="viewerEmptyStateText" class="viewer-empty-state-text"></div>
+      </div>
       <div class="bottom-left-overlay">
         <div id="statusText" class="status"></div>
+        <div id="viewerImportMeta" class="viewer-import-meta">
+          <div class="viewer-import-meta-row">
+            <span id="viewerImportUnitLabel" class="viewer-import-meta-label">Detected unit</span>
+            <span id="viewerImportUnitValue" class="viewer-import-meta-value">unitless</span>
+          </div>
+          <div class="viewer-import-meta-row">
+            <span id="viewerImportBoundsLabel" class="viewer-import-meta-label">Bounds</span>
+            <span id="viewerImportBoundsValue" class="viewer-import-meta-value">-</span>
+          </div>
+          <div class="viewer-import-scale-buttons">
+            <button id="viewerImportScaleBtn1" type="button" style="display:none;">x1</button>
+            <button id="viewerImportScaleBtn2" type="button" style="display:none;">x10</button>
+            <button id="viewerImportScaleBtn3" type="button" style="display:none;">x0.1</button>
+            <button id="viewerImportResetViewBtn" type="button">Reset View</button>
+          </div>
+        </div>
+        <div id="gridScaleIndicator" class="grid-scale-indicator">
+          <div class="grid-scale-bar-wrap"><div id="gridScaleBar" class="grid-scale-bar"></div></div>
+          <div id="gridScaleText">1 grid = - mm</div>
+        </div>
       </div>
       <div id="touchConfirmOverlay" class="touch-confirm-overlay">
         <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">Confirm</button>
@@ -2714,10 +2894,6 @@
         <button id="touchSelectBackBtn" class="touch-select-back-btn" type="button">Back to Select</button>
       </div>
       <div class="bottom-scale-overlay">
-        <div id="gridScaleIndicator" class="grid-scale-indicator">
-          <div class="grid-scale-bar-wrap"><div id="gridScaleBar" class="grid-scale-bar"></div></div>
-          <div id="gridScaleText">1 grid = - mm</div>
-        </div>
         <div id="gridAutoDebugText" class="grid-auto-debug" style="display:none;">auto-grid debug</div>
       </div>
       <div id="debugConsolePanel" class="debug-console" style="display:none;">

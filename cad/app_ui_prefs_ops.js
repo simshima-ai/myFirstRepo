@@ -13,6 +13,7 @@ export function createUiPrefsOps(config) {
     scheduleSaveAppSettings,
     refreshAutoBackupTimer,
     saveAutoBackup,
+    saveModeTransferSnapshot,
     sanitizeToolShortcuts,
     normalizeShortcutKey,
     toolOrder,
@@ -132,7 +133,22 @@ export function createUiPrefsOps(config) {
   }
 
   function setDisplayMode(mode) {
-    const preset = applyDisplayModePreset(state, normalizeDisplayMode(mode));
+    const nextMode = normalizeDisplayMode(mode);
+    const currentMode = normalizeDisplayMode(state.ui?.displayMode || "cad");
+    if (nextMode === "viewer" && currentMode !== "viewer") {
+      try {
+        saveModeTransferSnapshot?.();
+        const url = new URL(window.location.href);
+        url.searchParams.set("mode", "viewer");
+        window.location.href = url.toString();
+        return "viewer";
+      } catch (_) {
+        saveModeTransferSnapshot?.();
+        window.location.href = "./cad.html?mode=viewer";
+        return "viewer";
+      }
+    }
+    const preset = applyDisplayModePreset(state, nextMode);
     syncDisplayModeUrl(preset?.mode || "cad");
     refreshAutoBackupTimer();
     scheduleSaveAppSettings();

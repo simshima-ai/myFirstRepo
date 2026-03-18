@@ -14,6 +14,13 @@
         findShortcutAction
     } = deps;
     const isEnterKey = (e) => e?.key === "Enter" || e?.code === "Enter" || Number(e?.keyCode) === 13;
+    const isDeleteKey = (e) =>
+        e?.key === "Delete" ||
+        e?.key === "Backspace" ||
+        e?.code === "Delete" ||
+        e?.code === "Backspace" ||
+        Number(e?.keyCode) === 46 ||
+        Number(e?.keyCode) === 8;
     const isTouchDebugEnabled = (() => {
         try {
             if (new URLSearchParams(window.location.search).has("debugTouch")) return true;
@@ -133,12 +140,14 @@
             e.preventDefault();
             return;
         }
-        if (e.key === "Delete") {
+        if (isDeleteKey(e) && !isTypingTarget(e.target)) {
             if (state.tool === "vertex") {
                 if (helpers.deleteSelectedVertices) helpers.deleteSelectedVertices();
             } else {
                 if (helpers.delete) helpers.delete();
             }
+            e.preventDefault();
+            return;
         }
         if (isEnterKey(e)) {
             const d = state.polylineDraft;

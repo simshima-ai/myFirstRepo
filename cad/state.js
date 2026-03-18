@@ -37,7 +37,7 @@ export const DEFAULT_TOOL_SHORTCUTS = Object.freeze({
 export function normalizeShortcutKey(v) {
   if (v == null) return "";
   const key = String(v).trim().toUpperCase();
-  if (key === "DELETE" || key === "DEL") return "DEL";
+  if (key === "DELETE" || key === "DEL" || key === "BACKSPACE") return "DEL";
   if (key === "\\") return "\\";
   return /^[A-Z0-9]$/.test(key) ? key : "";
 }

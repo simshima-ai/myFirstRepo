@@ -1,4 +1,5 @@
 import { getPatternCopyText } from "./ui_text.js";
+import { getSelectionUiRules } from "./ui_selection_rules.js";
 export function refreshToolPanels(state, dom, panelLang, helpers) {
   const patternCopyText = getPatternCopyText(panelLang);
   const {
@@ -285,35 +286,51 @@ export function refreshToolPanels(state, dom, panelLang, helpers) {
   const _selIdSet = new Set((state.selection?.ids || []).map(Number));
   const selectedShapes = _selIdSet.size > 0 ? (state.shapes || []).filter(s => _selIdSet.has(Number(s.id))) : [];
   refreshAttrPanel(state, dom, selectedShapes);
-  const firstText = selectedShapes.find(s => s.type === "text");
-  const firstLeader = selectedShapes.find(s => s.type === "dimleader");
-  const firstTextLike = firstText || firstLeader || null;
+  const selectionEditRules = getSelectionUiRules(state);
+  const firstText = selectionEditRules.textShape;
+  const firstLeader = selectionEditRules.leaderShape;
+  if (!state.ui) state.ui = {};
+  const selectionTypesSig = selectionEditRules.types.join(",");
+  const selectionDebugSig = [
+    selectionEditRules.count,
+    selectionTypesSig,
+    selectionEditRules.panelMode || "",
+    selectionEditRules.showTextEdit ? "text:on" : "text:off",
+    selectionEditRules.showLeaderStyleEdit ? "leader:on" : "leader:off",
+  ].join("|");
+  if (state.ui.selectionDebugSig !== selectionDebugSig) {
+    state.ui.selectionDebugSig = selectionDebugSig;
+  }
   if (dom.selectionTextEdit) {
-    dom.selectionTextEdit.style.display = firstTextLike ? "flex" : "none";
+    dom.selectionTextEdit.style.display = selectionEditRules.showTextEdit ? "flex" : "none";
+    const titleEl = dom.selectionTextEdit.querySelector?.(".section-title");
+    if (titleEl) {
+      titleEl.textContent = panelLang === "ja" ? "選択中のテキスト編集" : "Edit Selected Text";
+    }
   }
   if (dom.selectionLeaderStyleEdit) {
-    dom.selectionLeaderStyleEdit.style.display = firstLeader ? "flex" : "none";
+    dom.selectionLeaderStyleEdit.style.display = selectionEditRules.showLeaderStyleEdit ? "flex" : "none";
   }
-  if (firstTextLike && dom.selectionTextContentInput && document.activeElement !== dom.selectionTextContentInput) {
+  if (selectionEditRules.showTextEdit && dom.selectionTextContentInput && document.activeElement !== dom.selectionTextContentInput) {
     dom.selectionTextContentInput.value = firstText ? (firstText.text || "") : (firstLeader.leaderText || "");
   }
-  if (firstTextLike && dom.selectionTextSizePtInput && document.activeElement !== dom.selectionTextSizePtInput) {
+  if (selectionEditRules.showTextEdit && dom.selectionTextSizePtInput && document.activeElement !== dom.selectionTextSizePtInput) {
     dom.selectionTextSizePtInput.value = String(firstText ? (firstText.textSizePt || 12) : (firstLeader.fontSize || 12));
   }
-  if (firstTextLike && dom.selectionTextRotateInput && document.activeElement !== dom.selectionTextRotateInput) {
+  if (selectionEditRules.showTextEdit && dom.selectionTextRotateInput && document.activeElement !== dom.selectionTextRotateInput) {
     const rotateVal = firstText ? firstText.textRotate : firstLeader.textRotate;
     dom.selectionTextRotateInput.value = String(rotateVal === "auto" ? 0 : (rotateVal || 0));
   }
-  if (firstTextLike && dom.selectionTextFontFamilyInput && document.activeElement !== dom.selectionTextFontFamilyInput) {
-    dom.selectionTextFontFamilyInput.value = firstTextLike.textFontFamily || "Yu Gothic UI";
+  if (selectionEditRules.showTextEdit && dom.selectionTextFontFamilyInput && document.activeElement !== dom.selectionTextFontFamilyInput) {
+    dom.selectionTextFontFamilyInput.value = firstText.textFontFamily || "Yu Gothic UI";
   }
-  if (firstTextLike && dom.selectionTextBoldInput) {
-    dom.selectionTextBoldInput.checked = !!firstTextLike.textBold;
+  if (selectionEditRules.showTextEdit && dom.selectionTextBoldInput) {
+    dom.selectionTextBoldInput.checked = !!firstText.textBold;
   }
-  if (firstTextLike && dom.selectionTextItalicInput) {
-    dom.selectionTextItalicInput.checked = !!firstTextLike.textItalic;
+  if (selectionEditRules.showTextEdit && dom.selectionTextItalicInput) {
+    dom.selectionTextItalicInput.checked = !!firstText.textItalic;
   }
-  if (firstTextLike && dom.selectionTextColorInput) {
+  if (selectionEditRules.showTextEdit && dom.selectionTextColorInput) {
     dom.selectionTextColorInput.value = firstText ? (firstText.textColor || state.textSettings.color) : (firstLeader.textColor || firstLeader.color || state.textSettings.color);
   }
   if (firstLeader && dom.selectionLeaderArrowTypeSelect && document.activeElement !== dom.selectionLeaderArrowTypeSelect) {

@@ -1,4 +1,6 @@
-﻿export function bindKeyboardInput(state, helpers, deps) {
+﻿import { getEffectiveGridSize } from "./geom.js";
+
+export function bindKeyboardInput(state, helpers, deps) {
     const {
         draw,
         setStatus,
@@ -32,6 +34,17 @@
     const touchDebugLog = (msg) => {
         if (!isTouchDebugEnabled) return;
         try { console.log(`[touch-debug] ${msg}`); } catch (_) {}
+    };
+    const getMoveArrowDelta = (key) => {
+        const step = Math.max(
+            1e-9,
+            Number(getEffectiveGridSize(state.grid, state.view, state.pageSetup)) || 0
+        );
+        if (key === "ArrowLeft") return { dx: -step, dy: 0 };
+        if (key === "ArrowRight") return { dx: step, dy: 0 };
+        if (key === "ArrowUp") return { dx: 0, dy: -step };
+        if (key === "ArrowDown") return { dx: 0, dy: step };
+        return null;
     };
     const toggleVertexEditMode = () => {
         const cur = String(state.vertexEdit?.mode || "move").toLowerCase();
@@ -91,6 +104,26 @@
             if (helpers.pasteClipboard) helpers.pasteClipboard();
             e.preventDefault();
             return;
+        }
+        if (
+            !e.ctrlKey &&
+            !e.metaKey &&
+            !e.altKey &&
+            !isTypingTarget(e.target)
+        ) {
+            const arrowDelta = getMoveArrowDelta(e.key);
+            if (arrowDelta) {
+                if (state.tool === "move") {
+                    helpers.moveSelectedShapes?.(arrowDelta.dx, arrowDelta.dy);
+                    e.preventDefault();
+                    return;
+                }
+                if (state.tool === "vertex" && String(state.vertexEdit?.mode || "move").toLowerCase() !== "insert") {
+                    helpers.moveSelectedVertices?.(arrowDelta.dx, arrowDelta.dy);
+                    e.preventDefault();
+                    return;
+                }
+            }
         }
         if (!e.ctrlKey && !e.metaKey && !e.altKey && !isTypingTarget(e.target) && !isEnterKey(e)) {
             const shortcutAction = findShortcutAction(state, e.key);
@@ -254,27 +287,6 @@
                 if (setStatus) setStatus("Tool changed: SELECT");
                 if (draw) draw();
                 return;
-            }
-            if ((state.selection.ids.length === 0) && state.activeGroupId == null) {
-                if (!state.ui) state.ui = {};
-                const groupsPanelVisible = state.ui?.panelVisibility?.groupsPanel !== false;
-                if (!groupsPanelVisible) {
-                    state.ui.selectPickMode = "object";
-                    if (setStatus) setStatus("Selection mode: OBJECT");
-                    if (draw) draw();
-                    return;
-                }
-                const cur = String(state.ui.selectPickMode || "object");
-                state.ui.selectPickMode = (cur === "group") ? "object" : "group";
-                if (setStatus) setStatus(state.ui.selectPickMode === "group" ? "Selection mode: GROUP" : "Selection mode: OBJECT");
-                if (draw) draw();
-                return;
-            }
-            if (state.selection.ids.length > 0 || state.activeGroupId != null) {
-                clearSelection();
-                state.activeGroupId = null;
-                if (setStatus) setStatus("Selection cleared");
-                if (draw) draw();
             }
             return;
         }

@@ -1,5 +1,5 @@
 import {
-  worldToScreen, screenToWorld, getEffectiveGridSize, mmPerUnit,
+  worldToScreen, screenToWorld, getEffectiveGridSize, mmPerUnit, ptToWorld,
   getHatchPitchWorld, getHatchLineShiftWorld, getHatchPaddingWorld, getHatchDashWorld, getHatchGapWorld
 } from "./geom.js";
 import { getDimGeometry, getDimChainGeometry, getDimAngleGeometry, getLeaderDimGeometry, getSpecialDimGeometry, getCircleDimGeometry, circleDimHasCenterFollowAttribute } from "./dim_geom.js";
@@ -345,14 +345,30 @@ function drawShape(ctx, state, shape, currentShapeGroupMap = null, selectedSet =
     ctx.translate(p1.x, p1.y);
     const rDeg = Number(shape.textRotate) || 0;
     ctx.rotate(rDeg * Math.PI / 180);
-    ctx.fillStyle = selectedVisual ? "#f59e0b" : (groupActive ? "#2563eb" : (shape.textColor || baseStroke));
     const isBold = !!shape.textBold;
     const isItalic = !!shape.textItalic;
     const sizePt = Number(shape.textSizePt) || 12;
+    const fontPx = Math.max(1, ptToWorld(sizePt, state.pageSetup) * Math.max(1e-9, Number(state.view?.scale) || 1));
     const fontFamily = shape.textFontFamily || "Yu Gothic UI";
-    ctx.font = `${isItalic ? "italic " : ""}${isBold ? "bold " : ""}${(sizePt * state.view.scale * 1.33)}px "${fontFamily}"`;
+    ctx.font = `${isItalic ? "italic " : ""}${isBold ? "bold " : ""}${fontPx}px "${fontFamily}"`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
+    const isTouchPreview = String(shape.textPreviewMode || "") === "touch";
+    if (isTouchPreview) {
+      const m = ctx.measureText(shape.text || "");
+      const asc = Number(m.actualBoundingBoxAscent) || Math.max(6, fontPx * 0.8);
+      const desc = Number(m.actualBoundingBoxDescent) || Math.max(3, fontPx * 0.2);
+      const padX = Math.max(4, fontPx * 0.22);
+      const padY = Math.max(3, fontPx * 0.12);
+      ctx.strokeStyle = "#ef4444";
+      ctx.setLineDash([6, 4]);
+      ctx.lineWidth = 1.1;
+      ctx.strokeRect(-padX, -asc - padY, Math.max(8, m.width) + padX * 2, asc + desc + padY * 2);
+      ctx.setLineDash([]);
+      ctx.fillStyle = "#ef4444";
+    } else {
+      ctx.fillStyle = selectedVisual ? "#f59e0b" : (groupActive ? "#2563eb" : (shape.textColor || baseStroke));
+    }
     ctx.fillText(shape.text || "", 0, 0);
     ctx.restore();
   }

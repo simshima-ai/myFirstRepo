@@ -109,8 +109,8 @@ export function computeShapeBounds(shape) {
       const value = Number(shape[key]);
       if (!Number.isFinite(value)) continue;
       const lower = key.toLowerCase();
-      if (lower.startsWith("x") || lower === "cx" || lower === "tx") xs.push(value);
-      if (lower.startsWith("y") || lower === "cy" || lower === "ty") ys.push(value);
+      if (lower.startsWith("x") || lower === "cx" || lower === "px" || lower === "tx") xs.push(value);
+      if (lower.startsWith("y") || lower === "cy" || lower === "py" || lower === "ty") ys.push(value);
     }
     if (!xs.length || !ys.length) return null;
     return {

@@ -125,6 +125,30 @@ export function createViewerFileOpsRuntime(config) {
         target.a2 = Math.atan2(te2.y - c.y, te2.x - c.x);
         const baseCcw = base.ccw !== false;
         target.ccw = ((!!p.flipX) !== (!!p.flipY)) ? !baseCcw : baseCcw;
+      } else if (t === "text") {
+        const p1 = transformPointImportAdjust(base.x1, base.y1, origin, p);
+        target.x1 = p1.x; target.y1 = p1.y;
+        if (Number.isFinite(Number(base.x2)) && Number.isFinite(Number(base.y2))) {
+          const p2 = transformPointImportAdjust(base.x2, base.y2, origin, p);
+          target.x2 = p2.x; target.y2 = p2.y;
+        }
+        if (Number.isFinite(Number(base.textSizePt))) {
+          target.textSizePt = Math.max(0.01, Number(base.textSizePt) * Math.max(1e-6, Number(p.scale) || 1));
+        }
+      } else if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circledim") {
+        const pairs = [["x1", "y1"], ["x2", "y2"], ["px", "py"], ["tx", "ty"]];
+        for (const [kx, ky] of pairs) {
+          if (Number.isFinite(Number(base[kx])) && Number.isFinite(Number(base[ky]))) {
+            const tp = transformPointImportAdjust(base[kx], base[ky], origin, p);
+            target[kx] = tp.x;
+            target[ky] = tp.y;
+          }
+        }
+        for (const key of ["fontSize", "dimArrowSizePt", "extOffset", "extOver", "rOverrun"]) {
+          if (Number.isFinite(Number(base[key]))) {
+            target[key] = Math.max(0.01, Number(base[key]) * Math.max(1e-6, Number(p.scale) || 1));
+          }
+        }
       }
     }
     return true;
@@ -326,6 +350,18 @@ export function createViewerFileOpsRuntime(config) {
       if (t === "line" || t === "rect") { s.x1 = Number(s.x1) + dx; s.y1 = Number(s.y1) + dy; s.x2 = Number(s.x2) + dx; s.y2 = Number(s.y2) + dy; }
       else if (t === "polyline" && Array.isArray(s.points)) { s.points = s.points.map((p) => ({ x: Number(p?.x) + dx, y: Number(p?.y) + dy })); }
       else if (t === "circle" || t === "arc") { s.cx = Number(s.cx) + dx; s.cy = Number(s.cy) + dy; }
+      else if (t === "text") {
+        s.x1 = Number(s.x1) + dx; s.y1 = Number(s.y1) + dy;
+        if (Number.isFinite(Number(s.x2))) s.x2 = Number(s.x2) + dx;
+        if (Number.isFinite(Number(s.y2))) s.y2 = Number(s.y2) + dy;
+      } else if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circledim") {
+        for (const key of ["x1", "x2", "px", "tx"]) {
+          if (Number.isFinite(Number(s[key]))) s[key] = Number(s[key]) + dx;
+        }
+        for (const key of ["y1", "y2", "py", "ty"]) {
+          if (Number.isFinite(Number(s[key]))) s[key] = Number(s[key]) + dy;
+        }
+      }
     };
     let importSource = src.map((shape) => JSON.parse(JSON.stringify(shape || {})));
     if (isSvgSource) {
@@ -364,12 +400,14 @@ export function createViewerFileOpsRuntime(config) {
     state.nextGroupId = gid + 1;
     for (const raw of importSource) {
       const t = String(raw?.type || "").toLowerCase();
-      if (!["line", "polyline", "rect", "circle", "arc"].includes(t)) continue;
+      if (!["line", "polyline", "rect", "circle", "arc", "text", "dim", "dimchain", "dimangle", "circledim"].includes(t)) continue;
       const s = { ...raw, id: nextShapeId(state), type: t, layerId: state.activeLayerId, groupId: gid, lineWidthMm: Math.max(0.01, Number(state.lineWidthMm ?? 0.25) || 0.25), lineType: "solid" };
       imported.push(s);
       if (t === "line" || t === "rect") { minX = Math.min(minX, Number(s.x1), Number(s.x2)); minY = Math.min(minY, Number(s.y1), Number(s.y2)); maxX = Math.max(maxX, Number(s.x1), Number(s.x2)); maxY = Math.max(maxY, Number(s.y1), Number(s.y2)); }
       else if (t === "polyline") { for (const p of (Array.isArray(s.points) ? s.points : [])) { minX = Math.min(minX, Number(p?.x)); minY = Math.min(minY, Number(p?.y)); maxX = Math.max(maxX, Number(p?.x)); maxY = Math.max(maxY, Number(p?.y)); } }
       else if (t === "circle" || t === "arc") { minX = Math.min(minX, Number(s.cx) - Number(s.r)); minY = Math.min(minY, Number(s.cy) - Number(s.r)); maxX = Math.max(maxX, Number(s.cx) + Number(s.r)); maxY = Math.max(maxY, Number(s.cy) + Number(s.r)); }
+      else if (t === "text") { minX = Math.min(minX, Number(s.x1), Number(s.x2)); minY = Math.min(minY, Number(s.y1), Number(s.y2)); maxX = Math.max(maxX, Number(s.x1), Number(s.x2)); maxY = Math.max(maxY, Number(s.y1), Number(s.y2)); }
+      else if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circledim") { for (const key of Object.keys(s || {})) { const value = Number(s[key]); if (!Number.isFinite(value)) continue; const lower = key.toLowerCase(); if (lower.startsWith("x") || lower === "cx" || lower === "px" || lower === "tx") { minX = Math.min(minX, value); maxX = Math.max(maxX, value); } if (lower.startsWith("y") || lower === "cy" || lower === "py" || lower === "ty") { minY = Math.min(minY, value); maxY = Math.max(maxY, value); } } }
     }
     if (!imported.length) return false;
     for (const s of imported) state.shapes.push(s);
@@ -410,7 +448,7 @@ export function createViewerFileOpsRuntime(config) {
       const srcUnit = resolveImportSourceUnit("dxf", text);
       const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
       const unitScale = resolveUnitScale(srcUnit, dstUnit);
-      const parsed = parseDxfToCadShapes(text, { polylineize: false });
+      const parsed = parseDxfToCadShapes(text, { polylineize: false, sourceUnit: srcUnit });
       if (!parsed.shapes.length) throw new Error(parsed.warnings?.[0] || "DXF import failed");
       importVectorShapes(parsed.shapes, String(file.name || "DXF"), mode, {
         sourceKind: "dxf",

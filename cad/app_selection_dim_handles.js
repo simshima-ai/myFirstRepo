@@ -149,6 +149,21 @@ export function applyDimHandleDrag(state, worldRaw) {
   };
 
   if (dim.type === "dim") {
+    const numericPriority = !!dim.numericPriority;
+    const translateDimByDelta = (dx, dy) => {
+      if (Math.abs(dx) <= 0 && Math.abs(dy) <= 0) return;
+      dim.x1 = Number(dim.x1) + dx; dim.y1 = Number(dim.y1) + dy;
+      dim.x2 = Number(dim.x2) + dx; dim.y2 = Number(dim.y2) + dy;
+      dim.px = Number(dim.px) + dx; dim.py = Number(dim.py) + dy;
+      if (Number.isFinite(Number(dim.tx)) && Number.isFinite(Number(dim.ty))) {
+        dim.tx = Number(dim.tx) + dx;
+        dim.ty = Number(dim.ty) + dy;
+      }
+      if (Number.isFinite(Number(dim.tdx)) && Number.isFinite(Number(dim.tdy))) {
+        dim.tdx = Number(dim.tdx);
+        dim.tdy = Number(dim.tdy);
+      }
+    };
     if (dd.part === "text") {
       const g0 = getDimGeometry(dim);
       if (g0) {
@@ -166,11 +181,24 @@ export function applyDimHandleDrag(state, worldRaw) {
       }
     }
     else if (dd.part === "p1") {
-      dim.x1 = pSnap.x; dim.y1 = pSnap.y;
+      if (numericPriority) {
+        const basePt = getDimGeometry(dim)?.x1 != null ? { x: Number(dim.x1), y: Number(dim.y1) } : null;
+        const dx = Number(pSnap.x) - Number(basePt?.x ?? dim.x1);
+        const dy = Number(pSnap.y) - Number(basePt?.y ?? dim.y1);
+        translateDimByDelta(dx, dy);
+      } else {
+        dim.x1 = pSnap.x; dim.y1 = pSnap.y;
+      }
       applyKeepSnapToDimTarget(dim, "p1", pSnap);
     }
     else if (dd.part === "p2") {
-      dim.x2 = pSnap.x; dim.y2 = pSnap.y;
+      if (numericPriority) {
+        const dx = Number(pSnap.x) - Number(dim.x2);
+        const dy = Number(pSnap.y) - Number(dim.y2);
+        translateDimByDelta(dx, dy);
+      } else {
+        dim.x2 = pSnap.x; dim.y2 = pSnap.y;
+      }
       applyKeepSnapToDimTarget(dim, "p2", pSnap);
     }
     else if (dd.part === "all") {
@@ -189,8 +217,13 @@ export function applyDimHandleDrag(state, worldRaw) {
     }
     else if (dd.part === "target1" || dd.part === "target2") {
       const tp = pSnap;
-      if (dd.part === "target1") { dim.x1 = tp.x; dim.y1 = tp.y; }
-      else { dim.x2 = tp.x; dim.y2 = tp.y; }
+      if (numericPriority) {
+        const anchor = dd.part === "target1" ? { x: Number(dim.x1), y: Number(dim.y1) } : { x: Number(dim.x2), y: Number(dim.y2) };
+        translateDimByDelta(Number(tp.x) - Number(anchor.x), Number(tp.y) - Number(anchor.y));
+      } else {
+        if (dd.part === "target1") { dim.x1 = tp.x; dim.y1 = tp.y; }
+        else { dim.x2 = tp.x; dim.y2 = tp.y; }
+      }
       if (dd.part === "target1") applyKeepSnapToDimTarget(dim, "p1", tp);
       else applyKeepSnapToDimTarget(dim, "p2", tp);
     }
@@ -209,7 +242,15 @@ export function applyDimHandleDrag(state, worldRaw) {
         dim.extVisLens[idx] = dist;
       }
     }
-    else if (dd.part === "edge") { dim.x2 = pSnap.x; dim.y2 = pSnap.y; }
+    else if (dd.part === "edge") {
+      if (numericPriority) {
+        const dx = Number(pSnap.x) - Number(dim.x2);
+        const dy = Number(pSnap.y) - Number(dim.y2);
+        translateDimByDelta(dx, dy);
+      } else {
+        dim.x2 = pSnap.x; dim.y2 = pSnap.y;
+      }
+    }
     else { dim.px = pSnap.x; dim.py = pSnap.y; }
   } else if (dim.type === "dimchain") {
     if (dd.part === "text") {
@@ -233,15 +274,61 @@ export function applyDimHandleDrag(state, worldRaw) {
     else if (dd.part.startsWith("p:")) {
       const idx = parseInt(dd.part.substring(2), 10);
       if (!isNaN(idx) && dim.points && dim.points[idx]) {
-        dim.points[idx].x = pSnap.x; dim.points[idx].y = pSnap.y;
-        alignDimChainTargets(dim);
+        const numericPriority = !!dim.numericPriority;
+        const lastIdx = dim.points.length - 1;
+        if (numericPriority && idx !== 0 && idx !== lastIdx) {
+          return;
+        }
+        if (numericPriority && (idx === 0 || idx === lastIdx)) {
+          const basePt = dim.points[idx];
+          const dx = Number(pSnap.x) - Number(basePt.x);
+          const dy = Number(pSnap.y) - Number(basePt.y);
+          if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+            for (const pt of (dim.points || [])) {
+              pt.x = Number(pt.x) + dx;
+              pt.y = Number(pt.y) + dy;
+            }
+            dim.px = Number(dim.px || 0) + dx;
+            dim.py = Number(dim.py || 0) + dy;
+            if (Number.isFinite(Number(dim.tx)) && Number.isFinite(Number(dim.ty))) {
+              dim.tx = Number(dim.tx) + dx;
+              dim.ty = Number(dim.ty) + dy;
+            }
+          }
+        } else {
+          dim.points[idx].x = pSnap.x; dim.points[idx].y = pSnap.y;
+          alignDimChainTargets(dim);
+        }
       }
     }
     else if (dd.part.startsWith("target:")) {
       const idx = parseInt(dd.part.substring(7), 10);
       if (!isNaN(idx) && dim.points && dim.points[idx]) {
-        dim.points[idx].x = pSnap.x; dim.points[idx].y = pSnap.y;
-        alignDimChainTargets(dim);
+        const numericPriority = !!dim.numericPriority;
+        const lastIdx = dim.points.length - 1;
+        if (numericPriority && idx !== 0 && idx !== lastIdx) {
+          return;
+        }
+        if (numericPriority && (idx === 0 || idx === lastIdx)) {
+          const basePt = dim.points[idx];
+          const dx = Number(pSnap.x) - Number(basePt.x);
+          const dy = Number(pSnap.y) - Number(basePt.y);
+          if (Math.abs(dx) > 0 || Math.abs(dy) > 0) {
+            for (const pt of (dim.points || [])) {
+              pt.x = Number(pt.x) + dx;
+              pt.y = Number(pt.y) + dy;
+            }
+            dim.px = Number(dim.px || 0) + dx;
+            dim.py = Number(dim.py || 0) + dy;
+            if (Number.isFinite(Number(dim.tx)) && Number.isFinite(Number(dim.ty))) {
+              dim.tx = Number(dim.tx) + dx;
+              dim.ty = Number(dim.ty) + dy;
+            }
+          }
+        } else {
+          dim.points[idx].x = pSnap.x; dim.points[idx].y = pSnap.y;
+          alignDimChainTargets(dim);
+        }
       }
     }
     else if (dd.part === "all") {

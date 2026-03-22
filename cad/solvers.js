@@ -702,6 +702,14 @@ export function getObjectSnapPoint(state, worldRaw, shouldUseObjectSnap, exclude
                     consider(Number(cp.x), Number(cp.y), "endpoint", { shapeId: Number(s.id), refType: "bspline_control", refKey: `cp${i}` });
                 }
             }
+        } else if (s.type === "polyline") {
+            if (state.objectSnap?.endpoint !== false && Array.isArray(s.points)) {
+                for (let i = 0; i < s.points.length; i++) {
+                    const pt = s.points[i];
+                    if (!Number.isFinite(Number(pt?.x)) || !Number.isFinite(Number(pt?.y))) continue;
+                    consider(Number(pt.x), Number(pt.y), "endpoint", { shapeId: Number(s.id), refType: "polyline_vertex", refKey: `v${i}` });
+                }
+            }
         } else if (s.type === "dim") {
             if (state.objectSnap?.endpoint !== false) {
                 consider(Number(s.x1), Number(s.y1), "endpoint", { shapeId: Number(s.id), refType: "dim_endpoint", refKey: "p1" });

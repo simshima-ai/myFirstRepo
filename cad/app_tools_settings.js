@@ -145,6 +145,10 @@ export function setRectInputs(state, w, h) {
     if (w !== null) state.rectSettings.width = w;
     if (h !== null) state.rectSettings.height = h;
 }
+export function setRectAsPolyline(state, on) {
+    if (!state.rectSettings) state.rectSettings = {};
+    state.rectSettings.asPolyline = !!on;
+}
 export function setRectSizeLocked(state, helpers, on = null) {
     if (!state.rectSettings) state.rectSettings = {};
     const next = (on == null) ? !state.rectSettings.sizeLocked : !!on;
@@ -170,6 +174,7 @@ export function setCircleMode(state, helpers, mode) {
     state.circleSettings.radiusLocked = (next === "fixed");
     if (!state.input) state.input = {};
     if (next !== "threepoint") state.input.circleThreePointRefs = [];
+    state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
     state.input.dragStartWorld = null;
     if (helpers?.setStatus) {
         if (next === "fixed") helpers.setStatus("Circle creation: Fixed radius mode");
@@ -185,6 +190,7 @@ export function setCircleRadiusLocked(state, helpers, on = null) {
     state.circleSettings.mode = next ? "fixed" : (state.circleSettings.mode === "fixed" ? "drag" : (state.circleSettings.mode || "drag"));
     if (!state.input) state.input = {};
     if (state.circleSettings.mode !== "threepoint") state.input.circleThreePointRefs = [];
+    state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
     state.input.dragStartWorld = null;
     if (helpers?.setStatus) {
         helpers.setStatus(next ? "Circle creation: Radius lock ON" : "Circle creation: Radius lock OFF");

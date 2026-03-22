@@ -1,6 +1,7 @@
 ﻿import {
   worldToScreen,
   mmPerUnit,
+  ptToWorld,
   getHatchPitchWorld,
   getHatchLineShiftWorld,
   getHatchPaddingWorld,
@@ -158,8 +159,9 @@ function drawShape(ctx, state, shape) {
     const isBold = !!shape.textBold;
     const isItalic = !!shape.textItalic;
     const sizePt = Number(shape.textSizePt) || 12;
+    const fontPx = Math.max(1, ptToWorld(sizePt, state.pageSetup) * Math.max(1e-9, Number(state.view?.scale) || 1));
     const fontFamily = shape.textFontFamily || "Yu Gothic UI";
-    ctx.font = `${isItalic ? "italic " : ""}${isBold ? "bold " : ""}${(sizePt * state.view.scale * 1.33)}px "${fontFamily}"`;
+    ctx.font = `${isItalic ? "italic " : ""}${isBold ? "bold " : ""}${fontPx}px "${fontFamily}"`;
     ctx.textAlign = "left";
     ctx.textBaseline = "middle";
     ctx.fillStyle = shape.textColor || shapeColor;

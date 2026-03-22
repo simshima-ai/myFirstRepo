@@ -109,6 +109,66 @@ export function normalizeMaxZoomPreset(v) {
   return best;
 }
 
+export function normalizeMenuScaleMode(v) {
+  return String(v || "").toLowerCase() === "manual" ? "manual" : "auto";
+}
+
+export function normalizeMenuScaleAutoPreset(v) {
+  const s = String(v || "normal").toLowerCase();
+  const opts = new Set(["subtle", "normal", "dynamic", "strong"]);
+  return opts.has(s) ? s : "normal";
+}
+
+export function computeAutoMenuScale(width, height, preset = "normal") {
+  const w = Number(width);
+  const h = Number(height);
+  const base = Math.min(
+    Number.isFinite(w) && w > 0 ? w : Infinity,
+    Number.isFinite(h) && h > 0 ? h : Infinity
+  );
+  if (!Number.isFinite(base)) return 1;
+  const p = normalizeMenuScaleAutoPreset(preset);
+  const table = {
+    subtle: { small: 0.9, medium: 1.0, large: 1.05, xlarge: 1.1 },
+    normal: { small: 0.8, medium: 1.0, large: 1.1, xlarge: 1.2 },
+    dynamic: { small: 0.7, medium: 1.0, large: 1.15, xlarge: 1.3 },
+    strong: { small: 0.6, medium: 1.0, large: 1.2, xlarge: 1.35 },
+  };
+  const c = table[p] || table.normal;
+  const lerp = (a, b, t) => a + ((b - a) * t);
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const t1 = clamp01((base - 900) / 300);
+  const t2 = clamp01((base - 1200) / 400);
+  const t3 = clamp01((base - 1600) / 600);
+  if (base <= 1200) return lerp(c.small, c.medium, t1);
+  if (base <= 1600) return lerp(c.medium, c.large, t2);
+  return lerp(c.large, c.xlarge, t3);
+}
+
+export function resolveMenuScale(ui, width, height) {
+  const mode = normalizeMenuScaleMode(ui?.menuScaleMode);
+  if (mode === "manual") {
+    return normalizeMenuScalePreset(ui?.menuScalePct ?? 100) / 100;
+  }
+  return computeAutoMenuScale(width, height, ui?.menuScaleAutoPreset);
+}
+
+export function normalizeWheelZoomPreset(v) {
+  const n = Number(v);
+  const opts = [1.05, 1.1, 1.2, 1.35, 1.5];
+  if (!Number.isFinite(n)) return 1.1;
+  let best = opts[0];
+  let bestD = Math.abs(n - best);
+  for (let i = 1; i < opts.length; i++) {
+    const d = Math.abs(n - opts[i]);
+    if (d < bestD) {
+      bestD = d;
+      best = opts[i];
+    }
+  }
+  return best;
+}
+
 export function normalizeMenuScalePreset(v) {
   const n = Number(v);
   if (!Number.isFinite(n)) return 100;

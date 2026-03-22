@@ -1,3 +1,5 @@
+import { ptToWorld } from "./geom.js";
+
 export function createHitTestOps(config) {
   const {
     isGroupVisible,
@@ -188,7 +190,10 @@ export function createHitTestOps(config) {
       if (s.type === "text") {
         const p1 = { x: Number(s.x1), y: Number(s.y1) };
         const txt = String(s.text || "");
-        const sizePx = (Number(s.textSizePt) || 12) * 1.33;
+        const sizePx = Math.max(
+          1,
+          ptToWorld(Number(s.textSizePt) || 12, state.pageSetup) * Math.max(1e-9, Number(state.view?.scale) || 1)
+        );
         const rDeg = Number(s.textRotate) || 0;
         const tctx = dom?.canvas?.getContext?.("2d");
         if (!tctx) continue;

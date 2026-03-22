@@ -313,6 +313,7 @@ export function getDimAngleGeometry(dim, shapes = null) {
  */
 export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
     const tol = 8 / scale;
+    const textTol = 16 / scale;
     const dimPtToWorld = (pt) => Math.max(0, Number(pt) || 0) / Math.max(1e-9, scale);
     if (dim.type === 'dim') {
         const g = getDimGeometry(dim);
@@ -336,7 +337,7 @@ export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
 
         // Text
         const textHandle = getLinearDimTextHandleWorld(dim, g, scale);
-        if (textHandle && Math.hypot(worldX - textHandle.x, worldY - textHandle.y) < tol * 1.4) return 'text';
+        if (textHandle && Math.hypot(worldX - textHandle.x, worldY - textHandle.y) < textTol) return 'text';
 
         // Radial specifics
         if (dim.dimRef) {
@@ -355,7 +356,10 @@ export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
             if (Math.hypot(worldX - allCtrl.x, worldY - allCtrl.y) < tol) return "all";
         }
         if (Math.hypot(worldX - Number(dim.px || 0), worldY - Number(dim.py || 0)) < tol) return "place";
+        const numericPriority = !!dim?.numericPriority;
+        const isEndpointIndex = (idx, total) => idx === 0 || idx === total - 1;
         for (let i = 0; i < dim.points.length; i++) {
+            if (numericPriority && !isEndpointIndex(i, dim.points.length)) continue;
             const p = dim.points[i];
             const dp = dimPoints[i] || { x: p.x, y: p.y };
             if (Math.hypot(worldX - dp.x, worldY - dp.y) < tol) return `target:${i}`;
@@ -370,13 +374,13 @@ export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
                 x: Number(g.chainMid?.x || 0) + Number(g.nx || 0) * (12 / Math.max(1e-9, scale)),
                 y: Number(g.chainMid?.y || 0) + Number(g.ny || 0) * (12 / Math.max(1e-9, scale))
             };
-        if (Math.hypot(worldX - txt.x, worldY - txt.y) < tol) return 'text';
+        if (Math.hypot(worldX - txt.x, worldY - txt.y) < textTol) return 'text';
     } else if (dim.type === 'dimangle') {
         const g = getDimAngleGeometry(dim, shapes);
         if (!g) return null;
         const rp = { x: Number(g.cx) + Number(g.ux) * Number(g.r), y: Number(g.cy) + Number(g.uy) * Number(g.r) };
         if (Math.hypot(worldX - rp.x, worldY - rp.y) < tol) return "radius";
-        if (Math.hypot(worldX - Number(g.tx), worldY - Number(g.ty)) < tol) return 'text';
+        if (Math.hypot(worldX - Number(g.tx), worldY - Number(g.ty)) < textTol) return 'text';
     } else if (dim.type === 'dimleader') {
         const g = getLeaderDimGeometry(dim);
         if (!g) return null;
@@ -387,7 +391,7 @@ export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
         if (Math.hypot(worldX - allCtrl.x, worldY - allCtrl.y) < tol) return 'all';
         if (distToSegment(worldX, worldY, g.p1.x, g.p1.y, g.p2.x, g.p2.y) < tol) return 'leader';
         if (distToSegment(worldX, worldY, g.p2.x, g.p2.y, g.p3.x, g.p3.y) < tol) return 'line';
-        if (Math.hypot(worldX - Number(g.tx), worldY - Number(g.ty)) < tol) return 'text';
+        if (Math.hypot(worldX - Number(g.tx), worldY - Number(g.ty)) < textTol) return 'text';
     } else if (dim.type === 'circleDim') {
         const g = getCircleDimGeometry(dim, shapes);
         if (!g) return null;
@@ -396,7 +400,7 @@ export function hitTestDimPart(dim, worldX, worldY, shapes, scale = 1.0) {
         if (Math.hypot(worldX - g.p1.x, worldY - g.p1.y) < tol) return 'off1';
         if (Math.hypot(worldX - g.p2.x, worldY - g.p2.y) < tol) return 'off2';
         if (circleDimHasCenterFollowAttribute(dim) && Math.hypot(worldX - g.cx, worldY - g.cy) < tol) return 'centerCtrl';
-        if (Math.hypot(worldX - g.tx, worldY - g.ty) < tol) return 'text';
+        if (Math.hypot(worldX - g.tx, worldY - g.ty) < textTol) return 'text';
     }
     return null;
 }

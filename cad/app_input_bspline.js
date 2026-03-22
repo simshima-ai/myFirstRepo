@@ -3,8 +3,7 @@ export function finalizeBsplineDraftState(state, deps) {
         nextShapeId,
         pushHistory,
         addShape,
-        clearSelection,
-        applyToolStrokeToShape
+        clearSelection
     } = deps;
     const d = state.polylineDraft;
     if (!d || d.kind !== "bspline" || !Array.isArray(d.points) || d.points.length < 2) {
@@ -23,7 +22,12 @@ export function finalizeBsplineDraftState(state, deps) {
     };
     shape.id = nextShapeId();
     shape.layerId = state.activeLayerId;
-    applyToolStrokeToShape(shape, "line");
+    shape.lineWidthMm = Math.max(0.01, Number(state.lineSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+    shape.lineType = String(state.lineSettings?.lineType || "solid");
+    {
+        const rawColor = String(state.lineSettings?.color || "#0f172a").trim();
+        shape.color = /^#[0-9a-fA-F]{6}$/.test(rawColor) ? rawColor.toLowerCase() : "#0f172a";
+    }
     pushHistory();
     addShape(shape);
     clearSelection();

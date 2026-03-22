@@ -16,18 +16,121 @@ export function bindToolParameterEvents(params) {
   bindColorInputPalette(dom.dimSelectionColorInput, (c) => {
     actions.setSelectedColor?.(c);
   });
+  const focusInput = (input) => {
+    if (!input || typeof input.focus !== "function") return;
+    try {
+      input.focus({ preventScroll: true });
+    } catch (_) {
+      input.focus();
+    }
+    if (typeof input.select === "function") input.select();
+  };
+  const focusButton = (button) => {
+    if (!button || typeof button.focus !== "function") return;
+    try {
+      button.focus({ preventScroll: true });
+    } catch (_) {
+      button.focus();
+    }
+  };
+  const isDeleteSelectionKey = (e) =>
+    !e.ctrlKey &&
+    !e.metaKey &&
+    !e.altKey &&
+    (e.key === "Delete" || e.code === "Delete" || Number(e.keyCode) === 46);
+  const runSelectMoveDeleteKey = (e) => {
+    if (!isDeleteSelectionKey(e)) return;
+    e.preventDefault();
+    actions.delete?.();
+  };
   const runSelectMoveByEnter = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
-    const dx = Number(dom.selectMoveDxInput?.value || 0);
-    const dy = Number(dom.selectMoveDyInput?.value || 0);
+    if (e.target === dom.selectMoveDxInput) {
+      focusInput(dom.selectMoveDyInput);
+      return;
+    }
+    if (e.target === dom.selectMoveDyInput) {
+      if (e.ctrlKey) {
+        focusButton(dom.copySelectedShapesBtn);
+        return;
+      }
+      focusButton(dom.moveSelectedShapesBtn);
+      return;
+    }
+  };
+  const runSelectToolMoveByEnter = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (e.target === dom.selectToolDxInput) {
+      focusInput(dom.selectToolDyInput);
+      return;
+    }
+    if (e.target === dom.selectToolDyInput) {
+      if (e.ctrlKey) {
+        focusButton(dom.selectToolCopyBtn);
+        return;
+      }
+      focusButton(dom.selectToolMoveBtn);
+      return;
+    }
+  };
+  const runMoveToolByEnter = (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const dx = Number(dom.moveToolDxInput?.value || 0);
+    const dy = Number(dom.moveToolDyInput?.value || 0);
     actions.moveSelectedShapes?.(dx, dy);
   };
   if (dom.selectMoveDxInput) {
     dom.selectMoveDxInput.addEventListener("keydown", runSelectMoveByEnter);
+    dom.selectMoveDxInput.addEventListener("keydown", runSelectMoveDeleteKey);
   }
   if (dom.selectMoveDyInput) {
     dom.selectMoveDyInput.addEventListener("keydown", runSelectMoveByEnter);
+    dom.selectMoveDyInput.addEventListener("keydown", runSelectMoveDeleteKey);
+  }
+  if (dom.selectToolDxInput) {
+    dom.selectToolDxInput.addEventListener("keydown", runSelectToolMoveByEnter);
+    dom.selectToolDxInput.addEventListener("keydown", runSelectMoveDeleteKey);
+  }
+  if (dom.selectToolDyInput) {
+    dom.selectToolDyInput.addEventListener("keydown", runSelectToolMoveByEnter);
+    dom.selectToolDyInput.addEventListener("keydown", runSelectMoveDeleteKey);
+  }
+  if (dom.selectToolMoveBtn) {
+    dom.selectToolMoveBtn.addEventListener("click", () => {
+      const dx = Number(dom.selectToolDxInput?.value || 0);
+      const dy = Number(dom.selectToolDyInput?.value || 0);
+      actions.moveSelectedShapes?.(dx, dy);
+    });
+  }
+  if (dom.selectToolCopyBtn) {
+    dom.selectToolCopyBtn.addEventListener("click", () => {
+      const dx = Number(dom.selectToolDxInput?.value || 0);
+      const dy = Number(dom.selectToolDyInput?.value || 0);
+      actions.copySelectedShapes?.(dx, dy);
+    });
+  }
+  if (dom.moveToolDxInput) {
+    dom.moveToolDxInput.addEventListener("keydown", runMoveToolByEnter);
+  }
+  if (dom.moveToolDyInput) {
+    dom.moveToolDyInput.addEventListener("keydown", runMoveToolByEnter);
+  }
+  if (dom.moveToolApplyBtn) {
+    dom.moveToolApplyBtn.addEventListener("click", () => {
+      const dx = Number(dom.moveToolDxInput?.value || 0);
+      const dy = Number(dom.moveToolDyInput?.value || 0);
+      actions.moveSelectedShapes?.(dx, dy);
+    });
+  }
+  if (dom.moveToolCopyBtn) {
+    dom.moveToolCopyBtn.addEventListener("click", () => {
+      const dx = Number(dom.moveToolDxInput?.value || 0);
+      const dy = Number(dom.moveToolDyInput?.value || 0);
+      actions.copySelectedShapes?.(dx, dy);
+    });
   }
   if (dom.groupRotateSnapInput) {
     dom.groupRotateSnapInput.addEventListener("change", () => {
@@ -138,9 +241,19 @@ export function bindToolParameterEvents(params) {
   const runRectApplyByEnter = (e) => {
     if (e.key !== "Enter") return;
     e.preventDefault();
-    const w = Number(dom.rectWidthInput?.value || 0);
-    const h = Number(dom.rectHeightInput?.value || 0);
-    actions.setRectInputs(w, h);
+    if (e.target === dom.rectWidthInput) {
+      const w = Number(dom.rectWidthInput?.value || 0);
+      actions.setRectInputs(w, null);
+      dom.rectHeightInput?.focus?.();
+      dom.rectHeightInput?.select?.();
+      return;
+    }
+    if (e.target === dom.rectHeightInput) {
+      const h = Number(dom.rectHeightInput?.value || 0);
+      actions.setRectInputs(null, h);
+      dom.applyRectInputBtn?.focus?.();
+      return;
+    }
   };
   if (dom.rectWidthInput) {
     dom.rectWidthInput.addEventListener("change", () => {
@@ -157,6 +270,11 @@ export function bindToolParameterEvents(params) {
   if (dom.rectAnchorSelect) {
     dom.rectAnchorSelect.addEventListener("change", () => {
       actions.setRectAnchor?.(dom.rectAnchorSelect.value || "c");
+    });
+  }
+  if (dom.rectAsPolylineToggle) {
+    dom.rectAsPolylineToggle.addEventListener("change", () => {
+      actions.setRectAsPolyline?.(!!dom.rectAsPolylineToggle.checked);
     });
   }
   if (dom.applyCircleInputBtn) {

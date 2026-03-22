@@ -140,8 +140,12 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
   }
   const selIdsForObjMove = new Set((state.selection?.ids || []).map(Number));
   const selectedShapesForMove = selIdsForObjMove.size > 0 ? (state.shapes || []).filter(s => selIdsForObjMove.has(Number(s.id))) : [];
-  const hasObjectSelectionForMove = state.tool === "select" && selectedShapesForMove.length > 0;
-  const canCopyLineCircle = state.tool === "select"
+  const hasObjectSelectionForMove = (state.tool === "move" || state.tool === "select") && selectedShapesForMove.length > 0;
+  const hasObjectSelectionForSelectTool = state.tool === "select" && selectedShapesForMove.length > 0;
+  const canCopyLineCircle = (state.tool === "move" || state.tool === "select")
+    && selectedShapesForMove.length > 0
+    && selectedShapesForMove.every(s => s.type === "line" || s.type === "polyline" || s.type === "circle" || s.type === "arc");
+  const canCopyLineCircleForSelectTool = state.tool === "select"
     && selectedShapesForMove.length > 0
     && selectedShapesForMove.every(s => s.type === "line" || s.type === "polyline" || s.type === "circle" || s.type === "arc");
   const objectMoveOps = document.getElementById("lineCircleMoveOps");
@@ -154,6 +158,18 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
   if (dom.copySelectedShapesBtn) {
     dom.copySelectedShapesBtn.disabled = !canCopyLineCircle || (state.activeGroupId != null);
   }
+  if (dom.selectToolMoveBtn) {
+    dom.selectToolMoveBtn.disabled = !hasObjectSelectionForSelectTool || (state.activeGroupId != null);
+  }
+  if (dom.selectToolCopyBtn) {
+    dom.selectToolCopyBtn.disabled = !canCopyLineCircleForSelectTool || (state.activeGroupId != null);
+  }
+  if (dom.moveToolApplyBtn) {
+    dom.moveToolApplyBtn.disabled = !hasObjectSelectionForMove || (state.activeGroupId != null);
+  }
+  if (dom.moveToolCopyBtn) {
+    dom.moveToolCopyBtn.disabled = !canCopyLineCircle || (state.activeGroupId != null);
+  }
   if (dom.groupRotateSnapInput) {
     const v = Number(state.input?.groupRotate?.snapDeg || 5);
     syncInputValue(dom.groupRotateSnapInput, v);
@@ -163,6 +179,18 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
   }
   if (dom.selectMoveDyInput && (dom.selectMoveDyInput.value == null || dom.selectMoveDyInput.value === "")) {
     dom.selectMoveDyInput.value = "0";
+  }
+  if (dom.selectToolDxInput && (dom.selectToolDxInput.value == null || dom.selectToolDxInput.value === "")) {
+    dom.selectToolDxInput.value = "0";
+  }
+  if (dom.selectToolDyInput && (dom.selectToolDyInput.value == null || dom.selectToolDyInput.value === "")) {
+    dom.selectToolDyInput.value = "0";
+  }
+  if (dom.moveToolDxInput && (dom.moveToolDxInput.value == null || dom.moveToolDxInput.value === "")) {
+    dom.moveToolDxInput.value = "0";
+  }
+  if (dom.moveToolDyInput && (dom.moveToolDyInput.value == null || dom.moveToolDyInput.value === "")) {
+    dom.moveToolDyInput.value = "0";
   }
   if (dom.vertexMoveDxInput) {
     const v = Number(state.vertexEdit?.moveDx || 0);
@@ -238,6 +266,9 @@ export function refreshSelectionAndGroupPanels(state, dom, panelLang, panelText,
   if (dom.rectAnchorSelect) {
     const v = String(state.rectSettings?.anchor || "c");
     if (dom.rectAnchorSelect.value !== v) dom.rectAnchorSelect.value = v;
+  }
+  if (dom.rectAsPolylineToggle) {
+    dom.rectAsPolylineToggle.checked = !!state.rectSettings?.asPolyline;
   }
   if (dom.circleRadiusInput) {
     const v = Number(state.circleSettings?.radius || 0);

@@ -167,20 +167,22 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
     const layersPanelVisible = state.ui?.panelVisibility?.layersPanel !== false;
     if (!layersPanelVisible) {
       layersSectionEl.style.display = "none";
+      layersSectionEl.style.removeProperty("flex");
       layersSectionEl.style.removeProperty("height");
       layersSectionEl.style.removeProperty("max-height");
       layersSectionEl.style.removeProperty("min-height");
       return;
     }
+    layersSectionEl.style.display = "flex";
+    layersSectionEl.style.flexDirection = "column";
+    layersSectionEl.style.flex = "0 0 auto";
+    layersSectionEl.style.minHeight = "0";
     const collapsed = !!state.ui?.rightPanelCollapsed?.layers;
     if (collapsed) {
       layersSectionEl.style.removeProperty("height");
       layersSectionEl.style.removeProperty("max-height");
     } else {
       const layerListEl = dom.layerList;
-      layersSectionEl.style.minHeight = "0";
-      layersSectionEl.style.display = "flex";
-      layersSectionEl.style.flexDirection = "column";
       if (layerListEl) {
         let chromeH = 0;
         for (const child of Array.from(layersSectionEl.children || [])) {
@@ -201,7 +203,6 @@ export function refreshLayerPanels(state, dom, panelText, getUiLanguage, getMaxG
         if (layerPanelUserSet && Number.isFinite(desiredListH) && desiredListH > 0) {
           const targetH = chromeH + Math.max(40, Math.round(desiredListH)) + 8;
           layersSectionEl.style.flex = "0 0 auto";
-          layersSectionEl.style.removeProperty("margin-top");
           layersSectionEl.style.height = `${Math.round(targetH)}px`;
           layersSectionEl.style.maxHeight = `${Math.round(targetH)}px`;
         } else {

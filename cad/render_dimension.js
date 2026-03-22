@@ -1,4 +1,4 @@
-import { worldToScreen, mmPerUnit } from "./geom.js";
+﻿import { worldToScreen, mmPerUnit } from "./geom.js";
 
 export function dimWorldPerMm(state) {
   const pageScale = Math.max(0.0001, Number(state.pageSetup?.scale ?? 1) || 1);
@@ -96,6 +96,19 @@ function computeAutoTextAngleDeg(tx, ty) {
   return a;
 }
 
+function getNumericPriorityValue(dim, measuredValue, segmentIndex = null) {
+  if (dim?.numericPriority) {
+    if (Number.isInteger(segmentIndex) && Array.isArray(dim.numericValues)) {
+      const raw = Number(dim.numericValues[segmentIndex]);
+      if (Number.isFinite(raw)) return raw;
+    }
+    if (Number.isFinite(Number(dim.numericValue))) {
+      return Number(dim.numericValue);
+    }
+  }
+  return Number(measuredValue) || 0;
+}
+
 function drawTextLabel(ctx, state, dim, g, textVal, selected, groupActive, normalColor = "#0f172a") {
   const nx = g.nx ?? 0;
   const ny = g.ny ?? 0;
@@ -134,9 +147,10 @@ function drawTextLabel(ctx, state, dim, g, textVal, selected, groupActive, norma
   ctx.font = `${dm.fontPx}px sans-serif`;
   ctx.textAlign = "center";
   ctx.textBaseline = "middle";
-
   let rotDeg;
-  if (dim.textRotate === "auto" || dim.textRotate == null) {
+  if (dim.numericPriority && Number.isFinite(Number(dim.fixedTextRotate))) {
+    rotDeg = Number(dim.fixedTextRotate) || 0;
+  } else if (dim.textRotate === "auto" || dim.textRotate == null) {
     rotDeg = g.tx != null && g.ty != null ? computeAutoTextAngleDeg(g.tx, g.ty) : 0;
   } else {
     rotDeg = Number(dim.textRotate) || 0;
@@ -209,7 +223,7 @@ export function createRenderDimensionOps(deps) {
         const c = worldToScreen(state.view, { x: geom.cx, y: geom.cy });
         const p2 = worldToScreen(state.view, { x: dim.x2, y: dim.y2 });
         const dimComp = getDimScaleComp(dim);
-        const label = (geom.kind === "circle" ? "ﾃ・" : "R ") + (geom.len / dimComp).toFixed(dim.precision ?? 1);
+        const label = (geom.kind === "circle" ? "・・・" : "R ") + getNumericPriorityValue(dim, geom.len / dimComp).toFixed(dim.precision ?? 1);
         ctx.beginPath();
         ctx.moveTo(c.x, c.y);
         ctx.lineTo(p2.x, p2.y);
@@ -258,7 +272,7 @@ export function createRenderDimensionOps(deps) {
         drawArrow(ctx, d1s, d1dir, scale, baseStroke, arrowType, arrowSize);
         drawArrow(ctx, d2s, d2dir, scale, baseStroke, arrowType, arrowSize);
         const dimComp = getDimScaleComp(dim);
-        const textVal = (geom.len / dimComp).toFixed(dim.precision ?? 1);
+        const textVal = getNumericPriorityValue(dim, geom.len / dimComp).toFixed(dim.precision ?? 1);
         drawTextLabel(ctx, state, dim, geom, textVal, selected, groupActive, normalColor);
       }
     } else if (dim.type === "dimleader") {
@@ -311,7 +325,7 @@ export function createRenderDimensionOps(deps) {
       }
 
       const dimComp = getDimScaleComp(dim);
-      const value = (dim.kind === "diameter" ? g.r * 2 : g.r) / dimComp;
+      const value = getNumericPriorityValue(dim, (dim.kind === "diameter" ? g.r * 2 : g.r) / dimComp);
       const label = (dim.kind === "diameter" ? "D " : "R ") + value.toFixed(dim.precision ?? 1);
       const tGeom = { ...g, tx: g.ux, ty: g.uy };
       const tDim = { ...dim, tx: g.tx, ty: g.ty };
@@ -339,7 +353,7 @@ export function createRenderDimensionOps(deps) {
           ctx.stroke();
         }
       }
-      segs.forEach((g) => {
+      segs.forEach((g, i) => {
         const d1s = worldToScreen(state.view, g.d1);
         const d2s = worldToScreen(state.view, g.d2);
         ctx.beginPath();
@@ -349,7 +363,7 @@ export function createRenderDimensionOps(deps) {
         drawArrow(ctx, d1s, { x: -g.tx, y: -g.ty }, scale, baseStroke, arrowType, arrowSize);
         drawArrow(ctx, d2s, { x: g.tx, y: g.ty }, scale, baseStroke, arrowType, arrowSize);
         const dimComp = getDimScaleComp(dim);
-        const textVal = (g.len / dimComp).toFixed(dim.precision ?? 1);
+        const textVal = getNumericPriorityValue(dim, g.len / dimComp, i).toFixed(dim.precision ?? 1);
         drawTextLabel(ctx, state, dim, g, textVal, selected, groupActive, normalColor);
       });
     } else if (dim.type === "dimangle") {
@@ -370,7 +384,7 @@ export function createRenderDimensionOps(deps) {
       const ad2 = reverseArrow ? { x: -d2.x, y: -d2.y } : d2;
       drawArrow(ctx, p1s, ad1, scale, baseStroke, arrowType, arrowSize);
       drawArrow(ctx, p2s, ad2, scale, baseStroke, arrowType, arrowSize);
-      const textVal = `${((geom.angle * 180) / Math.PI).toFixed(dim.precision ?? 1)}°`;
+      const textVal = `${((geom.angle * 180) / Math.PI).toFixed(dim.precision ?? 1)}ﾂｰ`;
       drawTextLabel(ctx, state, dim, geom, textVal, selected, groupActive, normalColor);
     }
   }
@@ -379,3 +393,4 @@ export function createRenderDimensionOps(deps) {
     drawDimensionCommon,
   };
 }
+

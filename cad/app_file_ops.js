@@ -93,6 +93,18 @@ export function createFileOpsRuntime(config) {
         s.points = s.points.map((p) => ({ x: Number(p?.x) * f, y: Number(p?.y) * f }));
       } else if (t === "circle" || t === "arc") {
         s.cx = Number(s.cx) * f; s.cy = Number(s.cy) * f; s.r = Math.abs(Number(s.r) * f);
+      } else if (t === "text") {
+        s.x1 = Number(s.x1) * f; s.y1 = Number(s.y1) * f;
+        if (Number.isFinite(Number(s.x2))) s.x2 = Number(s.x2) * f;
+        if (Number.isFinite(Number(s.y2))) s.y2 = Number(s.y2) * f;
+        if (Number.isFinite(Number(s.textSizePt))) s.textSizePt = Math.max(0.01, Number(s.textSizePt) * f);
+      } else if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circledim") {
+        for (const key of ["x1", "y1", "x2", "y2", "px", "py", "tx", "ty"]) {
+          if (Number.isFinite(Number(s[key]))) s[key] = Number(s[key]) * f;
+        }
+        for (const key of ["fontSize", "dimArrowSizePt", "extOffset", "extOver", "rOverrun"]) {
+          if (Number.isFinite(Number(s[key]))) s[key] = Math.max(0.01, Number(s[key]) * f);
+        }
       }
       out.push(s);
     }
@@ -757,25 +769,36 @@ export function createFileOpsRuntime(config) {
     };
     const computeBounds = (items) => {
       let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-      const addPt = (x, y) => {
-        const nx = Number(x), ny = Number(y);
-        if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;
-        minX = Math.min(minX, nx);
-        minY = Math.min(minY, ny);
-        maxX = Math.max(maxX, nx);
-        maxY = Math.max(maxY, ny);
-      };
-      for (const s of (items || [])) {
-        const t = String(s?.type || "").toLowerCase();
-        if (t === "line" || t === "rect") {
-          addPt(s.x1, s.y1); addPt(s.x2, s.y2);
-        } else if (t === "polyline") {
-          for (const p of (Array.isArray(s.points) ? s.points : [])) addPt(p?.x, p?.y);
-        } else if (t === "circle" || t === "arc") {
-          const cx = Number(s.cx), cy = Number(s.cy), r = Math.abs(Number(s.r) || 0);
-          addPt(cx - r, cy - r); addPt(cx + r, cy + r);
+    const addPt = (x, y) => {
+      const nx = Number(x), ny = Number(y);
+      if (!Number.isFinite(nx) || !Number.isFinite(ny)) return;
+      minX = Math.min(minX, nx);
+      minY = Math.min(minY, ny);
+      maxX = Math.max(maxX, nx);
+      maxY = Math.max(maxY, ny);
+    };
+    for (const s of (items || [])) {
+      const t = String(s?.type || "").toLowerCase();
+      if (t === "line" || t === "rect") {
+        addPt(s.x1, s.y1); addPt(s.x2, s.y2);
+      } else if (t === "polyline") {
+        for (const p of (Array.isArray(s.points) ? s.points : [])) addPt(p?.x, p?.y);
+      } else if (t === "circle" || t === "arc") {
+        const cx = Number(s.cx), cy = Number(s.cy), r = Math.abs(Number(s.r) || 0);
+        addPt(cx - r, cy - r); addPt(cx + r, cy + r);
+      } else if (t === "text") {
+        addPt(s.x1, s.y1);
+        addPt(s.x2, s.y2);
+      } else if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circledim") {
+        for (const key of Object.keys(s || {})) {
+          const v = Number(s[key]);
+          if (!Number.isFinite(v)) continue;
+          const lower = key.toLowerCase();
+          if (lower.startsWith("x") || lower === "cx" || lower === "tx") addPt(v, Number.isFinite(Number(s[key.replace(/^x/i, "y")])) ? Number(s[key.replace(/^x/i, "y")]) : v);
+          if (lower.startsWith("y") || lower === "cy" || lower === "ty") addPt(Number.isFinite(Number(s[key.replace(/^y/i, "x")])) ? Number(s[key.replace(/^y/i, "x")]) : v, v);
         }
       }
+    }
       if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) return null;
       return { minX, minY, maxX, maxY };
     };
@@ -798,6 +821,17 @@ export function createFileOpsRuntime(config) {
         }
       } else if (t === "circle" || t === "arc") {
         s.cx = Number(s.cx) + dx; s.cy = Number(s.cy) + dy;
+      } else if (t === "text") {
+        s.x1 = Number(s.x1) + dx; s.y1 = Number(s.y1) + dy;
+        if (Number.isFinite(Number(s.x2))) s.x2 = Number(s.x2) + dx;
+        if (Number.isFinite(Number(s.y2))) s.y2 = Number(s.y2) + dy;
+      } else if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circledim") {
+        for (const key of ["x1", "x2", "px", "tx"]) {
+          if (Number.isFinite(Number(s[key]))) s[key] = Number(s[key]) + dx;
+        }
+        for (const key of ["y1", "y2", "py", "ty"]) {
+          if (Number.isFinite(Number(s[key]))) s[key] = Number(s[key]) + dy;
+        }
       }
     };
     let importSource = src.map(normalizeImported);
@@ -853,6 +887,21 @@ export function createFileOpsRuntime(config) {
         minY = Math.min(minY, Number(s.cy) - Number(s.r));
         maxX = Math.max(maxX, Number(s.cx) + Number(s.r));
         maxY = Math.max(maxY, Number(s.cy) + Number(s.r));
+      } else if (s.type === "text") {
+        minX = Math.min(minX, Number(s.x1), Number(s.x2));
+        minY = Math.min(minY, Number(s.y1), Number(s.y2));
+        maxX = Math.max(maxX, Number(s.x1), Number(s.x2));
+        maxY = Math.max(maxY, Number(s.y1), Number(s.y2));
+      } else if (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "circledim") {
+        for (const key of Object.keys(s || {})) {
+          const value = Number(s[key]);
+          if (!Number.isFinite(value)) continue;
+          const lower = key.toLowerCase();
+          if (lower.startsWith("x") || lower === "cx" || lower === "px" || lower === "tx") minX = Math.min(minX, value);
+          if (lower.startsWith("y") || lower === "cy" || lower === "py" || lower === "ty") minY = Math.min(minY, value);
+          if (lower.startsWith("x") || lower === "cx" || lower === "px" || lower === "tx") maxX = Math.max(maxX, value);
+          if (lower.startsWith("y") || lower === "cy" || lower === "py" || lower === "ty") maxY = Math.max(maxY, value);
+        }
       }
     };
 
@@ -861,7 +910,7 @@ export function createFileOpsRuntime(config) {
     const imported = [];
     for (const raw of importSource) {
       const t = String(raw?.type || "").toLowerCase();
-      if (!["line", "polyline", "rect", "circle", "arc"].includes(t)) continue;
+      if (!["line", "polyline", "rect", "circle", "arc", "text", "dim", "dimchain", "dimangle", "circledim"].includes(t)) continue;
       const s = { ...raw };
       s.id = nextShapeId(state);
       s.type = t;
@@ -1164,6 +1213,30 @@ export function createFileOpsRuntime(config) {
         const baseCcw = base.ccw !== false;
         const flipsOdd = (!!p.flipX) !== (!!p.flipY);
         target.ccw = flipsOdd ? !baseCcw : baseCcw;
+      } else if (t === "text") {
+        const p1 = transformPointImportAdjust(base.x1, base.y1, origin, p);
+        target.x1 = p1.x; target.y1 = p1.y;
+        if (Number.isFinite(Number(base.x2)) && Number.isFinite(Number(base.y2))) {
+          const p2 = transformPointImportAdjust(base.x2, base.y2, origin, p);
+          target.x2 = p2.x; target.y2 = p2.y;
+        }
+        if (Number.isFinite(Number(base.textSizePt))) {
+          target.textSizePt = Math.max(0.01, Number(base.textSizePt) * Math.max(1e-6, Number(p.scale) || 1));
+        }
+      } else if (t === "dim" || t === "dimchain" || t === "dimangle" || t === "circledim") {
+        const coordPairs = [["x1", "y1"], ["x2", "y2"], ["px", "py"], ["tx", "ty"]];
+        for (const [kx, ky] of coordPairs) {
+          if (Number.isFinite(Number(base[kx])) && Number.isFinite(Number(base[ky]))) {
+            const tp = transformPointImportAdjust(base[kx], base[ky], origin, p);
+            target[kx] = tp.x;
+            target[ky] = tp.y;
+          }
+        }
+        for (const key of ["fontSize", "dimArrowSizePt", "extOffset", "extOver", "rOverrun"]) {
+          if (Number.isFinite(Number(base[key]))) {
+            target[key] = Math.max(0.01, Number(base[key]) * Math.max(1e-6, Number(p.scale) || 1));
+          }
+        }
       }
     }
 
@@ -1288,7 +1361,8 @@ export function createFileOpsRuntime(config) {
       const dstUnit = String(state.pageSetup?.unit || "mm").toLowerCase();
       const unitScale = resolveUnitScale(srcUnit, dstUnit);
       const parsed = parseDxfToCadShapes(text, {
-        polylineize: false
+        polylineize: false,
+        sourceUnit: srcUnit,
       });
       const shapes = parsed.shapes;
       const polyCount = shapes.filter((s) => String(s?.type || "").toLowerCase() === "polyline").length;

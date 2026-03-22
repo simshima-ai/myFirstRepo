@@ -14,6 +14,8 @@ import {
   normalizeMaxZoomPreset,
   normalizeMenuScalePreset,
   normalizePageScalePreset,
+  resolveMenuScale,
+  normalizeWheelZoomPreset,
 } from "./ui_numeric.js";
 import { refreshUiMain } from "./ui_refresh_main.js";
 import { bindInitTailEvents } from "./ui_init_tail_events.js";
@@ -129,8 +131,7 @@ export function initUiMain(state, dom, actions, deps = {}) {
   const onGroupPanelResizeMove = (e) => {
     if (!groupPanelResizeDrag) return;
     if (!state.ui.panelLayout) state.ui.panelLayout = {};
-    const scalePct = Number(state.ui?.menuScalePct ?? 100);
-    const scale = (Number.isFinite(scalePct) && scalePct > 0) ? (scalePct / 100) : 1;
+    const scale = resolveMenuScale(state.ui, window.innerWidth, window.innerHeight);
     const invScale = (scale > 0) ? (1 / scale) : 1;
     const dx = (e.clientX - groupPanelResizeDrag.startX) * invScale;
     const dy = (e.clientY - groupPanelResizeDrag.startY) * invScale;
@@ -693,6 +694,70 @@ export function initUiMain(state, dom, actions, deps = {}) {
     dom.gridAutoTimingSlider.addEventListener("input", onGridAutoTimingChange);
     onGridAutoTimingChange();
   }
+  const applyStartSetupGridSizeValue = (raw) => {
+    const v = normalizeGridPreset(raw);
+    if (!state.grid) state.grid = {};
+    state.grid.presetSize = v;
+    if (dom.startSetupGridSizeSelect) dom.startSetupGridSizeSelect.value = String(v);
+    if (!state.grid.customSizeEnabled) {
+      actions.setGridSize(v);
+      actions.refitViewToPage?.();
+    }
+  };
+  if (dom.startSetupGridSizeSelect) {
+    dom.startSetupGridSizeSelect.addEventListener("change", () => applyStartSetupGridSizeValue(dom.startSetupGridSizeSelect.value));
+    dom.startSetupGridSizeSelect.addEventListener("input", () => applyStartSetupGridSizeValue(dom.startSetupGridSizeSelect.value));
+  }
+  if (dom.startSetupCustomGridInput) {
+    const applyStartCustomGrid = () => {
+      if (!state.grid) state.grid = {};
+      const v = Math.max(1, Number(normalizePositiveNumber(dom.startSetupCustomGridInput.value, state.grid.customSize ?? 10, 1)));
+      dom.startSetupCustomGridInput.value = String(v);
+      state.grid.customSize = v;
+      if (state.grid.customSizeEnabled) {
+        actions.setGridSize(v);
+        actions.refitViewToPage?.();
+      }
+    };
+    dom.startSetupCustomGridInput.addEventListener("change", applyStartCustomGrid);
+    dom.startSetupCustomGridInput.addEventListener("input", applyStartCustomGrid);
+  }
+  if (dom.startSetupCustomGridToggle) {
+    dom.startSetupCustomGridToggle.addEventListener("change", () => {
+      if (!state.grid) state.grid = {};
+      state.grid.customSizeEnabled = !!dom.startSetupCustomGridToggle.checked;
+      const v = state.grid.customSizeEnabled
+        ? Math.max(1, Number(state.grid.customSize) || 10)
+        : Math.max(1, Number(state.grid.presetSize ?? state.grid.size ?? 10) || 10);
+      actions.setGridSize(v);
+      actions.refitViewToPage?.();
+      actions.render?.();
+    });
+  }
+  if (dom.startSetupGridShowToggle) {
+    dom.startSetupGridShowToggle.addEventListener("change", () => {
+      actions.setGridShow?.(!!dom.startSetupGridShowToggle.checked);
+    });
+  }
+  if (dom.startSetupGridAutoToggle) {
+    dom.startSetupGridAutoToggle.addEventListener("change", () => {
+      actions.setGridAuto?.(!!dom.startSetupGridAutoToggle.checked);
+    });
+  }
+  if (dom.startSetupGridAutoTimingSlider) {
+    const onStartSetupGridAutoTimingChange = () => {
+      const timing = clampGridAutoTiming(dom.startSetupGridAutoTimingSlider.value);
+      const th = gridThresholdsFromTiming(timing);
+      actions.setGridAutoThresholds?.(th.th50, th.th10, th.th5, th.th1, timing);
+      if (dom.startSetupGridAutoTimingLabel) dom.startSetupGridAutoTimingLabel.textContent = gridAutoTimingLabelText(timing);
+      if (dom.startSetupGridAutoHint) {
+        dom.startSetupGridAutoHint.textContent = String(state.ui?.language || "en").toLowerCase().startsWith("ja")
+          ? `閾値: 50=${th.th50}% / 10=${th.th10}% / 5=${th.th5}% / 1=${th.th1}%`
+          : `Thresholds: 50=${th.th50}% / 10=${th.th10}% / 5=${th.th5}% / 1=${th.th1}%`;
+      }
+    };
+    dom.startSetupGridAutoTimingSlider.addEventListener("input", onStartSetupGridAutoTimingChange);
+  }
   if (dom.objSnapToggle) {
     dom.objSnapToggle.checked = state.objectSnap?.enabled !== false;
     dom.objSnapToggle.addEventListener("change", () => actions.setObjectSnapEnabled(!!dom.objSnapToggle.checked));
@@ -910,6 +975,7 @@ export function initUiMain(state, dom, actions, deps = {}) {
     normalizeLineTypePreset,
     normalizePageScalePreset,
     normalizeMaxZoomPreset,
+    normalizeWheelZoomPreset,
     normalizeMenuScalePreset,
   });
 }

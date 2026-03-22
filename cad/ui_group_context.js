@@ -1,3 +1,4 @@
+import { getSelectionUiRules } from "./ui_selection_rules.js";
 import { getGroupContextTitle } from "./ui_text.js";
 
 export function refreshGroupContext(state, dom, panelLang) {
@@ -32,7 +33,8 @@ export function refreshGroupContext(state, dom, panelLang) {
   const groupRelativeMoveOps = document.getElementById("groupRelativeMoveOps");
   const dimMergeGroupsRow = document.getElementById("dimMergeGroupsRow");
   if (groupCtxObjectOps || groupCtxGroupOps) {
-    const selectedCount = (state.selection?.ids || []).length;
+    const selectionRules = getSelectionUiRules(state);
+    const selectedCount = selectionRules.count;
     const hasObjectSelection = selectedCount > 0;
     const selectedGroupIds = Array.isArray(state.selection?.groupIds)
       ? state.selection.groupIds.map(Number).filter(Number.isFinite)
@@ -46,25 +48,13 @@ export function refreshGroupContext(state, dom, panelLang) {
     const hasActiveGroup = Number.isFinite(effectiveActiveGroupId);
     const aimPickActive = !!(state.input?.groupAimPick?.active)
       && Number(state.input?.groupAimPick?.groupId) === Number(effectiveActiveGroupId);
-    const selIds = new Set((state.selection?.ids || []).map(Number));
-    const selectedShapes = selIds.size > 0 ? (state.shapes || []).filter(s => selIds.has(Number(s.id))) : [];
-    const styleTargetTypes = new Set(["line", "polyline", "circle", "arc", "position"]);
-    const colorTargetTypes = new Set(["line", "polyline", "rect", "circle", "arc", "position", "text", "dim", "dimchain", "dimangle", "circleDim", "hatch"]);
-    const hasOnlyStyleTargetSelection = selectedShapes.length > 0
-      && selectedShapes.every(s => styleTargetTypes.has(String(s.type || "")));
-    const hasOnlyColorTargetSelection = selectedShapes.length > 0
-      && selectedShapes.every(s => colorTargetTypes.has(String(s.type || "")));
-    const hasOnlyPositionSelection = selectedShapes.length > 0
-      && selectedShapes.every(s => String(s.type || "") === "position");
-    const hasOnlyImageSelection = selectedShapes.length > 0
-      && selectedShapes.every(s => String(s.type || "") === "image");
-    const hasOnlyCircleSelection = selectedShapes.length > 0
-      && selectedShapes.every(s => {
-        const t = String(s.type || "");
-        return t === "circle" || t === "arc";
-      });
-    const hasOnlyDimSelection = selectedShapes.length > 0
-      && selectedShapes.every(s => s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "circleDim");
+    const selectedShapes = selectionRules.selectedShapes;
+    const hasOnlyStyleTargetSelection = selectionRules.hasOnlyStyleTargetSelection;
+    const hasOnlyColorTargetSelection = selectionRules.hasOnlyColorTargetSelection;
+    const hasOnlyPositionSelection = selectionRules.hasOnlyPositionSelection;
+    const hasOnlyImageSelection = selectionRules.hasOnlyImageSelection;
+    const hasOnlyCircleSelection = selectionRules.hasOnlyCircleSelection;
+    const hasOnlyDimSelection = selectionRules.hasOnlyTypes("dim", "dimchain", "dimangle", "circleDim");
     if (groupCtxTitle) {
       let titleKey = "group";
       if (aimPickActive) {

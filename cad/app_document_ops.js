@@ -12,12 +12,14 @@
   function loadJson() {
     if (!state.ui) state.ui = {};
     state.ui.jsonFileMode = "replace";
+    state.ui.startSetupVisible = false;
     loadJsonFromFileDialog(state, dom);
   }
 
   function importJson() {
     if (!state.ui) state.ui = {};
     state.ui.jsonFileMode = "import";
+    state.ui.startSetupVisible = false;
     loadJsonFromFileDialog(state, dom);
   }
 
@@ -63,6 +65,7 @@
     if (!state.ui) state.ui = {};
     state.ui.layerView = { colorize: false, editOnlyActive: false };
     state.ui.groupView = { colorize: false, currentLayerOnly: false };
+    state.ui.startSetupVisible = true;
     state.history.past = [];
     state.history.future = [];
     setTool(state, "select");

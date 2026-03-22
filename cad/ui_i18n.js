@@ -1,3 +1,5 @@
+import { getPanelText } from "./ui_text.js";
+
 function clampGridAutoTiming(v) {
   return Math.max(0, Math.min(100, Math.round(Number(v) || 0)));
 }
@@ -55,6 +57,7 @@ export function refreshGridUnitLabels(state) {
 
 export function applyLanguageUi(state, dom) {
   const lang = getUiLanguage(state);
+  const panelText = getPanelText(lang);
   const q = (sel) => document.querySelector(sel);
   const setText = (sel, text) => {
     const el = q(sel);
@@ -106,6 +109,31 @@ export function applyLanguageUi(state, dom) {
     if (prev && prev.tagName === "SPAN") prev.textContent = text;
   };
   document.documentElement.lang = lang;
+  const setContextTitle = (selector, text) => setText(selector, text);
+  setContextTitle("#topContext [data-context='select'] .section-title", panelText.selectionModeTitle);
+  setContextTitle("#topContext [data-context='vertex'] .section-title", panelText.vertexEditTitle);
+  setContextTitle("#topContext [data-context='move'] .section-title", panelText.move);
+  setContextTitle("#topContext [data-context='line'] .section-title", panelText.lineTitle);
+  setContextTitle("#topContext [data-context='rect'] .section-title", panelText.rectTitle);
+  setContextTitle("#topContext [data-context='circle'] .section-title", panelText.circleTitle);
+  setContextTitle("#topContext [data-context='fillet'] .section-title", panelText.filletTitle);
+  setContextTitle("#topContext [data-context='trim'] .section-title", panelText.trimTitle);
+  setContextTitle("#topContext [data-context='position'] .section-title", panelText.positionTitle);
+  setContextTitle("#topContext [data-context='text'] .section-title", panelText.textTitle);
+  setContextTitle("#topContext [data-context='dim'] .section-title", panelText.dimTitle);
+  setContextTitle("#topContext [data-context='hatch'] .section-title", panelText.hatchTitle);
+  setContextTitle("#topContext [data-context='importadjust'] .section-title", panelText.importAdjustTitle);
+  setContextTitle("#topContext [data-context='trace'] .section-title", panelText.traceTitle);
+  setContextTitle("#topContext [data-context='patterncopy'] .section-title", panelText.patternCopyTitle);
+  setContextTitle("#topContext [data-context='doubleline'] .section-title", panelText.doublelineTitle);
+  setContextTitle("#topContext [data-context='preview'] .section-title", panelText.previewTitle);
+  setContextTitle("#topContext [data-context='settings'] .section-title", panelText.settingsTitle);
+  setText("#gridSettingsTitle", panelText.gridSettingsTitle);
+  setText("#shortcutSettingsLabel", panelText.keyboardShortcutsLabel);
+  setText("#shortcutSettingsHint", panelText.keyboardShortcutsHint);
+  setContextTitle("#selectionTextEdit .section-title", panelText.selectionTextEditTitle);
+  setContextTitle("#selectionLeaderStyleEdit .section-title", panelText.selectionLeaderStyleTitle);
+  setText("#touchToolPanelTitle", panelText.touchPanelTitle);
 
   const dict = {
     ja: {
@@ -217,6 +245,7 @@ export function applyLanguageUi(state, dom) {
       down: "\u4e0b\u3078",
       lineApply: "\u4f5c\u6210",
       rectApply: "\u4f5c\u6210",
+      rectAsPolyline: "Polylineとして生成",
       circleApply: "\u4f5c\u6210",
       vertexMoveApply: "\u79fb\u52d5",
       groupRotation: "\u56de\u8ee2",
@@ -271,7 +300,7 @@ export function applyLanguageUi(state, dom) {
       layerName: "レイヤー名",
       grid: "グリッド",
       onCurve: "線上",
-      endpoint: "端点",
+      endpoint: "頂点",
       midpoint: "中点",
       center: "中心",
       intersection: "交点",
@@ -539,6 +568,7 @@ export function applyLanguageUi(state, dom) {
       down: "Down",
       lineApply: "Create",
       rectApply: "Create",
+      rectAsPolyline: "Generate as Polyline",
       circleApply: "Create",
       vertexMoveApply: "Move",
       groupRotation: "Rotation",
@@ -593,7 +623,7 @@ export function applyLanguageUi(state, dom) {
       layerName: "Layer Name",
       grid: "Grid",
       onCurve: "On Curve",
-      endpoint: "Endpoint",
+      endpoint: "Vertex",
       midpoint: "Midpoint",
       center: "Center",
       intersection: "Intersection",
@@ -791,7 +821,11 @@ export function applyLanguageUi(state, dom) {
   if (layerResizeTop) layerResizeTop.title = t.layerPanelHeightTitle;
   if (layerResizeLeft) layerResizeLeft.title = t.layerPanelWidthTitle;
   if (dom.attrAddBtn) dom.attrAddBtn.textContent = t.add;
+  if (dom.selectToolMoveBtn) dom.selectToolMoveBtn.textContent = t.move;
+  if (dom.selectToolCopyBtn) dom.selectToolCopyBtn.textContent = t.copy;
   if (dom.moveVertexBtn) dom.moveVertexBtn.textContent = t.vertexMoveApply;
+  if (dom.moveToolApplyBtn) dom.moveToolApplyBtn.textContent = t.move;
+  if (dom.moveToolCopyBtn) dom.moveToolCopyBtn.textContent = t.copy;
   if (dom.applyLineInputBtn) dom.applyLineInputBtn.textContent = t.lineApply;
   if (dom.applyRectInputBtn) dom.applyRectInputBtn.textContent = t.rectApply;
   if (dom.applyCircleInputBtn) dom.applyCircleInputBtn.textContent = t.circleApply;
@@ -898,12 +932,15 @@ export function applyLanguageUi(state, dom) {
   if (dom.applyFilletBtn) dom.applyFilletBtn.textContent = t.filletApply;
   setText("#uiLanguageLabel", t.language);
   setText(".section[data-panel-id='view'] > .section-title", t.view);
+  setText("#menuScaleModeLabel", t.menuScaleMode || (lang === "ja" ? "メニュースケールモード" : "Menu Scale Mode"));
+  setText("#menuScaleAutoLabel", lang === "ja" ? "自動倍率の強さ" : "Auto Scale");
   setLabelByControl("gridShowToggle", t.show);
   setLabelByControl("gridAutoToggle", t.autoGrid);
   setLabelByControl("menuScaleSelect", t.menuScale);
   setLabelByControl("touchModeToggle", t.touchMode);
   setText("#leftMenuVisibilityLabel", t.leftMenuVisibleItems);
   setButtonById("touchConfirmBtn", t.touchConfirmCommon);
+  setButtonById("touchLineFinishBtn", lang === "ja" ? "連続ライン確定" : "Finish Continuous Line");
   setButtonById("touchCancelBtn", t.touchCancelCommon);
   setButtonById("touchSelectBackBtn", t.touchBackToSelect);
   if (dom.touchMultiSelectBtn) {
@@ -939,6 +976,7 @@ export function applyLanguageUi(state, dom) {
   setPrevSpanByControl("rectWidthInput", t.width);
   setPrevSpanByControl("rectHeightInput", t.height);
   setPrevSpanByControl("rectAnchorSelect", t.basePoint);
+  setLabelByControl("rectAsPolylineToggle", t.rectAsPolyline);
   setOptionText("rectAnchorSelect", "c", t.centerPoint);
   setOptionText("rectAnchorSelect", "tl", t.topLeft);
   setOptionText("rectAnchorSelect", "tc", t.topCenter);
@@ -992,6 +1030,8 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("dimArrowDirectionSelect", t.arrowDirection);
   setLabelByControl("dimFontSizeInput", t.textSizePt);
   setLabelByControl("dimTextRotateInput", t.textRotate);
+  setLabelByControl("dimNumericPriorityToggle", lang === "ja" ? "数値優先" : "Numeric Priority");
+  setLabelByControl("dimNumericValueInput", lang === "ja" ? "数値" : "Value");
   setLabelByControl("dimExtOffsetInput", t.extOffset);
   setLabelByControl("dimExtOverInput", t.extOver);
   setLabelByControl("dimROvershootInput", t.dimOvershoot);
@@ -1094,7 +1134,6 @@ export function applyLanguageUi(state, dom) {
   if (dom.patternCopySetCenterBtn) dom.patternCopySetCenterBtn.textContent = t.setAsCenter;
   if (dom.patternCopySetAxisBtn) dom.patternCopySetAxisBtn.textContent = t.setAsAxis;
   setLabelByControl("trimNoDeleteToggle", t.trimNoDelete);
-  setText("#selectionTextEdit .section-title", t.textSelectedEdit);
   setLabelByControl("positionSizeInput", t.size);
   setLabelByControl("previewPrecisionSelect", t.precision);
   setLabelByControl("dimIgnoreGridSnapToggle", t.noGridSnap);
@@ -1121,6 +1160,12 @@ export function applyLanguageUi(state, dom) {
   setLabelByControl("pageScaleInput", t.scale);
   setText("#customScaleToggleLabel", t.customScale);
   setLabelByControl("maxZoomInput", t.maxZoom);
+  setLabelByControl("wheelZoomFactorSelect", lang === "ja" ? "ホイールズーム" : "Wheel Zoom");
+  setOptionText("wheelZoomFactorSelect", "1.05", lang === "ja" ? "とても遅い" : "Very Slow");
+  setOptionText("wheelZoomFactorSelect", "1.1", lang === "ja" ? "遅い" : "Slow");
+  setOptionText("wheelZoomFactorSelect", "1.2", lang === "ja" ? "標準" : "Normal");
+  setOptionText("wheelZoomFactorSelect", "1.35", lang === "ja" ? "速い" : "Fast");
+  setOptionText("wheelZoomFactorSelect", "1.5", lang === "ja" ? "とても速い" : "Very Fast");
   setLabelByControl("fpsDisplayToggle", t.fps);
   setLabelByControl("objectCountDisplayToggle", t.objectCount);
   setLabelByControl("autoBackupToggle", t.autoBackup);
@@ -1147,8 +1192,8 @@ export function applyLanguageUi(state, dom) {
   setText("#customGridToggleLabel", t.customGrid);
   setText("#gridShowContextLabel", t.show);
   setText("#gridAutoContextLabel", t.autoGrid);
-  setText(".section[data-context='settings'] > div > div", t.pageSettings);
-  setText(".section[data-context='settings'] .section-title[style]", t.gridSettings);
+  setText("#pageSettingsTitle", t.pageSettings);
+  setText("#gridSettingsTitle", t.gridSettings);
   setText("#settingsInterfaceLabel", t.interfaceSection);
   setText("#gridAutoTimingLabel", localizeGridAutoTimingLabelText(Number(dom.gridAutoTimingSlider?.value || 0), lang));
   setText("#filletModeLabel", t.filletMode);
@@ -1157,7 +1202,7 @@ export function applyLanguageUi(state, dom) {
   const gridHint = document.getElementById("gridAutoTimingHint");
   if (gridHint) gridHint.textContent = t.gridAutoTimingHint;
   setText("#gridAutoTimingTitle", t.autoGridTiming);
-  const debugTitle = document.querySelector(".debug-console-title");
+  const debugTitle = document.getElementById("debugConsoleTitle");
   if (debugTitle) debugTitle.textContent = t.debugConsole;
   const debugCopyBtn = document.getElementById("debugConsoleCopyBtn");
   const debugClearBtn = document.getElementById("debugConsoleClearBtn");

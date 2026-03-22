@@ -25,7 +25,7 @@ import {
   moveActiveGroupOrder, moveActiveLayerOrder, deleteActiveLayer,
   deleteActiveGroup, unparentActiveGroup, moveActiveGroup,
   updateSelectedTextSettings, updateSelectedImageSettings, moveSelectedShapes, moveSelectedVertices,
-  setGroupRotateSnap, setVertexLinkCoincident, setLineInputs, setLineSizeLocked, setLineAnchor, setRectInputs, setRectSizeLocked, setRectAnchor, setCircleRadiusInput,
+  setGroupRotateSnap, setVertexLinkCoincident, setLineInputs, setLineSizeLocked, setLineAnchor, setRectInputs, setRectAsPolyline, setRectSizeLocked, setRectAnchor, setCircleRadiusInput,
   setCircleMode, setCircleRadiusLocked,
   setPositionSize, setSelectionCircleCenterMark, setFilletRadius, setFilletLineMode, setVertexMoveInputs,
   setLineWidthMm, setToolLineType, setSelectedLineWidthMm, setSelectedLineType,
@@ -87,7 +87,7 @@ import { createHistoryViewOps } from "./app_history_view_ops.js";
 import { createLayerGroupOps } from "./app_layer_group_ops.js";
 import { createDomRefs } from "./app_dom.js";
 import { DEFAULT_PANEL_VISIBILITY, ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
-import { DISPLAY_MODES, applyDisplayModePreset, normalizeDisplayMode } from "./ui_display_mode_presets.js";
+import { DISPLAY_MODES, applyDisplayModePreset, normalizeDisplayMode, getDisplayModePreset } from "./ui_display_mode_presets.js";
 import { finalizeBsplineDraftState } from "./app_input_bspline.js";
 import { localizeStatusText } from "./ui_text.js";
 
@@ -316,6 +316,8 @@ const persistence = createPersistenceRuntime({
 });
 const saveAppSettingsNow = () => persistence.saveAppSettingsNow();
 const scheduleSaveAppSettings = () => persistence.scheduleSaveAppSettings();
+const applyLoadedSettings = (data) => persistence.applyLoadedSettings(data);
+const applyLoadedToolSettings = (data) => persistence.applyLoadedToolSettings(data);
 const loadAppSettingsAtStartup = () => persistence.loadAppSettingsAtStartup();
 const detectInitialUiLanguage = () => persistence.detectInitialUiLanguage();
 const saveAutoBackup = () => persistence.saveAutoBackup(exportJsonObject, helpers);
@@ -503,13 +505,29 @@ function getShapeDisplayColorHex(shape) {
   return norm(shape.color) || norm(shape.lineColor) || norm(shape.textColor);
 }
 
-function buildRectAsLines(p1, p2) {
+function buildRectLineShapes(p1, p2) {
   return [
-    { type: "line", x1: p1.x, y1: p1.y, x2: p2.x, y2: p1.y },
-    { type: "line", x1: p2.x, y1: p1.y, x2: p2.x, y2: p2.y },
-    { type: "line", x1: p2.x, y1: p2.y, x2: p1.x, y2: p2.y },
-    { type: "line", x1: p1.x, y1: p2.y, x2: p1.x, y2: p1.y }
+    { type: "line", x1: Number(p1.x), y1: Number(p1.y), x2: Number(p2.x), y2: Number(p1.y) },
+    { type: "line", x1: Number(p2.x), y1: Number(p1.y), x2: Number(p2.x), y2: Number(p2.y) },
+    { type: "line", x1: Number(p2.x), y1: Number(p2.y), x2: Number(p1.x), y2: Number(p2.y) },
+    { type: "line", x1: Number(p1.x), y1: Number(p2.y), x2: Number(p1.x), y2: Number(p1.y) }
   ];
+}
+
+function buildRectShape(p1, p2, asPolyline = false) {
+  if (asPolyline) {
+    return {
+      type: "polyline",
+      points: [
+        { x: Number(p1.x), y: Number(p1.y) },
+        { x: Number(p2.x), y: Number(p1.y) },
+        { x: Number(p2.x), y: Number(p2.y) },
+        { x: Number(p1.x), y: Number(p2.y) },
+      ],
+      closed: true,
+    };
+  }
+  return null;
 }
 
 const clipboardOps = createClipboardOps({
@@ -611,8 +629,71 @@ const toolSwitchOps = createToolSwitchOps({
   clearSelection,
   draw,
   updateDimHover,
-  hitTestShapes: (st, wr) => hitTestShapes(st, wr, dom)
+  hitTestShapes: (st, wr) => hitTestShapes(st, wr, dom),
+  focusSelectMoveInput: () => {
+    const candidates = [
+      dom.selectMoveDxInput,
+      dom.selectToolDxInput
+    ];
+    const isUsableInput = (input) => {
+      if (!input || input.disabled) return false;
+      if (!input.isConnected) return false;
+      const style = (typeof window !== "undefined" && typeof window.getComputedStyle === "function")
+        ? window.getComputedStyle(input)
+        : null;
+      if (style && (style.display === "none" || style.visibility === "hidden")) return false;
+      const rect = (typeof input.getBoundingClientRect === "function")
+        ? input.getBoundingClientRect()
+        : null;
+      return !!rect && rect.width > 0 && rect.height > 0;
+    };
+    const tryFocus = () => {
+      if (String(state.tool || "") !== "select") return;
+      const hasObjectSelection = Array.isArray(state.selection?.ids) && state.selection.ids.length > 0;
+      if (!hasObjectSelection) return;
+      const input = candidates.find(isUsableInput);
+      if (!input || typeof input.focus !== "function") return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch (_) {
+        input.focus();
+      }
+      if (typeof input.select === "function") input.select();
+    };
+    tryFocus();
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        tryFocus();
+        requestAnimationFrame(() => {
+          tryFocus();
+        });
+      });
+    }
+  },
+  focusRectToolWidthInput: () => {
+    const input = dom.rectWidthInput;
+    if (!input || typeof input.focus !== "function") return;
+    const tryFocus = () => {
+      if (String(state.tool || "") !== "rect") return;
+      try {
+        input.focus({ preventScroll: true });
+      } catch (_) {
+        input.focus();
+      }
+      if (typeof input.select === "function") input.select();
+    };
+    tryFocus();
+    if (typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        tryFocus();
+        requestAnimationFrame(() => {
+          tryFocus();
+        });
+      });
+    }
+  }
 });
+dom.focusSelectMoveInput = toolSwitchOps.focusSelectMoveInput;
 const historyViewOps = createHistoryViewOps({
   state,
   stateUndo,
@@ -683,7 +764,8 @@ const helpers = {
   buildHatchLoopsFromBoundaryIds,
   chooseEndsForLineByKeepEnd,
   createGroupFromSelection: (st, name) => createGroupFromSelection(st, name),
-  setTool: (t) => toolSwitchOps.setToolAction(t),
+  setTool: (t) => { toolSwitchOps.setToolAction(t); scheduleSaveAppSettings(); },
+  focusSelectMoveInput: () => toolSwitchOps.focusSelectMoveInput?.(),
   undo: () => historyViewOps.undoAction(),
   redo: () => historyViewOps.redoAction(),
   delete: () => {
@@ -733,15 +815,23 @@ const helpers = {
   applyCircleInput: (r) => applyCircleInput(state, helpers, r),
   applyFillet: (r, worldHint = null) => applyFillet(state, helpers, r, worldHint),
 
-  setObjectSnapEnabled: (v) => { setObjectSnapEnabled(state, v); draw(); },
-  setObjectSnapKind: (k, v) => { setObjectSnapKind(state, k, v); draw(); },
+  setObjectSnapEnabled: (v) => { setObjectSnapEnabled(state, v); scheduleSaveAppSettings(); draw(); },
+  setObjectSnapKind: (k, v) => { setObjectSnapKind(state, k, v); scheduleSaveAppSettings(); draw(); },
   setGridSize: (v) => { setGridSize(state, v); scheduleSaveAppSettings(); draw(); },
   setGridSnap: (v) => { setGridSnap(state, v); scheduleSaveAppSettings(); draw(); },
   setGridShow: (v) => { setGridShow(state, v); scheduleSaveAppSettings(); draw(); },
   setGridAuto: (v) => { setGridAuto(state, v); scheduleSaveAppSettings(); draw(); },
   setGridAutoThresholds: (t50, t10, t5, t1, timing) => { setGridAutoThresholds(state, t50, t10, t5, t1, timing); scheduleSaveAppSettings(); draw(); },
+  setStartSetupVisible: (on) => {
+    if (!state.ui) state.ui = {};
+    state.ui.startSetupVisible = !!on;
+    draw();
+  },
   setLanguage: (lang) => uiPrefsOps.setLanguage(lang),
+  setMenuScaleMode: (mode) => uiPrefsOps.setMenuScaleMode(mode),
+  setMenuScaleAutoPreset: (preset) => uiPrefsOps.setMenuScaleAutoPreset(preset),
   setMenuScalePct: (pct) => uiPrefsOps.setMenuScalePct(pct),
+  setWheelZoomFactor: (v) => uiPrefsOps.setWheelZoomFactor(v),
 
   addLayer: (name) => layerGroupOps.addLayerAction(name),
   setActiveLayer: (id) => layerGroupOps.setActiveLayerAction(id),
@@ -795,6 +885,7 @@ const helpers = {
   setLineSizeLocked: (on = null) => { setLineSizeLocked(state, helpers, on); draw(); },
   setLineAnchor: (anchor) => { setLineAnchor(state, anchor); draw(); },
   setRectInputs: (w, h) => { setRectInputs(state, w, h); draw(); },
+  setRectAsPolyline: (on) => { setRectAsPolyline(state, on); scheduleSaveAppSettings(); draw(); },
   setRectSizeLocked: (on = null) => { setRectSizeLocked(state, helpers, on); draw(); },
   setRectAnchor: (anchor) => { setRectAnchor(state, anchor); draw(); },
   setCircleMode: (mode) => { setCircleMode(state, helpers, mode); draw(); },
@@ -879,9 +970,9 @@ const helpers = {
     }
     draw();
   },
-  setCircleRadiusInput: (r) => { setCircleRadiusInput(state, r); draw(); },
-  setCircleRadiusLocked: (on = null) => { setCircleRadiusLocked(state, helpers, on); draw(); },
-  setPositionSize: (v) => setPositionSize(state, helpers, v),
+  setCircleRadiusInput: (r) => { setCircleRadiusInput(state, r); scheduleSaveAppSettings(); draw(); },
+  setCircleRadiusLocked: (on = null) => { setCircleRadiusLocked(state, helpers, on); scheduleSaveAppSettings(); draw(); },
+  setPositionSize: (v) => { setPositionSize(state, helpers, v); scheduleSaveAppSettings(); },
   setTextSettings: (patch = {}) => {
     if (!state.textSettings) state.textSettings = {};
     const next = { ...state.textSettings };
@@ -893,10 +984,11 @@ const helpers = {
     if (Object.prototype.hasOwnProperty.call(patch, "italic")) next.italic = !!patch.italic;
     if (Object.prototype.hasOwnProperty.call(patch, "color")) next.color = String(patch.color || "#0f172a");
     state.textSettings = next;
+    scheduleSaveAppSettings();
     draw();
   },
-  setLineWidthMm: (v, toolKey = null) => setLineWidthMm(state, helpers, v, toolKey),
-  setToolLineType: (v, toolKey = null) => setToolLineType(state, helpers, v, toolKey),
+  setLineWidthMm: (v, toolKey = null) => { setLineWidthMm(state, helpers, v, toolKey); scheduleSaveAppSettings(); },
+  setToolLineType: (v, toolKey = null) => { setToolLineType(state, helpers, v, toolKey); scheduleSaveAppSettings(); },
   setSelectedLineWidthMm: (v) => setSelectedLineWidthMm(state, helpers, v),
   setSelectedLineType: (v) => setSelectedLineType(state, helpers, v),
   setSelectedColor: (v) => setSelectedColor(state, helpers, v),
@@ -946,19 +1038,20 @@ const helpers = {
     setStatus(`Selected ${matchedIds.length} same-color object(s)`);
     draw();
   },
-  setToolColor: (v, toolKey = null) => setToolColor(state, helpers, v, toolKey),
+  setToolColor: (v, toolKey = null) => { setToolColor(state, helpers, v, toolKey); scheduleSaveAppSettings(); },
   setSelectPickMode: (mode) => {
     if (!state.ui) state.ui = {};
     const groupsPanelVisible = state.ui?.panelVisibility?.groupsPanel !== false;
     state.ui.selectPickMode = (groupsPanelVisible && String(mode) === "group") ? "group" : "object";
     if (state.ui.selectPickMode !== "group") state.activeGroupId = null;
+    scheduleSaveAppSettings();
     draw();
   },
-  setSelectionCircleCenterMark: (on) => { setSelectionCircleCenterMark(state, helpers, on); draw(); },
-  setFilletRadius: (v) => { setFilletRadius(state, v); draw(); },
-  setFilletLineMode: (m) => { setFilletLineMode(state, m); draw(); },
-  setFilletNoTrim: (on) => { setFilletNoTrim(state, on); draw(); },
-  setTrimNoDelete: (v) => { state.trimSettings.noDelete = !!v; draw(); },
+  setSelectionCircleCenterMark: (on) => { setSelectionCircleCenterMark(state, helpers, on); scheduleSaveAppSettings(); draw(); },
+  setFilletRadius: (v) => { setFilletRadius(state, v); scheduleSaveAppSettings(); draw(); },
+  setFilletLineMode: (m) => { setFilletLineMode(state, m); scheduleSaveAppSettings(); draw(); },
+  setFilletNoTrim: (on) => { setFilletNoTrim(state, on); scheduleSaveAppSettings(); draw(); },
+  setTrimNoDelete: (v) => { state.trimSettings.noDelete = !!v; scheduleSaveAppSettings(); draw(); },
   setPageSetup: (patch) => {
     const prevUnit = String(state.pageSetup?.unit || "mm");
     const p = { ...(patch || {}) };
@@ -1030,6 +1123,7 @@ const helpers = {
   setAutoBackupIntervalSec: (sec) => uiPrefsOps.setAutoBackupIntervalSec(sec),
   setTouchMode: (on) => uiPrefsOps.setTouchMode(on),
   setTouchMultiSelect: (on) => uiPrefsOps.setTouchMultiSelect(on),
+  setTouchPanelPosition: (pos) => uiPrefsOps.setTouchPanelPosition(pos),
   chooseProjectFolder: async () => {
     const result = await persistence.chooseProjectFolder();
     if (result?.ok) setStatus(`Project folder linked: ${String(result.name || "")}`);
@@ -1050,6 +1144,435 @@ const helpers = {
     fileOps.onImportSourceUnitChanged?.();
   },
   setImportAsPolyline: (on) => uiPrefsOps.setImportAsPolyline(on),
+  touchLineSetCandidate: (world) => {
+    if (!(String(state.tool || "") === "line" && !!state.ui?.touchMode)) return false;
+    if (!state.input.touchLineDraft || typeof state.input.touchLineDraft !== "object") {
+      state.input.touchLineDraft = { stage: 0, p1: null, candidatePoint: null };
+    }
+    const d = state.input.touchLineDraft;
+    const x = Number(world?.x);
+    const y = Number(world?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    d.candidatePoint = { x, y };
+    return true;
+  },
+  confirmTouchLineStep: () => {
+    if (!(String(state.tool || "") === "line" && !!state.ui?.touchMode)) return false;
+    const modeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+    const mode = (modeRaw === "continuous" || modeRaw === "freehand") ? modeRaw : "segment";
+    if (!state.input.touchLineDraft || typeof state.input.touchLineDraft !== "object") {
+      state.input.touchLineDraft = { stage: 0, p1: null, candidatePoint: null };
+    }
+    const d = state.input.touchLineDraft;
+    const candidate = d.candidatePoint || state.input.hover?.world || null;
+    if (!candidate || !Number.isFinite(Number(candidate.x)) || !Number.isFinite(Number(candidate.y))) {
+      setStatus(mode === "segment"
+        ? (d.stage === 0 ? "Line: tap a start point first" : "Line: tap an end point first")
+        : "Line: tap a point first");
+      draw();
+      return false;
+    }
+    if (mode === "segment") {
+      if (d.stage !== 1 || !d.p1) {
+        d.p1 = { x: Number(candidate.x), y: Number(candidate.y) };
+        d.stage = 1;
+        d.candidatePoint = null;
+        state.input.dragStartWorld = { x: Number(d.p1.x), y: Number(d.p1.y) };
+        state.preview = { type: "position", x: Number(d.p1.x), y: Number(d.p1.y), positionPreviewMode: "marker" };
+        setStatus("Line: start point confirmed");
+        draw();
+        return true;
+      }
+      pushHistory(state);
+      const shape = createLine(d.p1, candidate);
+      shape.id = nextShapeId(state);
+      shape.layerId = state.activeLayerId;
+      shape.lineWidthMm = Math.max(0.01, Number(state.lineSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+      shape.lineType = String(state.lineSettings?.lineType || "solid");
+      {
+        const rawColor = String(state.lineSettings?.color || "#0f172a").trim();
+        shape.color = /^#[0-9a-fA-F]{6}$/.test(rawColor) ? rawColor.toLowerCase() : "#0f172a";
+      }
+      addShape(state, shape);
+      clearSelection(state);
+      state.activeGroupId = null;
+      state.input.dragStartWorld = null;
+      state.input.touchLineDraft = { stage: 0, p1: null, candidatePoint: null };
+      state.preview = null;
+      setStatus("LINE created");
+      draw();
+      return true;
+    }
+    if (mode === "continuous") {
+      beginOrExtendPolyline(state, candidate);
+      d.candidatePoint = null;
+      setStatus("Continuous line: current position confirmed");
+      draw();
+      return true;
+    }
+    if (!state.polylineDraft || state.polylineDraft.kind !== "bspline") {
+      state.polylineDraft = { kind: "bspline", points: [], hoverPoint: null };
+    }
+    {
+      const pts = state.polylineDraft.points;
+      const prev = pts.length ? pts[pts.length - 1] : null;
+      if (!prev || Math.hypot(Number(candidate.x) - Number(prev.x), Number(candidate.y) - Number(prev.y)) >= 1e-9) {
+        pts.push({ x: Number(candidate.x), y: Number(candidate.y) });
+      }
+      state.polylineDraft.hoverPoint = { x: Number(candidate.x), y: Number(candidate.y) };
+    }
+    d.candidatePoint = null;
+    setStatus("B-spline: current position confirmed");
+    draw();
+    return true;
+  },
+  touchCircleSetCandidate: (world) => {
+    if (!(String(state.tool || "") === "circle" && !!state.ui?.touchMode)) return false;
+    const modeRaw = String(state.circleSettings?.mode || "").toLowerCase();
+    const mode = (modeRaw === "fixed" || modeRaw === "threepoint" || modeRaw === "drag")
+      ? modeRaw
+      : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
+    if (mode !== "drag") return false;
+    if (!state.input.touchCircleDraft || typeof state.input.touchCircleDraft !== "object") {
+      state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
+    }
+    const d = state.input.touchCircleDraft;
+    const x = Number(world?.x);
+    const y = Number(world?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    d.candidatePoint = { x, y };
+    return true;
+  },
+  touchTextSetCandidate: (world) => {
+    if (!(String(state.tool || "") === "text" && !!state.ui?.touchMode)) return false;
+    if (!state.input.touchTextDraft || typeof state.input.touchTextDraft !== "object") {
+      state.input.touchTextDraft = { candidatePoint: null };
+    }
+    const x = Number(world?.x);
+    const y = Number(world?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    state.input.touchTextDraft.candidatePoint = { x, y };
+    return true;
+  },
+  touchDimSetCandidate: (world) => {
+    if (!(String(state.tool || "") === "dim" && !!state.ui?.touchMode)) return false;
+    if (!state.input.touchDimDraft || typeof state.input.touchDimDraft !== "object") {
+      state.input.touchDimDraft = { candidatePoint: null };
+    }
+    const x = Number(world?.x);
+    const y = Number(world?.y);
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+    state.input.touchDimDraft.candidatePoint = { x, y };
+    return true;
+  },
+  confirmTouchTextStep: () => {
+    if (!(String(state.tool || "") === "text" && !!state.ui?.touchMode)) return false;
+    if (!state.input.touchTextDraft || typeof state.input.touchTextDraft !== "object") {
+      state.input.touchTextDraft = { candidatePoint: null };
+    }
+    const d = state.input.touchTextDraft;
+    const candidate = d.candidatePoint || state.input.hover?.world || state.input.hoverWorld || null;
+    if (!candidate || !Number.isFinite(Number(candidate.x)) || !Number.isFinite(Number(candidate.y))) {
+      setStatus("Text: tap a placement point first");
+      draw();
+      return false;
+    }
+    pushHistory(state);
+    const shape = createText(candidate, state.textSettings);
+    shape.id = nextShapeId(state);
+    shape.layerId = state.activeLayerId;
+    addShape(state, shape);
+    clearSelection(state);
+    state.activeGroupId = null;
+    state.input.touchTextDraft = { candidatePoint: null };
+    state.preview = null;
+    setStatus("TEXT created");
+    draw();
+    return true;
+  },
+  confirmTouchDimStep: () => {
+    if (!(String(state.tool || "") === "dim" && !!state.ui?.touchMode)) return false;
+    const linearMode = String(state.dimSettings?.linearMode || "single");
+    if (!state.input.touchDimDraft || typeof state.input.touchDimDraft !== "object") {
+      state.input.touchDimDraft = { candidatePoint: null };
+    }
+    const clearCandidate = () => {
+      state.input.touchDimDraft.candidatePoint = null;
+    };
+    const candidate = state.input.touchDimDraft.candidatePoint || state.input.hover?.world || state.input.hoverWorld || null;
+    const candidateOk = candidate && Number.isFinite(Number(candidate.x)) && Number.isFinite(Number(candidate.y));
+    if (!candidateOk) {
+      setStatus("Dimension: tap a target point first");
+      draw();
+      return false;
+    }
+
+    const draft = state.dimDraft;
+    if (draft && draft.type === "dimchain") {
+      if (!draft.awaitingPlacement) {
+        const ok = beginOrAdvanceDim(state, candidate, helpers);
+        if (ok && ok !== "noop") {
+          clearCandidate();
+          setStatus((draft.points || []).length >= 2
+            ? "Chain dim: target added"
+            : "Chain dim: first target added");
+          draw();
+          return true;
+        }
+        setStatus("Chain dim: tap target point first");
+        draw();
+        return false;
+      }
+      if (draft.awaitingPlacement) {
+        // While placement is active, this button becomes "Generate Dimension Line".
+        return false;
+      }
+    }
+
+    if (draft && draft.type === "dimleader" && draft.p1 && draft.p2) {
+      const ok = finalizeDimDraft(state, helpers);
+      if (ok) {
+        clearCandidate();
+        setStatus("Leader dimension created");
+        draw();
+        return true;
+      }
+    }
+    if (draft && draft.type === "dimangle" && Number.isFinite(Number(draft.cx)) && Number.isFinite(Number(draft.cy)) && Number.isFinite(Number(draft.r)) && Number.isFinite(Number(draft.a1)) && Number.isFinite(Number(draft.a2))) {
+      const ok = finalizeDimDraft(state, helpers);
+      if (ok) {
+        clearCandidate();
+        setStatus("Angle dimension created");
+        draw();
+        return true;
+      }
+    }
+    if (draft && draft.type === "circleDim" && draft.dimRef) {
+      const ok = finalizeDimDraft(state, helpers);
+      if (ok) {
+        clearCandidate();
+        setStatus("Circle dimension created");
+        draw();
+        return true;
+      }
+    }
+    if (draft && draft.p1 && draft.p2 && draft.place) {
+      const ok = finalizeDimDraft(state, helpers);
+      if (ok) {
+        clearCandidate();
+        setStatus("Dimension created");
+        draw();
+        return true;
+      }
+    }
+
+    const res = beginOrAdvanceDim(state, candidate, helpers);
+    if (res && res !== "noop") {
+      clearCandidate();
+    }
+    if (res === "place") {
+      if (state.dimDraft?.type === "dimleader" && state.dimDraft.p1 && state.dimDraft.p2) {
+        const ok = finalizeDimDraft(state, helpers);
+        if (ok) {
+          clearCandidate();
+          setStatus("Leader dimension created");
+          draw();
+          return true;
+        }
+      }
+      if (state.dimDraft?.type === "dimangle" && Number.isFinite(Number(state.dimDraft.cx)) && Number.isFinite(Number(state.dimDraft.cy)) && Number.isFinite(Number(state.dimDraft.r)) && Number.isFinite(Number(state.dimDraft.a1)) && Number.isFinite(Number(state.dimDraft.a2))) {
+        const ok = finalizeDimDraft(state, helpers);
+        if (ok) {
+          clearCandidate();
+          setStatus("Angle dimension created");
+          draw();
+          return true;
+        }
+      }
+      if (state.dimDraft?.type === "circleDim" && state.dimDraft.dimRef) {
+        const ok = finalizeDimDraft(state, helpers);
+        if (ok) {
+          clearCandidate();
+          setStatus("Circle dimension created");
+          draw();
+          return true;
+        }
+      }
+      if (linearMode !== "chain" && state.dimDraft?.p1 && state.dimDraft?.p2 && state.dimDraft?.place) {
+        const ok = finalizeDimDraft(state, helpers);
+        if (ok) {
+          clearCandidate();
+          setStatus("Dimension created");
+          draw();
+          return true;
+        }
+      }
+    }
+    draw();
+    return true;
+  },
+  prepareTouchDimChain: () => {
+    if (!(String(state.tool || "") === "dim" && !!state.ui?.touchMode)) return false;
+    const draft = state.dimDraft;
+    if (!draft || draft.type !== "dimchain") return false;
+    if ((draft.points || []).length < 2) {
+      setStatus("Chain dim: add at least two targets first");
+      draw();
+      return false;
+    }
+    draft.awaitingPlacement = true;
+    const candidate = state.input.touchDimDraft?.candidatePoint || state.input.hover?.world || state.input.hoverWorld || null;
+    if (candidate && Number.isFinite(Number(candidate.x)) && Number.isFinite(Number(candidate.y))) {
+      draft.place = { x: Number(candidate.x), y: Number(candidate.y) };
+      draft.hoverPlace = { x: Number(candidate.x), y: Number(candidate.y) };
+    }
+    setStatus("Chain dim: choose placement, then generate");
+    draw();
+    return true;
+  },
+  finishTouchDimDraft: () => {
+    if (!(String(state.tool || "") === "dim" && !!state.ui?.touchMode)) return false;
+    const draft = state.dimDraft;
+    if (!draft || draft.type !== "dimchain" || !draft.awaitingPlacement || !draft.place) return false;
+    const ok = finalizeDimDraft(state, helpers);
+    if (ok) {
+      if (state.input?.touchDimDraft) state.input.touchDimDraft.candidatePoint = null;
+      setStatus("Chain dimension created");
+      draw();
+      return true;
+    }
+    return false;
+  },
+  confirmTouchCircleStep: () => {
+    if (!(String(state.tool || "") === "circle" && !!state.ui?.touchMode)) return false;
+    const modeRaw = String(state.circleSettings?.mode || "").toLowerCase();
+    const mode = (modeRaw === "fixed" || modeRaw === "threepoint" || modeRaw === "drag")
+      ? modeRaw
+      : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
+    if (mode === "fixed") {
+      setStatus("Circle: tap canvas to create");
+      draw();
+      return false;
+    }
+    if (mode === "drag") {
+      if (!state.input.touchCircleDraft || typeof state.input.touchCircleDraft !== "object") {
+        state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
+      }
+      const d = state.input.touchCircleDraft;
+      const candidate = d.candidatePoint || state.input.hover?.world || null;
+      if (!candidate || !Number.isFinite(Number(candidate.x)) || !Number.isFinite(Number(candidate.y))) {
+        setStatus(d.stage === 0 ? "Circle: tap a center point first" : "Circle: tap an edge point first");
+        draw();
+        return false;
+      }
+      if (d.stage !== 1 || !d.p1) {
+        d.p1 = { x: Number(candidate.x), y: Number(candidate.y) };
+        d.stage = 1;
+        d.candidatePoint = null;
+        state.input.dragStartWorld = { x: Number(d.p1.x), y: Number(d.p1.y) };
+        state.preview = { type: "position", x: Number(d.p1.x), y: Number(d.p1.y), positionPreviewMode: "marker" };
+        setStatus("Circle: center point confirmed");
+        draw();
+        return true;
+      }
+      pushHistory(state);
+      const shape = createCircle(d.p1, candidate);
+      shape.showCenterMark = !!state.circleSettings?.showCenterMark;
+      shape.id = nextShapeId(state);
+      shape.layerId = state.activeLayerId;
+      shape.lineWidthMm = Math.max(0.01, Number(state.circleSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+      shape.lineType = String(state.circleSettings?.lineType || "solid");
+      {
+        const rawColor = String(state.circleSettings?.color || "#0f172a").trim();
+        shape.color = /^#[0-9a-fA-F]{6}$/.test(rawColor) ? rawColor.toLowerCase() : "#0f172a";
+      }
+      addShape(state, shape);
+      clearSelection(state);
+      state.activeGroupId = null;
+      state.input.dragStartWorld = null;
+      state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
+      state.preview = null;
+      setStatus("CIRCLE created (touch 2-point)");
+      draw();
+      return true;
+    }
+    if (!Array.isArray(state.input.circleThreePointRefs)) state.input.circleThreePointRefs = [];
+    const refs = state.input.circleThreePointRefs.slice(0, 3);
+    if (refs.length >= 3) {
+      const hint = refs[refs.length - 1] || null;
+      const sol = solveCircleBy3CenterRefs(refs, hint);
+      if (!sol) {
+        state.input.circleThreePointRefs = [];
+        setStatus("3-point circle: failed to solve from current targets");
+        draw();
+        return false;
+      }
+      pushHistory(state);
+      const shape = createCircle({ x: sol.cx, y: sol.cy }, { x: sol.cx + sol.r, y: sol.cy });
+      shape.showCenterMark = !!state.circleSettings?.showCenterMark;
+      shape.id = nextShapeId(state);
+      shape.layerId = state.activeLayerId;
+      shape.lineWidthMm = Math.max(0.01, Number(state.circleSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+      shape.lineType = String(state.circleSettings?.lineType || "solid");
+      shape.color = String(state.circleSettings?.color || "#0f172a");
+      addShape(state, shape);
+      clearSelection(state);
+      state.activeGroupId = null;
+      state.input.circleThreePointRefs = [];
+      setStatus("CIRCLE created (3-point)");
+      draw();
+      return true;
+    }
+    const selIds = new Set((state.selection?.ids || []).map(Number).filter(Number.isFinite));
+    const selectedShapes = (state.shapes || []).filter(s => selIds.has(Number(s.id)));
+    const targetRefs = selectedShapes.map(getCircleThreePointRefFromShape).filter(r => !!r);
+    if (!targetRefs.length) {
+      setStatus("3-point circle: select a position, circle, or arc target first");
+      draw();
+      return false;
+    }
+    const existingIds = new Set(state.input.circleThreePointRefs.map(r => Number(r.shapeId)));
+    let added = 0;
+    for (const ref of targetRefs) {
+      if (state.input.circleThreePointRefs.length >= 3) break;
+      const sid = Number(ref.shapeId);
+      if (existingIds.has(sid)) continue;
+      state.input.circleThreePointRefs.push(ref);
+      existingIds.add(sid);
+      added += 1;
+    }
+    if (!added) {
+      setStatus("3-point circle: selected targets are already registered");
+      draw();
+      return false;
+    }
+    const count = state.input.circleThreePointRefs.length;
+    const ids = state.input.circleThreePointRefs.map(r => Number(r.shapeId)).filter(Number.isFinite).join(", ");
+    setStatus(count >= 3
+      ? `3-point circle: targets ready (${count}/3) [${ids}]`
+      : `3-point circle: added ${added} target(s) (${count}/3) [${ids}]`);
+    draw();
+    return true;
+  },
+  finishTouchLineDraft: () => {
+    if (!(String(state.tool || "") === "line" && !!state.ui?.touchMode)) return false;
+    const modeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+    const mode = (modeRaw === "continuous" || modeRaw === "freehand") ? modeRaw : "segment";
+    if (mode === "segment") return false;
+    const ok = (mode === "freehand")
+      ? finalizeBsplineDraftState(state, helpers)
+      : finalizePolylineDraft(state, helpers);
+    if (ok) {
+      state.input.touchLineDraft = { stage: 0, p1: null, candidatePoint: null };
+      state.input.dragStartWorld = null;
+      setStatus(mode === "freehand" ? "B-spline finished" : "Continuous line finished");
+      draw();
+      return true;
+    }
+    setStatus(mode === "freehand" ? "B-spline: not enough points" : "Continuous line: not enough points");
+    draw();
+    return false;
+  },
   confirmTouchRectStep: () => {
     if (!(String(state.tool || "") === "rect" && !!state.ui?.touchMode)) return false;
     if (!state.input.touchRectDraft || typeof state.input.touchRectDraft !== "object") {
@@ -1059,16 +1582,26 @@ const helpers = {
     if (Number(d.stage) === 1 && d.p1 && d.candidateEnd) {
       const p1 = { x: Number(d.p1.x), y: Number(d.p1.y) };
       const p2 = { x: Number(d.candidateEnd.x), y: Number(d.candidateEnd.y) };
-      const lines = buildRectAsLines(p1, p2);
-      lines.forEach((l) => {
-        l.id = nextShapeId(state);
-        l.layerId = state.activeLayerId;
-        l.color = "#0f172a";
-        l.lineWidthMm = Math.max(0.01, Number(state.rectSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
-        l.lineType = String(state.rectSettings?.lineType || "solid");
-      });
+      const shape = buildRectShape(p1, p2, !!state.rectSettings?.asPolyline);
       pushHistory(state);
-      addShapesAsGroup(state, lines);
+      if (shape) {
+        shape.id = nextShapeId(state);
+        shape.layerId = state.activeLayerId;
+        shape.color = "#0f172a";
+        shape.lineWidthMm = Math.max(0.01, Number(state.rectSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+        shape.lineType = String(state.rectSettings?.lineType || "solid");
+        addShape(state, shape);
+      } else {
+        const lines = buildRectLineShapes(p1, p2);
+        lines.forEach((l) => {
+          l.id = nextShapeId(state);
+          l.layerId = state.activeLayerId;
+          l.color = "#0f172a";
+          l.lineWidthMm = Math.max(0.01, Number(state.rectSettings?.lineWidthMm ?? state.lineWidthMm ?? 0.25) || 0.25);
+          l.lineType = String(state.rectSettings?.lineType || "solid");
+        });
+        addShapesAsGroup(state, lines);
+      }
       clearSelection(state);
       state.activeGroupId = null;
       state.preview = null;
@@ -1095,6 +1628,26 @@ const helpers = {
   },
   cancelTouchPending: () => {
     let changed = false;
+    if (state.input?.touchLineDraft) {
+      const d = state.input.touchLineDraft;
+      if (d.stage || d.p1 || d.candidatePoint) changed = true;
+    }
+    state.input.touchLineDraft = { stage: 0, p1: null, candidatePoint: null };
+    if (state.input?.touchCircleDraft) {
+      const d = state.input.touchCircleDraft;
+      if (d.stage || d.p1 || d.candidatePoint) changed = true;
+    }
+    state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
+    if (state.input?.touchTextDraft) {
+      const d = state.input.touchTextDraft;
+      if (d.candidatePoint) changed = true;
+    }
+    state.input.touchTextDraft = { candidatePoint: null };
+    if (state.input?.touchDimDraft) {
+      const d = state.input.touchDimDraft;
+      if (d.candidatePoint) changed = true;
+    }
+    state.input.touchDimDraft = { candidatePoint: null };
     if (state.polylineDraft) {
       state.polylineDraft = null;
       changed = true;
@@ -1117,6 +1670,10 @@ const helpers = {
     }
     state.input.touchRectDraft = { stage: 0, p1: null, candidateStart: null, candidateEnd: null };
     state.input.dragStartWorld = null;
+    state.input.dimHoverPreview = null;
+    state.input.dimHoveredShapeId = null;
+    state.input.dimHoveredSegmentIndex = null;
+    state.input.objectSnapHover = null;
     state.preview = null;
     if (changed) {
       setStatus("Canceled");
@@ -1136,7 +1693,7 @@ const helpers = {
   setPatternCopyAxisFromSelection: () => setPatternCopyAxisFromSelection(state, helpers),
   clearPatternCopyAxis: () => clearPatternCopyAxis(state, helpers),
   executePatternCopy: () => executePatternCopy(state, helpers),
-  setDimSettings: (patch) => { Object.assign(state.dimSettings, patch); draw(); },
+  setDimSettings: (patch) => { Object.assign(state.dimSettings, patch); scheduleSaveAppSettings(); draw(); },
   applyDimSettingsToSelection: (patch) => applyDimSettingsToSelection(state, helpers, patch),
   setHatchSettings: (patch) => {
     const p = patch || {};
@@ -1179,6 +1736,7 @@ const helpers = {
         }
       }
     }
+    scheduleSaveAppSettings();
     draw();
   },
   addSelectedAttribute: (name, value, target = "object") => attributeOps.addSelectedAttribute(name, value, target),
@@ -1223,6 +1781,9 @@ async function initApp() {
   }
   const urlDisplayMode = getDisplayModeFromUrl();
   applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode || state.ui?.displayMode || "cad"));
+  if (loadedAppSettings) applyLoadedSettings(loadedAppSettings);
+  if (loadedAppSettings) applyLoadedToolSettings(loadedAppSettings);
+  restoreEditorSidebarDefaultsIfNeeded();
   initUi(state, dom, helpers);
 
   // setupInputListeners
@@ -1239,17 +1800,36 @@ async function initApp() {
         || typeof window.confirm !== "function"
         || window.confirm(autoBackupPrompt)
       ));
-  const restoredFromAutoBackup = shouldRestoreAutoBackup ? restoreAutoBackupAtStartup() : false;
-  const restoredFromModeTransfer = restoredFromAutoBackup
+  const restoredFromModeTransfer = consumeModeTransferSnapshot(importJsonObject, state, helpers);
+  const restoredFromAutoBackup = restoredFromModeTransfer
     ? false
-    : consumeModeTransferSnapshot(importJsonObject, state, helpers);
-  if (urlDisplayMode) applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode));
+    : (shouldRestoreAutoBackup ? restoreAutoBackupAtStartup() : false);
+  if ((restoredFromAutoBackup || restoredFromModeTransfer) && loadedAppSettings) {
+    applyLoadedSettings(loadedAppSettings);
+    applyLoadedToolSettings(loadedAppSettings);
+  }
+  if (restoredFromAutoBackup || restoredFromModeTransfer) {
+    restoreEditorSidebarDefaultsIfNeeded();
+  }
+  if (urlDisplayMode) {
+    applyDisplayModePreset(state, normalizeDisplayMode(urlDisplayMode));
+    if (loadedAppSettings) {
+      applyLoadedSettings(loadedAppSettings);
+      applyLoadedToolSettings(loadedAppSettings);
+    }
+    restoreEditorSidebarDefaultsIfNeeded();
+  }
   if (!restoredFromAutoBackup && !restoredFromModeTransfer) {
     resetViewerImportDefaultsIfEmpty();
   }
+  if (!state.ui) state.ui = {};
+  if (!restoredFromAutoBackup && !restoredFromModeTransfer && (!Array.isArray(state.shapes) || state.shapes.length === 0)) {
+    state.ui.startSetupVisible = true;
+  } else if (restoredFromAutoBackup || restoredFromModeTransfer) {
+    state.ui.startSetupVisible = false;
+  }
   resizeCanvas();
   if (!restoredFromAutoBackup && !restoredFromModeTransfer) resetView();
-  if (!state.ui) state.ui = {};
   state.ui._needsTangentResolve = true;
   draw();
 
@@ -1292,6 +1872,85 @@ function resetViewerImportDefaultsIfEmpty() {
   if (!state.ui) state.ui = {};
   state.ui.importSourceUnit = "auto";
   return true;
+}
+
+function restoreEditorSidebarDefaultsIfNeeded() {
+  const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
+  if (displayMode === "viewer") return;
+  if (!state.ui) state.ui = {};
+  if (!state.ui.panelVisibility || typeof state.ui.panelVisibility !== "object") state.ui.panelVisibility = {};
+  if (!state.ui.rightPanelCollapsed || typeof state.ui.rightPanelCollapsed !== "object") state.ui.rightPanelCollapsed = {};
+  const panelVisibility = state.ui.panelVisibility;
+  const viewerLikePanels =
+    panelVisibility.createToolsPanel === false &&
+    panelVisibility.editToolsPanel === false &&
+    panelVisibility.fileToolsPanel === true;
+  const viewerLikeRightPanels =
+    panelVisibility.rightPanels === false &&
+    panelVisibility.groupsPanel === false &&
+    panelVisibility.layersPanel === false;
+  const leftMenuVisibility = (state.ui.leftMenuVisibility && typeof state.ui.leftMenuVisibility === "object")
+    ? state.ui.leftMenuVisibility
+    : {};
+  const visibleEditorItems = Object.entries(leftMenuVisibility)
+    .filter(([key, value]) => value !== false && /^(tool|action):/.test(String(key || "")))
+    .map(([key]) => String(key));
+  const viewerLikeMenu =
+    visibleEditorItems.length > 0 &&
+    visibleEditorItems.every((key) => (
+      key === "tool:select" ||
+      key === "tool:move" ||
+      key === "action:resetView" ||
+      key === "action:loadJson" ||
+      key === "tool:settings"
+    ));
+  const collapsedEditorMenu =
+    visibleEditorItems.length > 0 &&
+    visibleEditorItems.every((key) => (
+      key === "tool:settings" ||
+      key === "action:loadJson" ||
+      key === "action:saveJson" ||
+      key === "action:saveJsonAs" ||
+      key === "action:newFile"
+    ));
+  if (!(viewerLikePanels || viewerLikeRightPanels || viewerLikeMenu)) {
+    panelVisibility.snapPanel = true;
+    panelVisibility.createToolsPanel = true;
+    panelVisibility.editToolsPanel = true;
+    panelVisibility.fileToolsPanel = true;
+    panelVisibility.sidebar = true;
+    if (panelVisibility.topContext === false) panelVisibility.topContext = true;
+    state.ui.rightPanelCollapsed.snap = false;
+    if (!collapsedEditorMenu) return;
+  }
+  const preset = getDisplayModePreset(displayMode);
+  if (preset?.panelVisibility && typeof preset.panelVisibility === "object") {
+    panelVisibility.snapPanel = preset.panelVisibility.snapPanel !== false;
+    panelVisibility.attrPanel = preset.panelVisibility.attrPanel !== false;
+    panelVisibility.createToolsPanel = preset.panelVisibility.createToolsPanel !== false;
+    panelVisibility.editToolsPanel = preset.panelVisibility.editToolsPanel !== false;
+    panelVisibility.fileToolsPanel = preset.panelVisibility.fileToolsPanel !== false;
+    panelVisibility.sidebar = preset.panelVisibility.sidebar !== false;
+    panelVisibility.rightPanels = preset.panelVisibility.rightPanels !== false;
+    panelVisibility.groupsPanel = preset.panelVisibility.groupsPanel !== false;
+    panelVisibility.layersPanel = preset.panelVisibility.layersPanel !== false;
+    panelVisibility.topContext = preset.panelVisibility.topContext !== false;
+  } else {
+    panelVisibility.snapPanel = true;
+    panelVisibility.attrPanel = true;
+    panelVisibility.createToolsPanel = true;
+    panelVisibility.editToolsPanel = true;
+    panelVisibility.fileToolsPanel = true;
+    panelVisibility.sidebar = true;
+    panelVisibility.rightPanels = true;
+    panelVisibility.groupsPanel = true;
+    panelVisibility.layersPanel = true;
+    panelVisibility.topContext = true;
+  }
+  if (preset?.leftMenuVisibility && typeof preset.leftMenuVisibility === "object") {
+    state.ui.leftMenuVisibility = { ...preset.leftMenuVisibility };
+  }
+  state.ui.rightPanelCollapsed.snap = false;
 }
 
 void initApp();

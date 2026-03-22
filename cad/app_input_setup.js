@@ -42,7 +42,7 @@ import { isHatchBoundaryShape } from "./hatch_geom.js";
 
 export function setupInputListenersImpl(state, dom, helpers) {
     const {
-        draw, setStatus, pushHistory, snapshotModel, addShape, nextShapeId,
+        draw, setStatus, pushHistory, snapshotModel, addShape, addShapesAsGroup, nextShapeId,
         clearSelection, setSelection, finalizeDimDraft, trimClickedLineAtNearestIntersection,
         createLine, createRect, createCircle, createPosition, createText, createArc,
         beginOrExtendPolyline, updatePolylineHover, finalizePolylineDraft,
@@ -252,12 +252,13 @@ export function setupInputListenersImpl(state, dom, helpers) {
             }
         }
 
-        if (state.tool === "select") {
+        if (state.tool === "select" || state.tool === "move") {
             const consumed = handlePointerDownSelectMode(state, dom, helpers, {
                 isAppendSelect,
                 setSelection,
                 setStatus,
                 draw,
+                focusSelectMoveInput: () => helpers.focusSelectMoveInput?.(),
                 hitTestShapes,
                 findConnectedLinesChain,
                 hitActiveGroupRotateHandle,
@@ -273,7 +274,8 @@ export function setupInputListenersImpl(state, dom, helpers) {
                 toggleGroupSelectionById,
                 beginSelectionDrag,
                 clearSelection,
-                beginSelectionBox
+                beginSelectionBox,
+                allowMoveDrag: state.tool === "move"
             }, { e, screen, worldRaw });
             if (consumed) return;
         }
@@ -389,6 +391,7 @@ export function setupInputListenersImpl(state, dom, helpers) {
                 nextShapeId,
                 applyToolStrokeToShape,
                 addShape,
+                addShapesAsGroup,
                 clearSelection,
                 beginOrExtendBsplineDraft,
                 getLineCreateMode,
@@ -410,6 +413,18 @@ export function setupInputListenersImpl(state, dom, helpers) {
         }
 
         if (state.tool === "position" || state.tool === "text") {
+            if (state.tool === "text" && !!state.ui?.touchMode) {
+                if (!state.input.touchTextDraft || typeof state.input.touchTextDraft !== "object") {
+                    state.input.touchTextDraft = { candidatePoint: null };
+                }
+                state.input.touchTextDraft.candidatePoint = { x: Number(world.x), y: Number(world.y) };
+                state.preview = helpers.createText(world, state.textSettings);
+                state.preview.textPreviewMode = "touch";
+                state.preview.textPreviewAnchor = { x: Number(world.x), y: Number(world.y) };
+                if (setStatus) setStatus("Text: placement candidate set");
+                if (draw) draw();
+                return;
+            }
             if (e.button !== 0) return;
             pushHistory();
             let shape;
@@ -430,6 +445,37 @@ export function setupInputListenersImpl(state, dom, helpers) {
 
         if (state.tool === "dim") {
             if (e.button !== 0) return;
+            if (state.ui?.touchMode) {
+                if (!state.input.touchDimDraft || typeof state.input.touchDimDraft !== "object") {
+                    state.input.touchDimDraft = { candidatePoint: null };
+                }
+                state.input.touchDimDraft.candidatePoint = { x: world.x, y: world.y };
+                updateDimHover(state, worldRaw, world, helpers);
+                if (state.dimDraft) {
+                    state.input.dimHoverPreview = null;
+                }
+                if (state.dimDraft?.type === "dimchain" && state.dimDraft.awaitingPlacement) {
+                    if (setStatus) setStatus("Chain dim: place the dimension line, then generate.");
+                } else if (state.dimSettings?.linearMode === "leader") {
+                    if (setStatus) setStatus(state.dimDraft?.p1 && !state.dimDraft?.p2
+                        ? "Leader dimension: confirm elbow point."
+                        : "Leader dimension: confirm end point.");
+                } else if (state.dimSettings?.linearMode === "angle") {
+                    if (setStatus) setStatus(state.dimDraft?.type === "dimangle" && Number.isFinite(Number(state.dimDraft?.line1Id))
+                        ? "Angle dimension: confirm second line."
+                        : "Angle dimension: confirm first line.");
+                } else if (state.dimSettings?.linearMode === "chain") {
+                    if (setStatus) setStatus(state.dimDraft?.type === "dimchain" && (state.dimDraft?.points || []).length >= 2
+                        ? "Chain dimension: confirm target"
+                        : "Chain dimension: add target");
+                } else {
+                    if (setStatus) setStatus(state.dimDraft?.p1 && state.dimDraft?.p2 && !state.dimDraft?.place
+                        ? "Dimension: confirm placement point."
+                        : "Dimension: confirm target point.");
+                }
+                if (draw) draw();
+                return;
+            }
             const dimHandleHit = hitTestDimHandle(state, worldRaw);
             if (dimHandleHit) {
                 beginDimHandleDrag(state, dimHandleHit, worldRaw);
@@ -857,6 +903,61 @@ export function setupInputListenersImpl(state, dom, helpers) {
             drawFast();
             return;
         }
+        const touchLineDraft = state.input?.touchLineDraft;
+        const isTouchLineFlow = (state.tool === "line") && !!state.ui?.touchMode && !state.lineSettings?.sizeLocked;
+        if (isTouchLineFlow && touchLineDraft) {
+            const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+            const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+            const candidate = touchLineDraft.candidatePoint || state.input.hover?.world || world;
+            if (candidate) touchLineDraft.candidatePoint = { x: Number(candidate.x), y: Number(candidate.y) };
+            if (lineMode === "segment") {
+                if (Number(touchLineDraft.stage) === 1 && touchLineDraft.p1 && candidate) {
+                    state.preview = helpers.createLine(touchLineDraft.p1, candidate);
+                    state.preview.linePreviewMode = "touch";
+                } else {
+                    state.preview = helpers.createPosition(candidate);
+                    state.preview.positionPreviewMode = "marker";
+                }
+            } else {
+                state.preview = helpers.createPosition(candidate);
+                state.preview.positionPreviewMode = "marker";
+            }
+            drawFast();
+            return;
+        }
+        const touchTextDraft = state.input?.touchTextDraft;
+        const isTouchTextFlow = (state.tool === "text") && !!state.ui?.touchMode;
+        if (isTouchTextFlow && touchTextDraft) {
+            const candidate = touchTextDraft.candidatePoint || state.input.hover?.world || world;
+            if (candidate) {
+                state.preview = helpers.createText(candidate, state.textSettings);
+                state.preview.textPreviewMode = "touch";
+                state.preview.textPreviewAnchor = { x: Number(candidate.x), y: Number(candidate.y) };
+            }
+            drawFast();
+            return;
+        }
+        const touchCircleDraft = state.input?.touchCircleDraft;
+        const isTouchCircleFlow = (state.tool === "circle") && !!state.ui?.touchMode && getCircleCreateMode() !== "fixed";
+        if (isTouchCircleFlow && touchCircleDraft) {
+            const circleMode = getCircleCreateMode();
+            const candidate = touchCircleDraft.candidatePoint || state.input.hover?.world || world;
+            if (candidate) touchCircleDraft.candidatePoint = { x: Number(candidate.x), y: Number(candidate.y) };
+            if (circleMode === "drag") {
+                if (Number(touchCircleDraft.stage) === 1 && touchCircleDraft.p1 && candidate) {
+                    state.preview = helpers.createCircle(touchCircleDraft.p1, candidate);
+                    state.preview.circlePreviewMode = "touch";
+                    state.preview.circleAnchorWorld = { x: Number(touchCircleDraft.p1.x), y: Number(touchCircleDraft.p1.y) };
+                } else {
+                    state.preview = helpers.createPosition(candidate);
+                    state.preview.positionPreviewMode = "marker";
+                }
+            } else if (circleMode === "threepoint") {
+                // Target selection is shown by the selection highlight; no dashed preview here.
+            }
+            drawFast();
+            return;
+        }
         if (state.input.dragStartWorld) {
             const p1 = state.input.dragStartWorld;
             const p2 = state.input.hoverWorld;
@@ -1088,6 +1189,24 @@ export function setupInputListenersImpl(state, dom, helpers) {
         // in handlePointerDownDrawMode, same as rectangle.
 
         if (draw) draw();
+        if (state.tool === "select"
+            && Array.isArray(state.selection?.ids)
+            && state.selection.ids.length > 0
+            && typeof helpers.focusSelectMoveInput === "function") {
+            if (typeof setTimeout === "function") {
+                setTimeout(() => {
+                    if (typeof requestAnimationFrame === "function") {
+                        requestAnimationFrame(() => {
+                            helpers.focusSelectMoveInput();
+                        });
+                    } else {
+                        helpers.focusSelectMoveInput();
+                    }
+                }, 0);
+            } else {
+                helpers.focusSelectMoveInput();
+            }
+        }
     });
     bindInputTailEvents(state, dom, helpers, {
         touch,

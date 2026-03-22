@@ -328,12 +328,40 @@ export function createTrimFilletHoverOps(config) {
 
   function getTrimHoverCandidate(state, worldRaw, dom, options = null) {
     const hit = hitTestShapes(state, worldRaw, dom);
-    if (!hit) return null;
+    const scoreCircleLike = (cand) => {
+      const shape = cand?.arc || cand?.circle;
+      if (!shape) return Infinity;
+      const cx = Number(shape.cx);
+      const cy = Number(shape.cy);
+      const r = Math.abs(Number(shape.r) || 0);
+      if (!Number.isFinite(cx) || !Number.isFinite(cy) || !(r > 1e-9)) return Infinity;
+      return Math.abs(Math.hypot(Number(worldRaw.x) - cx, Number(worldRaw.y) - cy) - r);
+    };
+    const bestCircleFallback = () => {
+      let best = null;
+      let bestScore = Infinity;
+      for (const s of (state.shapes || [])) {
+        if (!s || !isLayerVisible(state, s.layerId)) continue;
+        const t = String(s.type || "").toLowerCase();
+        if (t !== "circle" && t !== "arc") continue;
+        const cand = (t === "circle")
+          ? getTrimHoverCandidateForCircle(state, worldRaw, s)
+          : getTrimHoverCandidateForArc(state, worldRaw, s);
+        if (!cand) continue;
+        const sc = scoreCircleLike(cand);
+        if (sc < bestScore) {
+          bestScore = sc;
+          best = cand;
+        }
+      }
+      return best;
+    };
+    if (!hit) return bestCircleFallback();
     if (hit.type === "circle") return getTrimHoverCandidateForCircle(state, worldRaw, hit);
     if (hit.type === "arc") return getTrimHoverCandidateForArc(state, worldRaw, hit);
     if (hit.type === "polyline") return getTrimHoverCandidateForPolyline(state, worldRaw, hit);
     if (hit.type === "bspline") return getTrimHoverCandidateForBspline(state, worldRaw, hit, options);
-    if (hit.type !== "line") return null;
+    if (hit.type !== "line") return bestCircleFallback();
 
     const line = hit;
     const a1 = { x: Number(line.x1), y: Number(line.y1) };
@@ -398,6 +426,37 @@ export function createTrimFilletHoverOps(config) {
     const clickU = arcParamAlong(thetaClick, a1Arc, a2Arc, ccwArc);
 
     const ips = [];
+    const addShapeCircleIntersections = (shape) => {
+      const st = String(shape?.type || "").toLowerCase();
+      if (st === "polyline") {
+        const pts = Array.isArray(shape.points) ? shape.points : [];
+        const segCount = Math.max(0, pts.length - 1) + (shape.closed ? 1 : 0);
+        for (let i = 0; i < segCount; i++) {
+          const pA = pts[i];
+          const pB = pts[(i + 1) % pts.length];
+          for (const ip of segmentCircleIntersectionPoints({ x: Number(pA?.x), y: Number(pA?.y) }, { x: Number(pB?.x), y: Number(pB?.y) }, arc)) {
+            const ang = normalizeRad(Math.atan2(ip.y - cy, ip.x - cx));
+            if (isAngleOnArc(ang, a1Arc, a2Arc, ccwArc)) {
+              const u = arcParamAlong(ang, a1Arc, a2Arc, ccwArc);
+              if (u != null) ips.push({ x: ip.x, y: ip.y, ang, u });
+            }
+          }
+        }
+        return;
+      }
+      if (st === "bspline") {
+        const sampled = sampleBSplinePoints(shape.controlPoints, Number(shape.degree) || 3);
+        for (let i = 1; i < sampled.length; i++) {
+          for (const ip of segmentCircleIntersectionPoints(sampled[i - 1], sampled[i], arc)) {
+            const ang = normalizeRad(Math.atan2(ip.y - cy, ip.x - cx));
+            if (isAngleOnArc(ang, a1Arc, a2Arc, ccwArc)) {
+              const u = arcParamAlong(ang, a1Arc, a2Arc, ccwArc);
+              if (u != null) ips.push({ x: ip.x, y: ip.y, ang, u });
+            }
+          }
+        }
+      }
+    };
     for (const s of state.shapes) {
       if (!s || Number(s.id) === Number(arc.id)) continue;
       if (!isLayerVisible(state, s.layerId)) continue;
@@ -434,6 +493,8 @@ export function createTrimFilletHoverOps(config) {
             }
           }
         });
+      } else if (s.type === "polyline" || s.type === "bspline") {
+        addShapeCircleIntersections(s);
       }
     }
 
@@ -487,6 +548,29 @@ export function createTrimFilletHoverOps(config) {
     if (r <= 1e-9) return null;
     const thetaClick = normalizeRad(Math.atan2(worldRaw.y - cy, worldRaw.x - cx));
     const ips = [];
+    const addShapeCircleIntersections = (shape) => {
+      const st = String(shape?.type || "").toLowerCase();
+      if (st === "polyline") {
+        const pts = Array.isArray(shape.points) ? shape.points : [];
+        const segCount = Math.max(0, pts.length - 1) + (shape.closed ? 1 : 0);
+        for (let i = 0; i < segCount; i++) {
+          const pA = pts[i];
+          const pB = pts[(i + 1) % pts.length];
+          for (const ip of segmentCircleIntersectionPoints({ x: Number(pA?.x), y: Number(pA?.y) }, { x: Number(pB?.x), y: Number(pB?.y) }, circle)) {
+            ips.push({ x: ip.x, y: ip.y, ang: normalizeRad(Math.atan2(ip.y - cy, ip.x - cx)) });
+          }
+        }
+        return;
+      }
+      if (st === "bspline") {
+        const sampled = sampleBSplinePoints(shape.controlPoints, Number(shape.degree) || 3);
+        for (let i = 1; i < sampled.length; i++) {
+          for (const ip of segmentCircleIntersectionPoints(sampled[i - 1], sampled[i], circle)) {
+            ips.push({ x: ip.x, y: ip.y, ang: normalizeRad(Math.atan2(ip.y - cy, ip.x - cx)) });
+          }
+        }
+      }
+    };
     for (const s of state.shapes) {
       if (!s || Number(s.id) === Number(circle.id)) continue;
       if (!isLayerVisible(state, s.layerId)) continue;
@@ -512,6 +596,8 @@ export function createTrimFilletHoverOps(config) {
             ips.push({ x: ip.x, y: ip.y, ang: normalizeRad(Math.atan2(ip.y - cy, ip.x - cx)) });
           }
         });
+      } else if (s.type === "polyline" || s.type === "bspline") {
+        addShapeCircleIntersections(s);
       }
     }
     if (ips.length < 2) return null;

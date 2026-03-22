@@ -592,6 +592,39 @@ export function createDoubleLineOps(config) {
     const baseSegsBySource = new Map();
     const rawSegsBySource = new Map();
     const rawBaseSegs = [];
+    const sourceEndpointOwners = new Map();
+    const endpointKeyTol = 1e-5;
+    const endpointKey = (x, y) => {
+      const nx = Number(x), ny = Number(y);
+      if (![nx, ny].every(Number.isFinite)) return null;
+      return `${Math.round(nx / endpointKeyTol)}:${Math.round(ny / endpointKeyTol)}`;
+    };
+    const addSourceEndpoint = (sid, x, y) => {
+      const k = endpointKey(x, y);
+      const owner = Number(sid);
+      if (!k || !Number.isFinite(owner)) return;
+      if (!sourceEndpointOwners.has(k)) sourceEndpointOwners.set(k, new Set());
+      sourceEndpointOwners.get(k).add(owner);
+    };
+    const arcEndpointPoint = (arc, endKey) => {
+      const cx = Number(arc?.cx), cy = Number(arc?.cy), r = Number(arc?.r);
+      const a1 = Number(arc?.a1), a2 = Number(arc?.a2);
+      if (![cx, cy, r, a1, a2].every(Number.isFinite)) return null;
+      const th = (endKey === "a2") ? a2 : a1;
+      return { x: cx + Math.cos(th) * r, y: cy + Math.sin(th) * r };
+    };
+    const touchesOtherSourceEndpoint = (sid, pt) => {
+      const nx = Number(pt?.x), ny = Number(pt?.y);
+      if (![nx, ny].every(Number.isFinite)) return false;
+      const k = endpointKey(nx, ny);
+      if (!k) return false;
+      const owners = sourceEndpointOwners.get(k);
+      if (!owners || owners.size === 0) return false;
+      for (const owner of owners) {
+        if (Number(owner) !== Number(sid)) return true;
+      }
+      return false;
+    };
     const addRawBaseSeg = (sid, x1, y1, x2, y2) => {
       if (![sid, x1, y1, x2, y2].every(Number.isFinite)) return;
       if (Math.hypot(x2 - x1, y2 - y1) <= 1e-9) return;
@@ -613,6 +646,8 @@ export function createDoubleLineOps(config) {
       if (!Number.isFinite(sid)) continue;
       if (t === "line") {
         addRawBaseSeg(sid, Number(s.x1), Number(s.y1), Number(s.x2), Number(s.y2));
+        addSourceEndpoint(sid, Number(s.x1), Number(s.y1));
+        addSourceEndpoint(sid, Number(s.x2), Number(s.y2));
       } else if (t === "polyline" && Array.isArray(s.points)) {
         const pts = s.points;
         for (let i = 0; i < pts.length - 1; i++) {
@@ -620,12 +655,24 @@ export function createDoubleLineOps(config) {
         }
         if (s.closed && pts.length >= 2) {
           addRawBaseSeg(sid, Number(pts[pts.length - 1]?.x), Number(pts[pts.length - 1]?.y), Number(pts[0]?.x), Number(pts[0]?.y));
+        } else if (pts.length >= 2) {
+          addSourceEndpoint(sid, Number(pts[0]?.x), Number(pts[0]?.y));
+          addSourceEndpoint(sid, Number(pts[pts.length - 1]?.x), Number(pts[pts.length - 1]?.y));
         }
       } else if (t === "bspline") {
         const sampled = sampleBSplinePoints(s.controlPoints, Number(s.degree) || 3);
         for (let i = 0; i < sampled.length - 1; i++) {
           addRawBaseSeg(sid, Number(sampled[i]?.x), Number(sampled[i]?.y), Number(sampled[i + 1]?.x), Number(sampled[i + 1]?.y));
         }
+        if (sampled.length >= 2) {
+          addSourceEndpoint(sid, Number(sampled[0]?.x), Number(sampled[0]?.y));
+          addSourceEndpoint(sid, Number(sampled[sampled.length - 1]?.x), Number(sampled[sampled.length - 1]?.y));
+        }
+      } else if (t === "arc") {
+        const p1 = arcEndpointPoint(s, "a1");
+        const p2 = arcEndpointPoint(s, "a2");
+        if (p1) addSourceEndpoint(sid, p1.x, p1.y);
+        if (p2) addSourceEndpoint(sid, p2.x, p2.y);
       }
     }
 
@@ -1042,7 +1089,7 @@ export function createDoubleLineOps(config) {
 
     // Endpoint targets for open sources.
     const endpointTol = Math.max(1e-6, e * 10);
-    const endpointKey = (x, y) => `${Math.round(Number(x) / endpointTol)}:${Math.round(Number(y) / endpointTol)}`;
+    const endpointKeyOpen = (x, y) => `${Math.round(Number(x) / endpointTol)}:${Math.round(Number(y) / endpointTol)}`;
     const endpointVirtualSidBase = -900000000;
     const endpointRefs = [];
     const endpointOwners = new Map();
@@ -1093,7 +1140,8 @@ export function createDoubleLineOps(config) {
         const tangent = norm(ep.tangent?.x, ep.tangent?.y);
         if (!tangent) continue;
         if (touchesOtherSourceInterior(Number(sid), ep)) continue;
-        const key = endpointKey(ep.x, ep.y);
+        if (touchesOtherSourceEndpoint(Number(sid), ep)) continue;
+        const key = endpointKeyOpen(ep.x, ep.y);
         endpointRefs.push({ sid: Number(sid), key, x: Number(ep.x), y: Number(ep.y), tangent });
         if (!endpointOwners.has(key)) endpointOwners.set(key, new Set());
         endpointOwners.get(key).add(Number(sid));
@@ -1264,6 +1312,18 @@ export function createDoubleLineOps(config) {
     const endpointKeyFilter = (x, y) => `${Math.round(Number(x) / endpointTolFilter)}:${Math.round(Number(y) / endpointTolFilter)}`;
     const endpointCountFilter = new Map();
     const endpointRepFilter = new Map();
+    const touchesOtherSourceEndpoint = (sid, pt) => {
+      const nx = Number(pt?.x), ny = Number(pt?.y);
+      if (![nx, ny].every(Number.isFinite)) return false;
+      const k = endpointKey(nx, ny);
+      if (!k) return false;
+      const owners = sourceEndpointOwners.get(k);
+      if (!owners || owners.size === 0) return false;
+      for (const owner of owners) {
+        if (Number(owner) !== Number(sid)) return true;
+      }
+      return false;
+    };
     const addEndpointFilter = (x, y) => {
       const nx = Number(x), ny = Number(y);
       if (![nx, ny].every(Number.isFinite)) return;

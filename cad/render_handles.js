@@ -120,26 +120,19 @@ export function createRenderHandlesOps(deps) {
       if (s.type === "dimchain") {
         if (!Array.isArray(s.points) || s.points.length < 2) continue;
         const geom = getDimChainGeometry(s);
+        const numericPriority = !!s.numericPriority;
         ctx.lineWidth = 1.5;
-        for (const pt of s.points) {
+        for (let i = 0; i < s.points.length; i += 1) {
+          const pt = s.points[i];
           const ps = worldToScreen(state.view, pt);
+          const isEndpoint = i === 0 || i === s.points.length - 1;
+          const muted = numericPriority && !isEndpoint;
           ctx.beginPath();
-          ctx.arc(ps.x, ps.y, 4.5, 0, Math.PI * 2);
-          ctx.fillStyle = "#fee2e2";
-          ctx.strokeStyle = "#dc2626";
+          ctx.arc(ps.x, ps.y, muted ? 3.5 : 4.5, 0, Math.PI * 2);
+          ctx.fillStyle = muted ? "#f0fdf4" : "#dcfce7";
+          ctx.strokeStyle = muted ? "#86efac" : "#16a34a";
           ctx.fill();
           ctx.stroke();
-        }
-        if (geom && Array.isArray(geom.dimPoints)) {
-          for (const dpt of geom.dimPoints) {
-            const ds = worldToScreen(state.view, dpt);
-            ctx.beginPath();
-            ctx.arc(ds.x, ds.y, 4.5, 0, Math.PI * 2);
-            ctx.fillStyle = "#ccfbf1";
-            ctx.strokeStyle = "#0f766e";
-            ctx.fill();
-            ctx.stroke();
-          }
         }
         const pp = worldToScreen(state.view, { x: Number(s.px), y: Number(s.py) });
         ctx.beginPath();
@@ -197,9 +190,9 @@ export function createRenderHandlesOps(deps) {
             : { x: Number(geom.chainMid.x) + Number(geom.nx) * defaultOff, y: Number(geom.chainMid.y) + Number(geom.ny) * defaultOff };
           const ts = worldToScreen(state.view, txtWorld);
           ctx.beginPath();
-          ctx.rect(ts.x - 5, ts.y - 5, 10, 10);
-          ctx.fillStyle = "#93c5fd";
-          ctx.strokeStyle = "#1d4ed8";
+          ctx.rect(ts.x - 7, ts.y - 7, 14, 14);
+          ctx.fillStyle = "#fecaca";
+          ctx.strokeStyle = "#dc2626";
           ctx.fill();
           ctx.stroke();
         }
@@ -246,9 +239,9 @@ export function createRenderHandlesOps(deps) {
         if (!g) continue;
         const ts = worldToScreen(state.view, { x: Number(g.tx), y: Number(g.ty) });
         ctx.beginPath();
-        ctx.rect(ts.x - 5, ts.y - 5, 10, 10);
-        ctx.fillStyle = "#93c5fd";
-        ctx.strokeStyle = "#1d4ed8";
+        ctx.rect(ts.x - 7, ts.y - 7, 14, 14);
+        ctx.fillStyle = "#ede9fe";
+        ctx.strokeStyle = "#7c3aed";
         ctx.lineWidth = 1.5;
         ctx.fill();
         ctx.stroke();

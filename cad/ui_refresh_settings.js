@@ -1,11 +1,81 @@
 import { getTouchConfirmText } from "./ui_text.js";
 import { ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
+import { getDimGeometry, getDimChainGeometry } from "./dim_geom.js";
+
+function getDimScaleComp(dim) {
+  const c = Number(dim?.groupScaleComp);
+  return Number.isFinite(c) && c > 1e-9 ? c : 1;
+}
+
+function getSelectedDimChainValues(dim) {
+  const geom = getDimChainGeometry(dim);
+  const segs = Array.isArray(geom?.segments) ? geom.segments : [];
+  const comp = getDimScaleComp(dim);
+  const measured = segs.map((seg) => Number(seg?.len) / comp);
+  const stored = Array.isArray(dim?.numericValues) ? dim.numericValues : [];
+  const fallback = Number.isFinite(Number(dim?.numericValue)) ? Number(dim.numericValue) : null;
+  return measured.map((m, i) => {
+    const sv = Number(stored[i]);
+    if (Number.isFinite(sv)) return sv;
+    if (fallback != null) return fallback;
+    return Number.isFinite(Number(m)) ? Number(m) : null;
+  });
+}
+
+function renderDimChainNumericValueInputs(state, dom, selectedDim) {
+  const wrap = dom.dimChainNumericValuesWrap;
+  const list = dom.dimChainNumericValuesList;
+  const singleWrap = dom.dimNumericValueWrap;
+  if (!wrap || !list || !singleWrap) return;
+  const isChainDim = !!selectedDim && selectedDim.type === "dimchain";
+  wrap.style.display = isChainDim ? "flex" : "none";
+  singleWrap.style.display = isChainDim ? "none" : "";
+  if (!isChainDim) {
+    wrap.dataset.dimChainSignature = "";
+    list.textContent = "";
+    return;
+  }
+  const values = getSelectedDimChainValues(selectedDim);
+  if (!values.length) {
+    wrap.style.display = "none";
+    singleWrap.style.display = "";
+    list.textContent = "";
+    return;
+  }
+  const signature = `${Number(selectedDim.id) || 0}:${values.length}:${values.map((v) => (Number.isFinite(Number(v)) ? Number(v).toFixed(6) : "null")).join(",")}`;
+  if (wrap.dataset.dimChainSignature === signature) return;
+  wrap.dataset.dimChainSignature = signature;
+  list.textContent = "";
+  values.forEach((value, index) => {
+    const label = document.createElement("label");
+    label.style.display = "inline-flex";
+    label.style.alignItems = "center";
+    label.style.gap = "4px";
+    label.style.fontSize = "12px";
+    label.style.whiteSpace = "nowrap";
+    label.textContent = `#${index + 1}`;
+
+    const input = document.createElement("input");
+    input.type = "number";
+    input.step = "0.1";
+    input.dataset.dimChainValueIndex = String(index);
+    input.value = Number.isFinite(Number(value)) ? String(Number(value)) : "";
+    input.style.width = "72px";
+    input.style.fontSize = "12px";
+    input.style.padding = "2px";
+
+    label.appendChild(input);
+    list.appendChild(label);
+  });
+}
 
 export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
   const {
     syncInputValue,
     normalizePageScalePreset,
     normalizeMaxZoomPreset,
+    normalizeWheelZoomPreset,
+    normalizeMenuScaleAutoPreset,
     normalizeMenuScalePreset,
     normalizePositiveNumber,
     refreshCustomPageSizeUnitLabels,
@@ -60,6 +130,30 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     const tv = (dimUiSource.textRotate ?? state.dimSettings?.textRotate);
     dom.dimTextRotateInput.value = (tv === "auto" || tv == null) ? "auto" : String(tv);
   }
+  const isNumericPriorityTarget = !selectedDim || selectedDim.type === "dim" || selectedDim.type === "dimchain";
+  if (dom.dimNumericPriorityToggle) {
+    dom.dimNumericPriorityToggle.checked = !!(dimUiSource.numericPriority ?? state.dimSettings?.numericPriority);
+    dom.dimNumericPriorityToggle.disabled = !isNumericPriorityTarget;
+  }
+  if (dom.dimNumericValueInput) {
+    const numericPriorityOn = !!(dimUiSource.numericPriority ?? state.dimSettings?.numericPriority);
+    const measuredDimValue = selectedDim && selectedDim.type === "dim"
+      ? (() => {
+          const g = getDimGeometry(selectedDim);
+          if (!g) return null;
+          const comp = Number(selectedDim?.groupScaleComp);
+          const scaleComp = Number.isFinite(comp) && comp > 1e-9 ? comp : 1;
+          const v = Number(g.len) / scaleComp;
+          return Number.isFinite(v) ? v : null;
+        })()
+      : null;
+    const rawNumericValue = dimUiSource.numericValue ?? state.dimSettings?.numericValue ?? (numericPriorityOn ? measuredDimValue : null);
+    dom.dimNumericValueInput.value = (rawNumericValue == null || rawNumericValue === "")
+      ? ""
+      : (Number.isFinite(Number(rawNumericValue)) ? String(Number(rawNumericValue)) : "");
+    dom.dimNumericValueInput.disabled = !isNumericPriorityTarget || !dom.dimNumericPriorityToggle?.checked;
+  }
+  renderDimChainNumericValueInputs(state, dom, selectedDim);
   if (dom.dimExtOffsetInput) syncInputValue(dom.dimExtOffsetInput, dimUiSource.extOffset ?? state.dimSettings?.extOffset ?? 2);
   if (dom.dimExtOverInput) syncInputValue(dom.dimExtOverInput, dimUiSource.extOver ?? state.dimSettings?.extOver ?? 2);
   if (dom.dimROvershootInput) syncInputValue(dom.dimROvershootInput, dimUiSource.rOverrun ?? state.dimSettings?.rOvershoot ?? 5);
@@ -136,9 +230,23 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     const v = normalizeMaxZoomPreset(state.view?.maxScale ?? 100);
     syncInputValue(dom.maxZoomInput, v);
   }
+  if (dom.wheelZoomFactorSelect) {
+    const v = normalizeWheelZoomPreset(state.ui?.wheelZoomFactor ?? 1.1);
+    syncInputValue(dom.wheelZoomFactorSelect, v);
+  }
   const menuScalePct = normalizeMenuScalePreset(state.ui?.menuScalePct ?? 100);
+  const menuScaleMode = String(state.ui?.menuScaleMode || "auto").toLowerCase() === "manual" ? "manual" : "auto";
+  const menuScaleAutoPreset = normalizeMenuScaleAutoPreset(state.ui?.menuScaleAutoPreset ?? "normal");
+  if (dom.menuScaleModeSelect) {
+    if (dom.menuScaleModeSelect.value !== menuScaleMode) dom.menuScaleModeSelect.value = menuScaleMode;
+  }
+  if (dom.menuScaleAutoSelect) {
+    if (dom.menuScaleAutoSelect.value !== menuScaleAutoPreset) dom.menuScaleAutoSelect.value = menuScaleAutoPreset;
+    dom.menuScaleAutoSelect.disabled = menuScaleMode === "manual";
+  }
   if (dom.menuScaleSelect) {
     syncInputValue(dom.menuScaleSelect, menuScalePct);
+    dom.menuScaleSelect.disabled = menuScaleMode === "auto";
   }
   if (dom.touchModeToggle) {
     dom.touchModeToggle.checked = !!state.ui?.touchMode;
@@ -146,9 +254,63 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
   if (dom.topRightAdZoneToggle) dom.topRightAdZoneToggle.checked = state.ui?.adZones?.topRight === true;
   if (dom.bottomLeftAdZoneToggle) dom.bottomLeftAdZoneToggle.checked = state.ui?.adZones?.bottomLeft === true;
   if (dom.bottomCenterAdZoneToggle) dom.bottomCenterAdZoneToggle.checked = state.ui?.adZones?.bottomCenter === true;
+  if (dom.touchToolPanel) {
+    const touchMode = !!state.ui?.touchMode;
+    const panelPos = state.ui?.touchPanelPos || { x: 14, y: 14 };
+    dom.touchToolPanel.style.display = touchMode ? "block" : "none";
+    dom.touchToolPanel.style.left = `${Math.max(8, Number(panelPos.x) || 14)}px`;
+    dom.touchToolPanel.style.top = `${Math.max(8, Number(panelPos.y) || 14)}px`;
+    if (dom.touchToolPanelStatus) {
+      const tool = String(state.tool || "select");
+      const liveStatus = String(state.ui?.statusText || "").trim();
+      const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+      const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+      const circleModeRaw = String(state.circleSettings?.mode || "").toLowerCase();
+      const circleMode = (circleModeRaw === "fixed" || circleModeRaw === "threepoint" || circleModeRaw === "drag")
+        ? circleModeRaw
+        : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
+      const lineDraft = state.input?.touchLineDraft || {};
+      const lineStage = Number(lineDraft.stage) || 0;
+      const circleDraft = state.input?.touchCircleDraft || {};
+      const circleStage = Number(circleDraft.stage) || 0;
+      const circleThreePointCount = Array.isArray(state.input?.circleThreePointRefs) ? state.input.circleThreePointRefs.length : 0;
+      const isJa = String(panelLang || "").toLowerCase().startsWith("ja");
+      const circleStatus = (touchMode && tool === "circle")
+        ? (circleMode === "fixed"
+          ? (isJa ? "円: キャンバスをタップして作成" : "Circle: tap canvas to create")
+          : (circleMode === "drag"
+            ? (circleStage === 0
+              ? (isJa ? "円: 中心点を確定" : "Circle: confirm center point")
+              : (isJa ? "円: 円周点を確定" : "Circle: confirm edge point"))
+            : (circleThreePointCount >= 3
+              ? (isJa ? "3点円: 作成可能" : "3-point circle: ready to create")
+              : (isJa ? "3点円: ターゲットを登録" : "3-point circle: register target"))))
+        : "";
+      const lineStatus = (touchMode && tool === "line" && !state.lineSettings?.sizeLocked)
+        ? (lineMode === "segment"
+          ? (lineStage === 0
+            ? (isJa ? "ライン: 始点を確定" : "Line: confirm start point")
+            : (isJa ? "ライン: 終点を確定" : "Line: confirm end point"))
+          : (lineMode === "freehand"
+            ? (isJa ? "B-スプライン: 現在位置を確定" : "B-Spline: confirm current position")
+            : (isJa ? "連続ライン: 現在位置を確定" : "Continuous line: confirm current position")))
+        : "";
+      const statusText = touchMode
+        ? (circleStatus || lineStatus || liveStatus || `${tool}${state.ui?.touchMultiSelect ? " / Multi-Select ON" : ""}`)
+        : "";
+      dom.touchToolPanelStatus.textContent = "";
+      dom.touchToolPanelStatus.style.display = "none";
+    }
+  }
   if (dom.touchConfirmOverlay && dom.touchConfirmBtn) {
     const touchMode = !!state.ui?.touchMode;
     const tool = String(state.tool || "");
+    const lineDraft = state.input?.touchLineDraft || {};
+    const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+    const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+    const isTouchLine = touchMode && tool === "line" && !state.lineSettings?.sizeLocked;
+    const lineCandidate = lineDraft.candidatePoint || state.input?.hover?.world || null;
+    const lineStage = Number(lineDraft.stage) || 0;
     const linearDraft = state.polylineDraft;
     const hasLinearDraft = !!(
       linearDraft &&
@@ -156,8 +318,6 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
       Array.isArray(linearDraft.points) &&
       linearDraft.points.length >= 2
     );
-    const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
-    const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
     const circleModeRaw = String(state.circleSettings?.mode || "").toLowerCase();
     const circleMode = (circleModeRaw === "fixed" || circleModeRaw === "threepoint" || circleModeRaw === "drag")
       ? circleModeRaw
@@ -183,7 +343,189 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
       (Number(rectDraft.stage) !== 1 && rectDraft.candidateStart) ||
       (Number(rectDraft.stage) === 1 && rectDraft.p1 && rectDraft.candidateEnd)
     ));
-    const show = touchMode && (hasLinearDraft || canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy" || tool === "rect");
+    const lineTouchTextUnused = panelLang === "ja"
+      ? {
+          startConfirm: "開始点を確定",
+          endConfirm: "終了点を確定",
+          currentConfirm: "現在位置を確定",
+          finishLine: "連続ライン確定",
+          cancel: "キャンセル",
+        }
+      : {
+          startConfirm: "Confirm Start Point",
+          endConfirm: "Confirm End Point",
+          currentConfirm: "Confirm Current Position",
+          finishLine: "Finish Continuous Line",
+          cancel: "Cancel",
+        };
+    const lineTouchText = panelLang === "ja"
+      ? {
+          startConfirm: "\u958b\u59cb\u70b9\u3092\u78ba\u5b9a",
+          endConfirm: "\u7d42\u70b9\u3092\u78ba\u5b9a",
+          currentConfirm: "\u73fe\u5728\u4f4d\u7f6e\u3092\u78ba\u5b9a",
+          finishLine: "\u9023\u7d9a\u30e9\u30a4\u30f3\u7d42\u4e86",
+          cancel: "\u30ad\u30e3\u30f3\u30bb\u30eb",
+        }
+      : {
+          startConfirm: "Confirm Start Point",
+          endConfirm: "Confirm End Point",
+          currentConfirm: "Confirm Current Position",
+          finishLine: "Finish Continuous Line",
+          cancel: "Cancel",
+        };
+    const dimTouchText = panelLang === "ja"
+      ? {
+          target: "\u30bf\u30fc\u30b2\u30c3\u30c8\u3092\u78ba\u5b9a",
+          secondTarget: "\u4e8c\u3064\u76ee\u3092\u78ba\u5b9a",
+          placement: "\u914d\u7f6e\u4f4d\u7f6e\u3092\u78ba\u5b9a",
+          create: "\u5bf8\u6cd5\u3092\u4f5c\u6210",
+          angleCreate: "\u89d2\u5ea6\u5bf8\u6cd5\u3092\u4f5c\u6210",
+          leaderCreate: "\u30ea\u30fc\u30c0\u30fc\u5bf8\u6cd5\u3092\u4f5c\u6210",
+          dimChainAddTarget: "\u30bf\u30fc\u30b2\u30c3\u30c8\u3092\u8ffd\u52a0",
+          dimChainConfirmTarget: "\u30bf\u30fc\u30b2\u30c3\u30c8\u3092\u78ba\u5b9a",
+          dimChainGenerate: "\u5bf8\u6cd5\u7dda\u3092\u751f\u6210",
+          cancel: "\u30ad\u30e3\u30f3\u30bb\u30eb",
+        }
+      : {
+          target: "Confirm Target",
+          secondTarget: "Confirm 2nd Target",
+          placement: "Confirm Placement",
+          create: "Create Dimension",
+          angleCreate: "Create Angle Dimension",
+          leaderCreate: "Create Leader Dimension",
+          dimChainAddTarget: "Add Target",
+          dimChainConfirmTarget: "Confirm Target",
+          dimChainGenerate: "Generate Dimension Line",
+          cancel: "Cancel",
+        };
+    const circleTouchText = panelLang === "ja"
+      ? {
+          centerConfirm: "\u4e2d\u5fc3\u70b9\u3092\u78ba\u5b9a",
+          edgeConfirm: "\u5186\u5468\u70b9\u3092\u78ba\u5b9a",
+          addTarget: "\u30bf\u30fc\u30b2\u30c3\u30c8\u3068\u3057\u3066\u767b\u9332",
+          createCircle: "\u5916\u63a5\u5186\u3092\u751f\u6210",
+          cancel: "\u30ad\u30e3\u30f3\u30bb\u30eb",
+        }
+      : {
+          centerConfirm: "Confirm Center Point",
+          edgeConfirm: "Confirm Edge Point",
+          addTarget: "Register Target",
+          createCircle: "Create Circumscribed Circle",
+          cancel: "Cancel",
+        };
+    if (isTouchLine) {
+      const showLineFinish = (lineMode === "continuous" || lineMode === "freehand");
+      const hasCurrentCandidate = !!lineCandidate;
+      const hasLineDraftPoints = !!(state.polylineDraft && Array.isArray(state.polylineDraft.points) && state.polylineDraft.points.length >= 2);
+      const hasBsplineDraftPoints = !!(state.polylineDraft && state.polylineDraft.kind === "bspline" && Array.isArray(state.polylineDraft.points) && state.polylineDraft.points.length >= 2);
+      const hasPending = hasCurrentCandidate || hasLineDraftPoints || hasBsplineDraftPoints || lineStage > 0 || !!lineDraft.p1;
+      dom.touchConfirmOverlay.style.display = (isPanelVisible(state, "touchConfirmOverlay")) ? "flex" : "none";
+      dom.touchConfirmBtn.style.display = "";
+      dom.touchConfirmBtn.disabled = !hasCurrentCandidate;
+      dom.touchConfirmBtn.textContent = (lineMode === "segment")
+        ? (lineStage === 0 ? lineTouchText.startConfirm : lineTouchText.endConfirm)
+        : lineTouchText.currentConfirm;
+      if (dom.touchLineFinishBtn) {
+        dom.touchLineFinishBtn.style.display = showLineFinish ? "" : "none";
+        dom.touchLineFinishBtn.disabled = !(hasLineDraftPoints || hasBsplineDraftPoints);
+        dom.touchLineFinishBtn.textContent = lineTouchText.finishLine;
+      }
+      if (dom.touchMultiSelectOverlay) {
+        dom.touchMultiSelectOverlay.style.display = "none";
+      }
+      return;
+    }
+    if (touchMode && tool === "dim") {
+      const linearMode = String(state.dimSettings?.linearMode || "single");
+      const draft = state.dimDraft || null;
+      const touchDraft = state.input?.touchDimDraft || {};
+      const hasCandidate = !!(touchDraft.candidatePoint || state.input?.hover?.world || state.input?.hoverWorld);
+      const dimType = String(draft?.type || "");
+      const isChain = linearMode === "chain" || dimType === "dimchain";
+      const isLeader = linearMode === "leader" || dimType === "dimleader";
+      const isAngle = linearMode === "angle" || dimType === "dimangle";
+      const isCircleDim = dimType === "circleDim";
+      const hasFirstTarget = !!(draft?.p1 || draft?.line1Id || draft?.dimRef || (draft?.points || []).length >= 1);
+      const hasSecondTarget = !!(draft?.p2 || draft?.line2Id || (isChain && (draft?.points || []).length >= 2));
+      const hasPlacementPoint = !!(draft?.place || draft?.tx != null || draft?.ty != null || draft?.x2 != null || draft?.y2 != null || draft?.cx != null);
+      const chainPointCount = Array.isArray(draft?.points) ? draft.points.length : 0;
+      const chainReady = isChain && hasPlacementPoint && chainPointCount >= 2;
+      const leaderReady = isLeader && hasSecondTarget;
+      const angleReady = isAngle && Number.isFinite(Number(draft?.cx)) && Number.isFinite(Number(draft?.cy)) && Number.isFinite(Number(draft?.r)) && Number.isFinite(Number(draft?.a1)) && Number.isFinite(Number(draft?.a2));
+      const circleReady = isCircleDim && !!draft?.dimRef;
+      const singleReady = !isChain && !isLeader && !isAngle && !isCircleDim && !!(draft?.p1 && draft?.p2 && draft?.place);
+      let label = dimTouchText.target;
+      let enabled = hasCandidate;
+      if (isLeader) {
+        label = hasFirstTarget && !hasSecondTarget ? dimTouchText.secondTarget : (leaderReady ? dimTouchText.leaderCreate : dimTouchText.target);
+        enabled = hasCandidate || leaderReady;
+      } else if (isAngle) {
+        label = hasFirstTarget && !hasSecondTarget ? dimTouchText.secondTarget : (angleReady ? dimTouchText.angleCreate : dimTouchText.target);
+        enabled = hasCandidate || angleReady;
+      } else if (isChain) {
+        if (!draft?.awaitingPlacement) {
+          label = dimTouchText.dimChainAddTarget || dimTouchText.target;
+          enabled = hasCandidate;
+        } else {
+          label = dimTouchText.dimChainGenerate || dimTouchText.dimCreate;
+          enabled = chainReady || hasPlacementPoint;
+        }
+      } else if (isCircleDim) {
+        label = circleReady ? dimTouchText.create : dimTouchText.target;
+        enabled = hasCandidate || circleReady;
+      } else {
+        if (!hasFirstTarget) {
+          label = dimTouchText.target;
+        } else if (!hasSecondTarget) {
+          label = dimTouchText.secondTarget;
+        } else if (!hasPlacementPoint) {
+          label = dimTouchText.placement;
+        } else {
+          label = dimTouchText.create;
+        }
+        enabled = hasCandidate || singleReady;
+      }
+      dom.touchConfirmOverlay.style.display = (isPanelVisible(state, "touchConfirmOverlay")) ? "flex" : "none";
+      dom.touchConfirmBtn.style.display = "";
+      dom.touchConfirmBtn.disabled = !enabled;
+      dom.touchConfirmBtn.textContent = label;
+      if (dom.touchLineFinishBtn) {
+        const showChainFinish = isChain && !draft?.awaitingPlacement;
+        dom.touchLineFinishBtn.style.display = showChainFinish ? "" : "none";
+        dom.touchLineFinishBtn.disabled = !(showChainFinish && chainPointCount >= 2);
+        dom.touchLineFinishBtn.textContent = dimTouchText.dimChainConfirmTarget || dimTouchText.placement;
+      }
+      if (dom.touchMultiSelectOverlay) {
+        dom.touchMultiSelectOverlay.style.display = "none";
+      }
+      return;
+    }
+    if (touchMode && tool === "circle") {
+      const circleMode = (circleModeRaw === "fixed" || circleModeRaw === "threepoint" || circleModeRaw === "drag")
+        ? circleModeRaw
+        : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
+      const circleDraft = state.input?.touchCircleDraft || {};
+      const circleStage = Number(circleDraft.stage) || 0;
+      const circleThreePointCount = Array.isArray(state.input?.circleThreePointRefs) ? state.input.circleThreePointRefs.length : 0;
+      const circleConfirmVisible = circleMode !== "fixed";
+      const circleConfirmEnabled = circleMode === "drag"
+        ? !!(circleDraft.candidatePoint || state.input?.hover?.world)
+        : (circleThreePointCount >= 3 || ((state.selection?.ids || []).length > 0));
+      const circleButtonText = circleMode === "drag"
+        ? (circleStage === 0 ? circleTouchText.centerConfirm : circleTouchText.edgeConfirm)
+        : (circleThreePointCount >= 3 ? circleTouchText.createCircle : circleTouchText.addTarget);
+      const circlePending = !!(circleDraft.stage || circleDraft.p1 || circleDraft.candidatePoint || circleThreePointCount > 0);
+      dom.touchConfirmOverlay.style.display = (isPanelVisible(state, "touchConfirmOverlay")) ? "flex" : "none";
+      dom.touchConfirmBtn.style.display = circleConfirmVisible ? "" : "none";
+      dom.touchConfirmBtn.disabled = !circleConfirmEnabled;
+      dom.touchConfirmBtn.textContent = circleButtonText;
+      if (dom.touchLineFinishBtn) dom.touchLineFinishBtn.style.display = "none";
+      if (dom.touchMultiSelectOverlay) {
+        dom.touchMultiSelectOverlay.style.display = "none";
+      }
+      return;
+    }
+    const show = touchMode && (hasLinearDraft || canLineFinalize || isChainDim || (tool === "circle" && circleMode === "threepoint") || tool === "fillet" || tool === "doubleline" || tool === "hatch" || tool === "patterncopy" || tool === "rect" || tool === "text");
     let enabled = false;
     let label = touchText.confirm;
     if (hasLinearDraft) {
@@ -220,39 +562,18 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
       label = (Number(rectDraft.stage) === 1)
         ? touchText.createRectangle
         : touchText.confirmFirstPoint;
+    } else if (tool === "text") {
+      const textDraft = state.input?.touchTextDraft || {};
+      enabled = !!textDraft.candidatePoint;
+      label = panelLang === "ja" ? "配置" : "Place Text";
     }
     dom.touchConfirmOverlay.style.display = (isPanelVisible(state, "touchConfirmOverlay") && show) ? "flex" : "none";
-    if (show) {
-      // Keep top-fixed placement and avoid overlap by shifting horizontally to the right of sidebar.
-      const sidebar = document.querySelector(".sidebar");
-      const top = 14;
-      let left = 14;
-      if (sidebar) {
-        const r = sidebar.getBoundingClientRect();
-        left = Math.max(8, Math.round(r.right + 8));
-      }
-      dom.touchConfirmOverlay.style.left = `${left}px`;
-      dom.touchConfirmOverlay.style.top = `${top}px`;
-    }
     dom.touchConfirmBtn.disabled = !enabled;
     dom.touchConfirmBtn.textContent = label;
-    if (dom.touchCancelBtn) {
-      const hasRectPending = !!(isTouchRect && (rectDraft.candidateStart || rectDraft.p1 || rectDraft.candidateEnd));
-      const hasPending = !!(
-        hasRectPending ||
-        hasLinearDraft ||
-        state.polylineDraft ||
-        state.dimDraft ||
-        (state.hatchDraft?.boundaryIds || []).length ||
-        (state.input?.circleThreePointRefs || []).length
-      );
-      dom.touchCancelBtn.disabled = !hasPending;
-    }
   }
   if (dom.touchSelectBackOverlay && dom.touchSelectBackBtn) {
     const touchMode = !!state.ui?.touchMode;
-    const isSelect = String(state.tool || "") === "select";
-    dom.touchSelectBackOverlay.style.display = (isPanelVisible(state, "touchSelectBackOverlay") && touchMode && !isSelect) ? "block" : "none";
+    dom.touchSelectBackOverlay.style.display = touchMode ? "flex" : "none";
   }
   if (dom.touchMultiSelectOverlay && dom.touchMultiSelectBtn) {
     const touchMode = !!state.ui?.touchMode;
@@ -261,27 +582,9 @@ export function refreshSettingsAndTouchPanels(state, dom, panelLang, helpers) {
     const circleMode = (circleModeRaw === "fixed" || circleModeRaw === "threepoint" || circleModeRaw === "drag")
       ? circleModeRaw
       : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
-    const needsMultiSelect = (tool === "select" || tool === "hatch" || tool === "doubleline" || tool === "patterncopy" || (tool === "circle" && circleMode === "threepoint"));
+    const needsMultiSelect = (tool === "select" || tool === "hatch" || tool === "doubleline" || tool === "patterncopy");
     const on = !!state.ui?.touchMultiSelect;
-    dom.touchMultiSelectOverlay.style.display = (isPanelVisible(state, "touchMultiSelectOverlay") && touchMode && needsMultiSelect) ? "block" : "none";
-    if (touchMode && needsMultiSelect) {
-      const sidebar = document.querySelector(".sidebar");
-      let left = 14;
-      let top = 14;
-      if (sidebar) {
-        const r = sidebar.getBoundingClientRect();
-        left = Math.max(8, Math.round(r.right + 8));
-      }
-      const confirmShown = !!(dom.touchConfirmOverlay && dom.touchConfirmOverlay.style.display !== "none");
-      if (confirmShown) {
-        const cr = dom.touchConfirmOverlay.getBoundingClientRect();
-        top = Math.max(8, Math.round(cr.bottom + 8));
-      } else {
-        top = 14;
-      }
-      dom.touchMultiSelectOverlay.style.left = `${left}px`;
-      dom.touchMultiSelectOverlay.style.top = `${top}px`;
-    }
+    dom.touchMultiSelectOverlay.style.display = (isPanelVisible(state, "touchMultiSelectOverlay") && touchMode && needsMultiSelect) ? "flex" : "none";
     dom.touchMultiSelectBtn.classList.toggle("is-active", on);
     dom.touchMultiSelectBtn.textContent = on
       ? "Multi-Select ON"

@@ -1,5 +1,6 @@
 import { ensurePanelVisibilityState, isPanelVisible } from "./ui_panel_visibility.js";
 import { getStatusBarText } from "./ui_text.js";
+import { resolveMenuScale, normalizeMenuScaleMode } from "./ui_numeric.js";
 
 export function setupLayoutAndTopContext(state, tool, helpers) {
   const {
@@ -10,18 +11,21 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
     getTopContextHelpText,
   } = helpers;
 
+  const vp = getViewportSizeForUi();
+  const menuScaleMode = normalizeMenuScaleMode(state.ui?.menuScaleMode ?? "auto");
   const menuScalePct = normalizeMenuScalePreset(state.ui?.menuScalePct ?? 100);
   if (!state.ui) state.ui = {};
+  state.ui.menuScaleMode = menuScaleMode;
   state.ui.menuScalePct = menuScalePct;
   if (!state.ui.adZones || typeof state.ui.adZones !== "object") {
     state.ui.adZones = { topRight: false, bottomLeft: false, bottomCenter: false };
   }
   ensurePanelVisibilityState(state);
-  const menuScale = menuScalePct / 100;
+  const menuScale = resolveMenuScale(state.ui, vp.width, vp.height);
   document.documentElement.style.setProperty("--menu-scale", String(menuScale));
   const scaleRoots = [
     document.querySelector(".top-context"),
-    document.querySelector(".right-stack"),
+    document.querySelector(".touch-tool-panel"),
   ];
   for (const el of scaleRoots) {
     if (!el) continue;
@@ -31,6 +35,15 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   const sidebarEl = document.querySelector(".sidebar");
   if (sidebarEl) {
     sidebarEl.style.display = isPanelVisible(state, "sidebar") ? "" : "none";
+  }
+  const leftAuxStackEl = document.querySelector(".left-aux-stack");
+  const displayMode = String(state.ui?.displayMode || "cad").toLowerCase();
+  if (leftAuxStackEl) {
+    if (displayMode === "viewer") {
+      leftAuxStackEl.style.display = "none";
+    } else {
+      leftAuxStackEl.style.display = "flex";
+    }
   }
   const sidebarPanels = [
     [".left-aux-stack .section[data-panel-id='snap']", "snapPanel"],
@@ -74,7 +87,6 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   updateSidebarScaleAndScroll();
   if (typeof requestAnimationFrame === "function") requestAnimationFrame(updateSidebarScaleAndScroll);
 
-  const vp = getViewportSizeForUi();
   const lang = getUiLanguage(state);
   const statusText = getStatusBarText(lang);
   const rootStyle = document.documentElement.style;
@@ -84,7 +96,11 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   const rightPanelsVisible = isPanelVisible(state, "rightPanels");
   const rightStackEl = document.querySelector(".right-stack");
   if (rightStackEl) {
+    rightStackEl.style.zoom = "1";
     rightStackEl.style.display = rightPanelsVisible ? "flex" : "none";
+    for (const child of Array.from(rightStackEl.children || [])) {
+      if (child?.style) child.style.zoom = String(menuScale);
+    }
   }
   const groupsSectionEl = document.querySelector(".right-stack .section[data-panel-id='groups']");
   if (groupsSectionEl) groupsSectionEl.style.display = isPanelVisible(state, "groupsPanel") ? "flex" : "none";
@@ -147,11 +163,27 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   };
   const topRightBox = fitBox(preset.topRight, Math.max(170, vp.width - 230), Math.max(100, vp.height - 40));
   const bottomLeftBox = fitBox(preset.bottomLeft, Math.max(170, vp.width * 0.28), Math.max(100, vp.height * 0.32));
-  const estimatedRightPanelW = Math.max(180, Math.round(Number(state.ui?.panelLayout?.rightPanelWidth) || 250));
+  const RIGHT_PANEL_MIN_W = 70;
+  const RIGHT_PANEL_WIDTH_SCALE_MIN = 0.42;
+  const RIGHT_PANEL_WIDTH_SCALE_MAX = 1.08;
+  const getRightPanelWidthScale = () => {
+    const vw = Number(vp.width) || 0;
+    if (vw >= 1280) return RIGHT_PANEL_WIDTH_SCALE_MAX;
+    if (vw <= 780) return RIGHT_PANEL_WIDTH_SCALE_MIN;
+    const t = (vw - 780) / (1280 - 780);
+    const smooth = t * t * (3 - (2 * t));
+    return RIGHT_PANEL_WIDTH_SCALE_MIN + ((RIGHT_PANEL_WIDTH_SCALE_MAX - RIGHT_PANEL_WIDTH_SCALE_MIN) * smooth);
+  };
+  const RIGHT_PANEL_SCALE = getRightPanelWidthScale();
+  const scaleRightPanelWidth = (rawWidth) => {
+    const base = Math.max(RIGHT_PANEL_MIN_W, Math.round(Number(rawWidth) || 250));
+    return Math.max(RIGHT_PANEL_MIN_W, Math.round(base * menuScale * RIGHT_PANEL_SCALE));
+  };
+  const estimatedRightPanelW = scaleRightPanelWidth(state.ui?.panelLayout?.rightPanelWidth);
   if (rightStackEl && rightPanelsVisible) {
     const presetRightW = Number(state.ui?.panelLayout?.rightPanelWidth);
     if (Number.isFinite(presetRightW) && presetRightW > 0) {
-      rightStackEl.style.width = `min(${presetRightW}px, calc(100% - 230px))`;
+      rightStackEl.style.width = `min(${scaleRightPanelWidth(presetRightW)}px, calc(100% - 230px))`;
     } else {
       rightStackEl.style.removeProperty("width");
     }
@@ -260,11 +292,11 @@ export function setupLayoutAndTopContext(state, tool, helpers) {
   if (rightStackEl && rightPanelsVisible) {
     const w = Number(state.ui?.panelLayout?.rightPanelWidth);
     if (Number.isFinite(w) && w > 0) {
-      rightStackEl.style.width = `min(${w}px, calc(100% - 230px))`;
+      rightStackEl.style.width = `min(${scaleRightPanelWidth(w)}px, calc(100% - 230px))`;
     } else {
       rightStackEl.style.removeProperty("width");
     }
-    const appliedRightPanelW = Math.max(180, Math.round(rightStackEl.getBoundingClientRect().width || w || 250));
+    const appliedRightPanelW = Math.max(RIGHT_PANEL_MIN_W, Math.round(rightStackEl.getBoundingClientRect().width || scaleRightPanelWidth(w || 250)));
     rootStyle.setProperty("--right-panel-w", `${appliedRightPanelW}px`);
   } else {
     rootStyle.setProperty("--right-panel-w", rightPanelsVisible ? "250px" : "0px");

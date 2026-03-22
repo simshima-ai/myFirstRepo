@@ -1,6 +1,7 @@
 export function createHtmlLikeLeftMenuRegistry() {
   return [
     { type: "tool", id: "select", label: "Select", group: "create" },
+    { type: "tool", id: "move", label: "Move", group: "create" },
     { type: "action", id: "resetView", label: "Reset View", implemented: true, group: "create" },
     { type: "tool", id: "line", label: "Line", group: "create" },
     { type: "tool", id: "rect", label: "Rect", group: "create" },

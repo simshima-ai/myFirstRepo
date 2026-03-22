@@ -1,5 +1,6 @@
 export const TOOL_SHORTCUT_TOOL_ORDER = Object.freeze([
   "select",
+  "move",
   "line",
   "rect",
   "circle",
@@ -18,6 +19,7 @@ export const TOOL_SHORTCUT_TOOL_ORDER = Object.freeze([
 
 export const DEFAULT_TOOL_SHORTCUTS = Object.freeze({
   select: "S",
+  move: "W",
   line: "L",
   rect: "R",
   circle: "C",
@@ -33,6 +35,14 @@ export const DEFAULT_TOOL_SHORTCUTS = Object.freeze({
   vertex_mode_toggle: "\\",
   delete: "DEL",
 });
+
+function createDefaultLayers() {
+  return [
+    { id: 1, name: "main", visible: true, locked: false },
+    { id: 2, name: "guide", visible: true, locked: false },
+    { id: 3, name: "dim", visible: true, locked: false },
+  ];
+}
 
 export function normalizeShortcutKey(v) {
   if (v == null) return "";
@@ -83,6 +93,9 @@ export function createState() {
       ignoreGridSnap: false,
       circleArrowSide: "outside", // "outside" | "inside"
       textRotate: "auto",
+      numericPriority: false,
+      numericValue: null,
+      fixedTextRotate: null,
       extOffset: 2,
       extOver: 2,
       fontSize: 12,
@@ -112,6 +125,7 @@ export function createState() {
       width: 100,
       height: 100,
       sizeLocked: false,
+      asPolyline: false,
       anchor: "c",
       lineWidthMm: 0.25,
       lineType: "solid",
@@ -195,10 +209,8 @@ export function createState() {
     groups: [],
     nextGroupId: 1,
     activeGroupId: null,
-    layers: [
-      { id: 1, name: "Layer 1", visible: true, locked: false },
-    ],
-    nextLayerId: 2,
+    layers: createDefaultLayers(),
+    nextLayerId: 4,
     activeLayerId: 1,
     selection: {
       ids: [],
@@ -383,6 +395,19 @@ export function createState() {
       },
       circleThreePointRefs: [], // [{ x, y, r, shapeId, type }]
       dragStartWorld: null,
+      touchLineDraft: {
+        stage: 0, // 0: waiting start confirm, 1: waiting end/current confirm
+        p1: null,
+        candidatePoint: null,
+      },
+      touchCircleDraft: {
+        stage: 0, // 0: waiting center confirm, 1: waiting edge confirm
+        p1: null,
+        candidatePoint: null,
+      },
+      touchDimDraft: {
+        candidatePoint: null,
+      },
       touchRectDraft: {
         stage: 0, // 0: waiting first confirm, 1: waiting second confirm
         p1: null,
@@ -442,9 +467,13 @@ export function createState() {
       selectPickMode: "object", // "object" | "group"
       language: "en",
       displayMode: "cad",
+      menuScaleMode: "auto",
+      menuScaleAutoPreset: "normal",
       menuScalePct: 100,
+      wheelZoomFactor: 1.1,
       touchMode: false,
       touchMultiSelect: false,
+      touchPanelPos: { x: 14, y: 14 },
       importSourceUnit: "auto",
       importAsPolyline: false,
       showFps: false,
@@ -532,7 +561,7 @@ export function restoreModel(state, snap) {
       visible: l.visible !== false,
       locked: l.locked === true,
     }))))
-    : [{ id: 1, name: "Layer 1", visible: true, locked: false }];
+    : createDefaultLayers();
   state.nextLayerId = Number(snap.nextLayerId) || (Math.max(...state.layers.map(l => Number(l.id) || 0), 0) + 1);
   const activeLayerId = Number(snap.activeLayerId) || Number(state.layers[0].id);
   state.activeLayerId = state.layers.some(l => Number(l.id) === activeLayerId)
@@ -623,6 +652,19 @@ export function setTool(state, tool) {
   }
   if (tool !== "circle" && state.input) {
     state.input.circleThreePointRefs = [];
+    state.input.dragStartWorld = null;
+  }
+  if (tool !== "line" && state.input) {
+    state.input.touchLineDraft = { stage: 0, p1: null, candidatePoint: null };
+    state.input.dragStartWorld = null;
+  }
+  if (tool !== "circle" && state.input) {
+    state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
+    state.input.circleThreePointRefs = [];
+    state.input.dragStartWorld = null;
+  }
+  if (tool !== "dim" && state.input) {
+    state.input.touchDimDraft = { candidatePoint: null };
     state.input.dragStartWorld = null;
   }
   if (tool !== "rect" && state.input) {

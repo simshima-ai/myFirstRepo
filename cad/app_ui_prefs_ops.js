@@ -5,6 +5,7 @@
   setPanelVisibleState,
 } from "./ui_panel_visibility.js";
 import { applyDisplayModePreset, normalizeDisplayMode } from "./ui_display_mode_presets.js";
+import { normalizeMenuScaleAutoPreset, normalizeMenuScaleMode, normalizeWheelZoomPreset } from "./ui_numeric.js";
 
 export function createUiPrefsOps(config) {
   const {
@@ -36,7 +37,29 @@ export function createUiPrefsOps(config) {
     const n = Number(pct);
     const snapped = Math.max(50, Math.min(200, Math.round((Number.isFinite(n) ? n : 100) / 5) * 5));
     if (!state.ui) state.ui = {};
+    state.ui.menuScaleMode = "manual";
     state.ui.menuScalePct = snapped;
+    scheduleSaveAppSettings();
+    draw();
+  }
+
+  function setMenuScaleMode(mode) {
+    if (!state.ui) state.ui = {};
+    state.ui.menuScaleMode = normalizeMenuScaleMode(mode);
+    scheduleSaveAppSettings();
+    draw();
+  }
+
+  function setMenuScaleAutoPreset(preset) {
+    if (!state.ui) state.ui = {};
+    state.ui.menuScaleAutoPreset = normalizeMenuScaleAutoPreset(preset);
+    scheduleSaveAppSettings();
+    draw();
+  }
+
+  function setWheelZoomFactor(v) {
+    if (!state.ui) state.ui = {};
+    state.ui.wheelZoomFactor = Math.max(1.01, Math.min(2, normalizeWheelZoomPreset(v)));
     scheduleSaveAppSettings();
     draw();
   }
@@ -189,6 +212,18 @@ export function createUiPrefsOps(config) {
     draw();
   }
 
+  function setTouchPanelPosition(pos) {
+    if (!state.ui) state.ui = {};
+    const x = Number(pos?.x);
+    const y = Number(pos?.y);
+    state.ui.touchPanelPos = {
+      x: Number.isFinite(x) ? x : (state.ui.touchPanelPos?.x ?? 14),
+      y: Number.isFinite(y) ? y : (state.ui.touchPanelPos?.y ?? 14),
+    };
+    scheduleSaveAppSettings();
+    draw();
+  }
+
   function setImportAsPolyline(on) {
     if (!state.ui) state.ui = {};
     state.ui.importAsPolyline = !!on;
@@ -229,7 +264,10 @@ export function createUiPrefsOps(config) {
     setPanelVisibility,
     setDisplayMode,
     setLanguage,
+    setMenuScaleMode,
+    setMenuScaleAutoPreset,
     setMenuScalePct,
+    setWheelZoomFactor,
     setFpsDisplay,
     setObjectCountDisplay,
     setAdZoneEnabled,
@@ -239,6 +277,7 @@ export function createUiPrefsOps(config) {
     setAutoBackupIntervalSec,
     setTouchMode,
     setTouchMultiSelect,
+    setTouchPanelPosition,
     setImportSourceUnit,
     setImportAsPolyline,
     setToolShortcut,

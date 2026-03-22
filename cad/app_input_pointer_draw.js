@@ -14,6 +14,7 @@
         nextShapeId,
         applyToolStrokeToShape,
         addShape,
+        addShapesAsGroup,
         clearSelection,
         beginOrExtendBsplineDraft,
         getLineCreateMode,
@@ -22,6 +23,27 @@
         getRectFromAnchor,
         beginOrExtendPolyline
     } = deps;
+    const buildRectLineShapes = (p1, p2) => ([
+        { type: "line", x1: Number(p1.x), y1: Number(p1.y), x2: Number(p2.x), y2: Number(p1.y) },
+        { type: "line", x1: Number(p2.x), y1: Number(p1.y), x2: Number(p2.x), y2: Number(p2.y) },
+        { type: "line", x1: Number(p2.x), y1: Number(p2.y), x2: Number(p1.x), y2: Number(p2.y) },
+        { type: "line", x1: Number(p1.x), y1: Number(p2.y), x2: Number(p1.x), y2: Number(p1.y) },
+    ]);
+    const buildRectShape = (p1, p2) => {
+        if (state.rectSettings?.asPolyline) {
+            return {
+                type: "polyline",
+                points: [
+                    { x: Number(p1.x), y: Number(p1.y) },
+                    { x: Number(p2.x), y: Number(p1.y) },
+                    { x: Number(p2.x), y: Number(p2.y) },
+                    { x: Number(p1.x), y: Number(p2.y) },
+                ],
+                closed: true,
+            };
+        }
+        return null;
+    };
 
     if (!(state.tool === "line" || state.tool === "rect" || state.tool === "circle")) return false;
     const isPrimaryPress = e.pointerType === "touch" || e.button === 0;
@@ -106,8 +128,49 @@
             }
             return true;
         }
+        if (circleMode === "drag" && !!state.ui?.touchMode) {
+            if (!state.input.touchCircleDraft || typeof state.input.touchCircleDraft !== "object") {
+                state.input.touchCircleDraft = { stage: 0, p1: null, candidatePoint: null };
+            }
+            const draft = state.input.touchCircleDraft;
+            draft.candidatePoint = { x: world.x, y: world.y };
+            state.preview = createPosition(world);
+            state.preview.positionPreviewMode = "marker";
+            if (setStatus) {
+                setStatus(draft.stage === 0
+                    ? "Circle: confirm center point"
+                    : "Circle: confirm edge point");
+            }
+            if (draw) draw();
+            return true;
+        }
         // circleMode === "drag" now uses the same 2-click flow as rectangle.
         // Fall through to the common "first point / second point" creation block below.
+    }
+    const isTouchLineFlow = (state.tool === "line") && !!state.ui?.touchMode && !state.lineSettings?.sizeLocked;
+    if (isTouchLineFlow) {
+        if (!state.input.touchLineDraft || typeof state.input.touchLineDraft !== "object") {
+            state.input.touchLineDraft = { stage: 0, p1: null, candidatePoint: null };
+        }
+        const draft = state.input.touchLineDraft;
+        draft.candidatePoint = { x: world.x, y: world.y };
+        state.preview = createPosition(world);
+        state.preview.positionPreviewMode = "marker";
+        const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+        const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+        if (setStatus) {
+            if (lineMode === "segment") {
+                setStatus(draft.stage === 0
+                    ? "Line: confirm start point"
+                    : "Line: confirm end point");
+            } else if (lineMode === "freehand") {
+                setStatus("B-Spline: confirm current position");
+            } else {
+                setStatus("Continuous line: confirm current position");
+            }
+        }
+        if (draw) draw();
+        return true;
     }
     if (state.tool === "line" && getLineCreateMode() === "freehand") {
         beginOrExtendBsplineDraft(world);
@@ -145,21 +208,22 @@
         if (ww > 0 && hh > 0) {
             const anchorKey = String(state.rectSettings?.anchor || "c");
             const { p1, p2 } = getRectFromAnchor(world, ww, hh, anchorKey);
-            const shape = {
-                type: "polyline",
-                points: [
-                    { x: Number(p1.x), y: Number(p1.y) },
-                    { x: Number(p2.x), y: Number(p1.y) },
-                    { x: Number(p2.x), y: Number(p2.y) },
-                    { x: Number(p1.x), y: Number(p2.y) },
-                ],
-                closed: true,
-            };
+            const shape = buildRectShape(p1, p2);
             pushHistory();
-            shape.id = nextShapeId();
-            shape.layerId = state.activeLayerId;
-            applyToolStrokeToShape(shape, "rect");
-            addShape(shape);
+            if (shape) {
+                shape.id = nextShapeId();
+                shape.layerId = state.activeLayerId;
+                applyToolStrokeToShape(shape, "rect");
+                addShape(shape);
+            } else {
+                const lines = buildRectLineShapes(p1, p2);
+                for (const line of lines) {
+                    line.id = nextShapeId();
+                    line.layerId = state.activeLayerId;
+                    applyToolStrokeToShape(line, "rect");
+                }
+                addShapesAsGroup?.(lines);
+            }
             clearSelection();
             state.activeGroupId = null;
             if (setStatus) setStatus("RECT created (size-locked)");
@@ -210,20 +274,21 @@
         } else if (state.tool === "rect") {
             const p1 = state.input.dragStartWorld;
             const p2 = world;
-            const shape = {
-                type: "polyline",
-                points: [
-                    { x: Number(p1.x), y: Number(p1.y) },
-                    { x: Number(p2.x), y: Number(p1.y) },
-                    { x: Number(p2.x), y: Number(p2.y) },
-                    { x: Number(p1.x), y: Number(p2.y) },
-                ],
-                closed: true,
-            };
-            shape.id = nextShapeId();
-            shape.layerId = state.activeLayerId;
-            applyToolStrokeToShape(shape, "rect");
-            addShape(shape);
+            const shape = buildRectShape(p1, p2);
+            if (shape) {
+                shape.id = nextShapeId();
+                shape.layerId = state.activeLayerId;
+                applyToolStrokeToShape(shape, "rect");
+                addShape(shape);
+            } else {
+                const lines = buildRectLineShapes(p1, p2);
+                for (const line of lines) {
+                    line.id = nextShapeId();
+                    line.layerId = state.activeLayerId;
+                    applyToolStrokeToShape(line, "rect");
+                }
+                addShapesAsGroup?.(lines);
+            }
             clearSelection();
             state.activeGroupId = null;
         }

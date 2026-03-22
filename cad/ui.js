@@ -4,6 +4,7 @@ import { refreshUiMain } from "./ui_refresh_main.js";
 export function createToolRegistry() {
   return [
     { id: "select", label: "Select" },
+    { id: "move", label: "Move" },
     { id: "vertex", label: "Vertex" },
     { id: "line", label: "Line" },
     { id: "polyline", label: "Polyline" },

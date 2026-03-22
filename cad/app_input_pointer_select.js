@@ -9,6 +9,7 @@
         setSelection,
         setStatus,
         draw,
+        focusSelectMoveInput,
         hitTestShapes,
         findConnectedLinesChain,
         hitActiveGroupRotateHandle,
@@ -24,8 +25,18 @@
         toggleGroupSelectionById,
         beginSelectionDrag,
         clearSelection,
-        beginSelectionBox
+        beginSelectionBox,
+        allowMoveDrag = true
     } = deps;
+
+    const focusSelectionMoveInputIfNeeded = () => {
+        if (String(state.tool || "") !== "select") return;
+        const hasObjectSelection = Array.isArray(state.selection?.ids) && state.selection.ids.length > 0;
+        if (!hasObjectSelection) return;
+        if (!state.ui || typeof state.ui !== "object") state.ui = {};
+        state.ui.pendingFocusSelectMoveInput = true;
+        if (typeof focusSelectMoveInput === "function") focusSelectMoveInput();
+    };
 
     if (e.button === 0 && Number(e.detail) >= 2) {
         const pickMode = String(state.ui?.selectPickMode || "object");
@@ -40,6 +51,7 @@
                 state.activeGroupId = null;
                 if (setStatus) setStatus("Connected objects selected");
                 if (draw) draw();
+                focusSelectionMoveInputIfNeeded();
                 e.preventDefault();
                 return true;
             }
@@ -121,6 +133,7 @@
             setSelection(Array.from(cur));
             state.activeGroupId = null;
             if (draw) draw();
+            focusSelectionMoveInputIfNeeded();
             return true;
         }
         if (pickMode === "group" && hit.groupId != null) {
@@ -137,14 +150,18 @@
                 state.activeGroupId = null;
             }
         }
-        let dragStarted = beginSelectionDrag(state, worldRaw, helpers);
-        if (!dragStarted && hit.type === "line" && pickMode !== "group") {
-            setSelection([Number(hit.id)]);
-            state.activeGroupId = null;
+        let dragStarted = false;
+        if (allowMoveDrag) {
             dragStarted = beginSelectionDrag(state, worldRaw, helpers);
+            if (!dragStarted && hit.type === "line" && pickMode !== "group") {
+                setSelection([Number(hit.id)]);
+                state.activeGroupId = null;
+                dragStarted = beginSelectionDrag(state, worldRaw, helpers);
+            }
         }
         void dragStarted;
         if (draw) draw();
+        focusSelectionMoveInputIfNeeded();
         return true;
     }
 

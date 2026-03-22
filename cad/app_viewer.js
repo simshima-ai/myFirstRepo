@@ -191,7 +191,14 @@ function bindViewerNavigation() {
     const rect = dom.canvas.getBoundingClientRect();
     const sx = Number(e.clientX) - Number(rect.left || 0);
     const sy = Number(e.clientY) - Number(rect.top || 0);
-    const factor = e.deltaY < 0 ? 1.1 : (1 / 1.1);
+    const selectFactor = Number(dom.wheelZoomFactorSelect?.value);
+    const zoomFactor = Math.max(
+      1.01,
+      Number.isFinite(selectFactor) && selectFactor > 0
+        ? selectFactor
+        : Number(state.ui?.wheelZoomFactor) || 1.1
+    );
+    const factor = e.deltaY < 0 ? zoomFactor : (1 / zoomFactor);
     zoomAt(state, sx, sy, factor);
     draw();
   }, { passive: false });

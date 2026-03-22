@@ -12,7 +12,23 @@ function syncInputValue(el, value) {
 }
 
 export function refreshViewerUi(state, dom) {
-  if (dom.buildBadge) dom.buildBadge.textContent = `Build ${state.buildVersion || ""}`.trim();
+  const buildNo = String(state.buildVersion || "unknown");
+  if (dom.buildBadge) dom.buildBadge.textContent = `Build No: ${buildNo}`;
+  if (dom.settingsBuildBadge) dom.settingsBuildBadge.textContent = `Build No: ${buildNo}`;
+  if (dom.selectionDebugBadge) {
+    const selIds = Array.isArray(state.selection?.ids) ? state.selection.ids.map(Number).filter(Number.isFinite) : [];
+    const selTypes = selIds.length
+      ? (state.shapes || [])
+          .filter((s) => selIds.includes(Number(s.id)))
+          .map((s) => String(s.type || ""))
+          .filter(Boolean)
+      : [];
+    dom.selectionDebugBadge.textContent = selIds.length
+      ? `Sel ${selIds.length}: ${selTypes.join(", ") || "-" }`
+      : "Sel 0";
+    dom.selectionDebugBadge.style.display = "";
+  }
+  document.title = `S-CAD Build No: ${buildNo}`;
 
   const displayMode = String(state.ui?.displayMode || "viewer").toLowerCase();
   const modeButtons = [

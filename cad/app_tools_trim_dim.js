@@ -2,6 +2,7 @@ import { normalizeRad, isAngleOnArc, segmentIntersectionParamPoint, segmentCircl
 import { mmPerUnit } from "./geom.js";
 import { getGroup, isLayerVisible } from "./state.js";
 import { createDim, createLine } from "./app_tools_misc.js";
+import { getDimGeometry, getDimChainGeometry } from "./dim_geom.js";
 import { sampleBSplinePoints } from "./bspline_utils.js";
 
 function getNearestPolylineSegment(poly, world) {
@@ -710,6 +711,9 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
     const world = worldSnapped ? { x: worldSnapped.x, y: worldSnapped.y } : { x: worldRaw.x, y: worldRaw.y };
     const { snapMode, circleMode, linearMode } = state.dimSettings;
     const circleArrowSide = state.dimSettings?.circleArrowSide === "inside" ? "inside" : "outside";
+    const touchPoint = state.ui?.touchMode
+        ? (state.input?.touchDimDraft?.candidatePoint || null)
+        : null;
 
     if (!state.dimDraft) {
         const hit = hitTestShapes(state, worldRaw);
@@ -811,26 +815,61 @@ export function updateDimHover(state, worldRaw, worldSnapped, helpers) {
     }
 
     if (state.dimDraft.type === "dimchain") {
-        if (state.dimDraft.awaitingPlacement) {
+        if (state.ui?.touchMode) {
+            if (touchPoint && Number.isFinite(Number(touchPoint.x)) && Number.isFinite(Number(touchPoint.y))) {
+                if (state.dimDraft.awaitingPlacement) {
+                    state.dimDraft.hoverPoint = { x: Number(touchPoint.x), y: Number(touchPoint.y) };
+                    state.dimDraft.hoverPlace = { x: Number(touchPoint.x), y: Number(touchPoint.y) };
+                    state.dimDraft.place = { x: Number(touchPoint.x), y: Number(touchPoint.y) };
+                } else {
+                    state.dimDraft.hoverPoint = { x: Number(touchPoint.x), y: Number(touchPoint.y) };
+                }
+            }
+        } else if (state.dimDraft.awaitingPlacement) {
             state.dimDraft.hoverPlace = { x: world.x, y: world.y };
+            state.dimDraft.place = { x: world.x, y: world.y };
         } else {
             state.dimDraft.hoverPoint = { x: world.x, y: world.y };
         }
     } else if (state.dimDraft.type === "dimleader") {
         state.input.objectSnapHover = null;
-        if (!state.dimDraft.p2) {
+        if (state.ui?.touchMode) {
+            if (touchPoint && Number.isFinite(Number(touchPoint.x)) && Number.isFinite(Number(touchPoint.y)) && !state.dimDraft.p2) {
+                state.dimDraft.hover = { x: Number(touchPoint.x), y: Number(touchPoint.y) };
+                if (setStatus) setStatus("Leader dimension: click elbow point.");
+            }
+        } else if (!state.dimDraft.p2) {
             state.dimDraft.hover = { x: world.x, y: world.y };
             if (setStatus) setStatus("Leader dimension: click elbow point.");
         } else {
             state.dimDraft.p2 = { x: world.x, y: world.y };
         }
     } else if (state.dimDraft.dimRef) {
-        state.dimDraft.x2 = world.x;
-        state.dimDraft.y2 = world.y;
+        if (state.ui?.touchMode) {
+            if (touchPoint && Number.isFinite(Number(touchPoint.x)) && Number.isFinite(Number(touchPoint.y))) {
+                state.dimDraft.x2 = Number(touchPoint.x);
+                state.dimDraft.y2 = Number(touchPoint.y);
+            }
+        } else if (!Number.isFinite(Number(state.dimDraft.x2)) || !Number.isFinite(Number(state.dimDraft.y2))) {
+            state.dimDraft.x2 = world.x;
+            state.dimDraft.y2 = world.y;
+        }
     } else if (!state.dimDraft.p2) {
-        state.dimDraft.hover = { x: world.x, y: world.y };
+        if (state.ui?.touchMode) {
+            if (touchPoint && Number.isFinite(Number(touchPoint.x)) && Number.isFinite(Number(touchPoint.y))) {
+                state.dimDraft.hover = { x: Number(touchPoint.x), y: Number(touchPoint.y) };
+            }
+        } else {
+            state.dimDraft.hover = { x: world.x, y: world.y };
+        }
     } else {
-        state.dimDraft.place = { x: world.x, y: world.y };
+        if (state.ui?.touchMode) {
+            if (touchPoint && Number.isFinite(Number(touchPoint.x)) && Number.isFinite(Number(touchPoint.y))) {
+                state.dimDraft.place = { x: Number(touchPoint.x), y: Number(touchPoint.y) };
+            }
+        } else {
+            state.dimDraft.place = { x: world.x, y: world.y };
+        }
     }
 }
 
@@ -1108,6 +1147,133 @@ function estimateLeaderLineLengthWorld(state, labelText, fontSizePt) {
     return dimMmToWorldInTools(state, lenMm);
 }
 
+function computeAutoTextAngleDeg(tx, ty) {
+    let a = (Math.atan2(Number(ty) || 0, Number(tx) || 0) * 180) / Math.PI;
+    while (a >= 90) a -= 180;
+    while (a < -90) a += 180;
+    return a;
+}
+
+function getFixedTextRotateForDim(dim) {
+    if (!dim || (dim.type !== "dim" && dim.type !== "dimchain")) return null;
+    if (dim.type === "dimchain") {
+        const geom = getDimChainGeometry(dim);
+        if (!geom) return null;
+        return computeAutoTextAngleDeg(geom.ux, geom.uy);
+    }
+    const geom = getDimGeometry(dim);
+    if (!geom) return null;
+    return computeAutoTextAngleDeg(geom.tx, geom.ty);
+}
+
+function getDimScaleComp(dim) {
+    const c = Number(dim?.groupScaleComp);
+    return Number.isFinite(c) && c > 1e-9 ? c : 1;
+}
+
+function getDimCurrentNumericValue(dim) {
+    const geom = getDimGeometry(dim);
+    if (!geom) return null;
+    const comp = getDimScaleComp(dim);
+    const v = Number(geom.len) / comp;
+    return Number.isFinite(v) ? v : null;
+}
+
+function getDimChainCurrentNumericValues(dim) {
+    const geom = getDimChainGeometry(dim);
+    if (!geom || !Array.isArray(geom.segments)) return [];
+    const comp = getDimScaleComp(dim);
+    return geom.segments.map((seg) => {
+        const v = Number(seg?.len) / comp;
+        return Number.isFinite(v) ? v : null;
+    });
+}
+
+function normalizeDimChainNumericValues(dim, values) {
+    const segCount = Math.max(0, (Array.isArray(dim?.points) ? dim.points.length : 0) - 1);
+    const src = Array.isArray(values) ? values : [];
+    const out = [];
+    for (let i = 0; i < segCount; i += 1) {
+        const n = Number(src[i]);
+        out.push(Number.isFinite(n) ? n : null);
+    }
+    return out;
+}
+
+function detachDimFollowAttributes(dim) {
+    if (!dim || dim.type !== "dim") return;
+    dim.p1Attrib = null;
+    dim.p2Attrib = null;
+    if (Array.isArray(dim.attributes)) {
+        dim.attributes = dim.attributes.filter((a) => {
+            const name = String(a?.name || "");
+            const target = String(a?.target || "");
+            return !(name === "keep_snap" && (target === "vertex:p1" || target === "vertex:p2"));
+        });
+    }
+}
+
+function reshapeDimFromNumericValue(dim) {
+    if (!dim || dim.type !== "dim") return false;
+    const target = Number(dim.numericValue);
+    if (!Number.isFinite(target)) return false;
+    const geom = getDimGeometry(dim);
+    if (!geom) return false;
+    const comp = getDimScaleComp(dim);
+    const targetLen = Math.max(0, target) * comp;
+    let ux = Number(geom.tx);
+    let uy = Number(geom.ty);
+    if (!Number.isFinite(ux) || !Number.isFinite(uy) || Math.hypot(ux, uy) < 1e-9) {
+        const dx = Number(dim.x2) - Number(dim.x1);
+        const dy = Number(dim.y2) - Number(dim.y1);
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-9) return false;
+        ux = dx / len;
+        uy = dy / len;
+    }
+    dim.x2 = Number(dim.x1) + ux * targetLen;
+    dim.y2 = Number(dim.y1) + uy * targetLen;
+    detachDimFollowAttributes(dim);
+    return true;
+}
+
+function reshapeDimChainFromNumericValues(dim) {
+    if (!dim || dim.type !== "dimchain" || !Array.isArray(dim.points) || dim.points.length < 2) return false;
+    const geom = getDimChainGeometry(dim);
+    if (!geom) return false;
+    const comp = getDimScaleComp(dim);
+    const currentValues = getDimChainCurrentNumericValues(dim);
+    const desiredValues = normalizeDimChainNumericValues(dim, dim.numericValues);
+    const normalized = desiredValues.map((v, i) => {
+        const n = Number(v);
+        if (Number.isFinite(n)) return Math.max(0, n);
+        const cur = Number(currentValues[i]);
+        return Number.isFinite(cur) ? Math.max(0, cur) : 0;
+    });
+    const p0 = dim.points[0];
+    const pN = dim.points[dim.points.length - 1];
+    let ux = Number(geom.ux);
+    let uy = Number(geom.uy);
+    if (!Number.isFinite(ux) || !Number.isFinite(uy) || Math.hypot(ux, uy) < 1e-9) {
+        const dx = Number(pN?.x) - Number(p0?.x);
+        const dy = Number(pN?.y) - Number(p0?.y);
+        const len = Math.hypot(dx, dy);
+        if (len < 1e-9) return false;
+        ux = dx / len;
+        uy = dy / len;
+    }
+    const baseX = Number(p0.x);
+    const baseY = Number(p0.y);
+    const nextPoints = [{ x: baseX, y: baseY }];
+    let acc = 0;
+    for (const v of normalized) {
+        acc += v * comp;
+        nextPoints.push({ x: baseX + ux * acc, y: baseY + uy * acc });
+    }
+    dim.points = nextPoints;
+    return true;
+}
+
 function solveDimAngleFromLines(state, line1, line2, pick1, pick2) {
     const c = lineInfiniteIntersection(line1, line2);
     if (!c) return null;
@@ -1164,7 +1330,83 @@ export function applyDimSettingsToSelection(state, helpers, patch) {
     if (selectedDims.length > 0) {
         if (pushHistory) pushHistory();
         for (const dim of selectedDims) {
-            Object.assign(dim, patch);
+            const nextPatch = { ...(patch || {}) };
+            const explicitNumericValue = Object.prototype.hasOwnProperty.call(nextPatch, "numericValue");
+            const explicitNumericValues = Object.prototype.hasOwnProperty.call(nextPatch, "numericValues");
+            const currentNumericValue = getDimCurrentNumericValue(dim);
+            const currentNumericValues = getDimChainCurrentNumericValues(dim);
+            if (dim.type !== "dim" && dim.type !== "dimchain") {
+                delete nextPatch.numericPriority;
+                delete nextPatch.numericValue;
+                delete nextPatch.numericValues;
+                delete nextPatch.fixedTextRotate;
+            } else {
+                const numericPriority = Object.prototype.hasOwnProperty.call(nextPatch, "numericPriority")
+                    ? !!nextPatch.numericPriority
+                    : !!dim.numericPriority;
+                if (numericPriority) {
+                    if (Object.prototype.hasOwnProperty.call(nextPatch, "textRotate")) {
+                        const explicitRotate = nextPatch.textRotate;
+                        nextPatch.fixedTextRotate = Number.isFinite(Number(explicitRotate))
+                            ? Number(explicitRotate)
+                            : (getFixedTextRotateForDim(dim) ?? 0);
+                    } else if (!Number.isFinite(Number(dim.fixedTextRotate))) {
+                        nextPatch.fixedTextRotate = getFixedTextRotateForDim(dim) ?? 0;
+                    }
+                } else if (Object.prototype.hasOwnProperty.call(nextPatch, "numericPriority") || dim.numericPriority) {
+                    nextPatch.fixedTextRotate = null;
+                }
+                if (explicitNumericValue) {
+                    const n = Number(nextPatch.numericValue);
+                    nextPatch.numericValue = Number.isFinite(n) ? n : null;
+                }
+                const numericPriorityToggledOn = Object.prototype.hasOwnProperty.call(nextPatch, "numericPriority") && !!nextPatch.numericPriority;
+                if (dim.type === "dim" && numericPriorityToggledOn && !explicitNumericValue && !Number.isFinite(Number(dim.numericValue)) && Number.isFinite(currentNumericValue)) {
+                    nextPatch.numericValue = currentNumericValue;
+                }
+                if (dim.type === "dimchain" && explicitNumericValues) {
+                    nextPatch.numericValues = normalizeDimChainNumericValues(dim, nextPatch.numericValues);
+                    if (nextPatch.numericPriority !== false) nextPatch.numericPriority = true;
+                    nextPatch.numericValue = null;
+                } else if (dim.type === "dimchain" && numericPriorityToggledOn && !explicitNumericValues && !Array.isArray(dim.numericValues) && currentNumericValues.length) {
+                    nextPatch.numericValues = currentNumericValues.slice();
+                } else if (dim.type === "dimchain" && Object.prototype.hasOwnProperty.call(nextPatch, "numericPriority") && !nextPatch.numericPriority) {
+                    nextPatch.numericValue = Number.isFinite(Number(nextPatch.numericValue)) ? Number(nextPatch.numericValue) : (Number.isFinite(Number(dim.numericValue)) ? Number(dim.numericValue) : null);
+                } else if (dim.type === "dimchain" && numericPriority && !Array.isArray(dim.numericValues) && !Number.isFinite(Number(dim.numericValue))) {
+                    const geom = getDimChainGeometry(dim);
+                    const comp = getDimScaleComp(dim);
+                    nextPatch.numericValues = Array.isArray(geom?.segments)
+                        ? geom.segments.map((seg) => {
+                            const n = Number(seg?.len) / comp;
+                            return Number.isFinite(n) ? n : null;
+                        })
+                        : [];
+                }
+            }
+            Object.assign(dim, nextPatch);
+            if (dim.type === "dim" && (nextPatch.numericPriority || dim.numericPriority) && explicitNumericValue) {
+                const nextValue = Number(dim.numericValue);
+                const currentValue = Number(currentNumericValue);
+                if (Number.isFinite(nextValue) && Number.isFinite(currentValue) && Math.abs(nextValue - currentValue) > 1e-9) {
+                    if (reshapeDimFromNumericValue(dim)) {
+                        // keep the dimension stable after it has been value-driven
+                    }
+                }
+            } else if (dim.type === "dimchain" && (nextPatch.numericPriority || dim.numericPriority) && explicitNumericValues) {
+                const nextValues = Array.isArray(dim.numericValues) ? dim.numericValues : [];
+                let changed = nextValues.length !== currentNumericValues.length;
+                if (!changed) {
+                    for (let i = 0; i < nextValues.length; i += 1) {
+                        const nv = Number(nextValues[i]);
+                        const cv = Number(currentNumericValues[i]);
+                        if (!Number.isFinite(nv) || !Number.isFinite(cv) || Math.abs(nv - cv) > 1e-9) {
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+                if (changed) reshapeDimChainFromNumericValues(dim);
+            }
         }
         if (draw) draw();
     }

@@ -25,6 +25,14 @@ export function mmPerUnit(unit) {
   }
 }
 
+export function ptToWorld(pt, pageSetup = null) {
+  const ptValue = Math.max(0, Number(pt) || 0);
+  const scale = Math.max(0.0001, Number(pageSetup?.scale ?? 1) || 1);
+  const unitMm = Math.max(1e-9, Number(mmPerUnit(pageSetup?.unit || "mm")) || 1);
+  const mm = ptValue * (25.4 / 72);
+  return (mm * scale) / unitMm;
+}
+
 export function getHatchPitchWorld(state, hatchShape) {
   const mm = Math.max(0.1, Number(hatchShape.pitchMm ?? state.hatchSettings?.pitchMm ?? 5));
   const sc = Math.max(1, Number(state.pageSetup?.scale) || 1);
@@ -58,6 +66,13 @@ export function getHatchGapWorld(state, hatchShape) {
   const sc = Math.max(1, Number(state.pageSetup?.scale) || 1);
   const unitMm = mmPerUnit(state.pageSetup?.unit || "mm");
   return (mm * sc) / Math.max(1e-9, unitMm);
+}
+
+export function getGridBaseSize(grid) {
+  const customOn = !!grid?.customSizeEnabled;
+  const preset = Math.max(1, Number(grid?.presetSize ?? grid?.size ?? 10) || 10);
+  const custom = Math.max(1, Number(grid?.customSize ?? grid?.size ?? preset) || preset);
+  return customOn ? custom : preset;
 }
 
 export function getPaperWorldRect(state) {
@@ -115,7 +130,7 @@ export function snapPoint(p, step) {
 }
 
 export function getEffectiveGridSize(grid, view, pageSetup = null) {
-  const base = Math.max(1e-9, Number(grid?.size) || 100);
+  const base = Math.max(1e-9, getGridBaseSize(grid));
   if (!grid?.auto) return base;
   const scale = Math.max(1e-9, Number(view?.scale) || 1);
   const currentPx = base * scale;

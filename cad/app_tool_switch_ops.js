@@ -5,8 +5,16 @@ export function createToolSwitchOps(config) {
     clearSelection,
     draw,
     updateDimHover,
-    hitTestShapes
+    hitTestShapes,
+    focusRectToolWidthInput,
+    focusSelectMoveInput
   } = config || {};
+
+  function focusSelectMoveAction() {
+    if (!state.ui || typeof state.ui !== "object") state.ui = {};
+    state.ui.pendingFocusSelectMoveInput = true;
+    if (typeof focusSelectMoveInput === "function") focusSelectMoveInput();
+  }
 
   function setToolAction(t) {
     const prevTool = String(state.tool || "");
@@ -39,8 +47,22 @@ export function createToolSwitchOps(config) {
         });
       }
     }
+    if (t === "rect" && typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        if (String(state.tool || "") !== "rect") return;
+        if (typeof focusRectToolWidthInput === "function") focusRectToolWidthInput();
+      });
+    }
+    if (t === "select" && typeof requestAnimationFrame === "function") {
+      requestAnimationFrame(() => {
+        if (String(state.tool || "") !== "select") return;
+        const hasObjectSelection = Array.isArray(state.selection?.ids) && state.selection.ids.length > 0;
+        if (!hasObjectSelection) return;
+        focusSelectMoveAction();
+      });
+    }
     draw();
   }
 
-  return { setToolAction };
+  return { setToolAction, focusSelectMoveInput: focusSelectMoveAction };
 }

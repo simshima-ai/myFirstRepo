@@ -32,6 +32,42 @@ export function createPersistenceRuntime(config) {
     };
   }
 
+  const toolSettingsKeys = [
+    "dimSettings",
+    "lineSettings",
+    "rectSettings",
+    "circleSettings",
+    "filletSettings",
+    "trimSettings",
+    "positionSettings",
+    "textSettings",
+    "hatchSettings",
+    "dlineSettings",
+    "previewSettings",
+  ];
+
+  function applyLoadedToolSettings(data) {
+    if (!data || typeof data !== "object") return false;
+    if (typeof data.tool === "string") {
+      state.tool = String(data.tool || state.tool || "select");
+    }
+    if (data.ui && typeof data.ui === "object") {
+      if (!state.ui) state.ui = {};
+      if (!state.ui.groupView || typeof state.ui.groupView !== "object") state.ui.groupView = {};
+      state.ui.selectPickMode = (String(data.ui.selectPickMode || state.ui.selectPickMode || "object") === "group") ? "group" : "object";
+    }
+    if (data.objectSnap && typeof data.objectSnap === "object") {
+      if (!state.objectSnap || typeof state.objectSnap !== "object") state.objectSnap = {};
+      Object.assign(state.objectSnap, data.objectSnap);
+    }
+    for (const key of toolSettingsKeys) {
+      if (!data[key] || typeof data[key] !== "object") continue;
+      if (!state[key] || typeof state[key] !== "object") state[key] = {};
+      Object.assign(state[key], data[key]);
+    }
+    return true;
+  }
+
   function ensureProjectFolderState() {
     if (!state.ui) state.ui = {};
     if (!state.ui.projectFolder || typeof state.ui.projectFolder !== "object") {
@@ -88,9 +124,24 @@ export function createPersistenceRuntime(config) {
       state.ui.language = String(data.ui.language || state.ui.language || "en").toLowerCase().startsWith("ja") ? "ja" : "en";
       state.ui.displayMode = String(data.ui.displayMode || state.ui.displayMode || "cad");
       state.ui.groupView.currentLayerOnly = !!(data.ui.groupCurrentLayerOnly ?? state.ui.groupView.currentLayerOnly);
+      const rawMenuScaleMode = String(data.ui.menuScaleMode || "").toLowerCase();
+      const legacyMenuScalePct = Number(data.ui.menuScalePct);
+      state.ui.menuScaleMode = (rawMenuScaleMode === "manual" || rawMenuScaleMode === "auto")
+        ? rawMenuScaleMode
+        : (Number.isFinite(legacyMenuScalePct) && Math.abs(legacyMenuScalePct - 100) > 1e-9 ? "manual" : "auto");
+      state.ui.menuScaleAutoPreset = String(data.ui.menuScaleAutoPreset || state.ui.menuScaleAutoPreset || "normal").toLowerCase();
       state.ui.menuScalePct = Math.max(50, Math.min(200, Math.round(Number(data.ui.menuScalePct ?? state.ui.menuScalePct ?? 100) / 5) * 5));
+      state.ui.wheelZoomFactor = Math.max(1.01, Math.min(2, Number(data.ui.wheelZoomFactor ?? state.ui.wheelZoomFactor ?? 1.1) || 1.1));
       state.ui.touchMode = !!(data.ui.touchMode ?? state.ui.touchMode);
       state.ui.touchMultiSelect = !!(data.ui.touchMultiSelect ?? state.ui.touchMultiSelect);
+      if (data.ui.touchPanelPos && typeof data.ui.touchPanelPos === "object") {
+        const x = Number(data.ui.touchPanelPos.x);
+        const y = Number(data.ui.touchPanelPos.y);
+        state.ui.touchPanelPos = {
+          x: Number.isFinite(x) ? x : (state.ui.touchPanelPos?.x ?? 14),
+          y: Number.isFinite(y) ? y : (state.ui.touchPanelPos?.y ?? 14),
+        };
+      }
       state.ui.importSourceUnit = String(data.ui.importSourceUnit || state.ui.importSourceUnit || "auto");
       const legacyPoly = !!(data.ui.importDxfAsPolyline || data.ui.importSvgAsPolyline);
       state.ui.importAsPolyline = !!(data.ui.importAsPolyline ?? state.ui.importAsPolyline ?? legacyPoly);
@@ -107,6 +158,7 @@ export function createPersistenceRuntime(config) {
       state.ui.autoBackupIntervalSec = Math.max(60, Math.min(600, Math.round(Number(data.ui.autoBackupIntervalSec ?? state.ui.autoBackupIntervalSec ?? 60) || 60)));
       state.ui.toolShortcuts = sanitizeToolShortcuts(data.ui.toolShortcuts ?? state.ui.toolShortcuts);
     }
+    applyLoadedToolSettings(data);
     return true;
   }
 
@@ -136,6 +188,7 @@ export function createPersistenceRuntime(config) {
 
   function buildSettingsSnapshot() {
     return {
+      tool: String(state.tool || "select"),
       pageSetup: { ...(state.pageSetup || {}) },
       grid: {
         size: Number(state.grid?.size ?? 10),
@@ -150,9 +203,17 @@ export function createPersistenceRuntime(config) {
       ui: {
         language: String(state.ui?.language || "ja"),
         displayMode: String(state.ui?.displayMode || "cad"),
+        selectPickMode: String(state.ui?.selectPickMode || "object"),
+        menuScaleMode: String(state.ui?.menuScaleMode || "auto"),
+        menuScaleAutoPreset: String(state.ui?.menuScaleAutoPreset || "normal"),
         menuScalePct: Number(state.ui?.menuScalePct ?? 100),
+        wheelZoomFactor: Number(state.ui?.wheelZoomFactor ?? 1.1),
         touchMode: !!state.ui?.touchMode,
         touchMultiSelect: !!state.ui?.touchMultiSelect,
+        touchPanelPos: {
+          x: Number(state.ui?.touchPanelPos?.x ?? 14),
+          y: Number(state.ui?.touchPanelPos?.y ?? 14),
+        },
         importSourceUnit: String(state.ui?.importSourceUnit || "auto"),
         importAsPolyline: !!state.ui?.importAsPolyline,
         groupCurrentLayerOnly: !!state.ui?.groupView?.currentLayerOnly,
@@ -169,6 +230,18 @@ export function createPersistenceRuntime(config) {
         autoBackupIntervalSec: Number(state.ui?.autoBackupIntervalSec ?? 60),
         toolShortcuts: sanitizeToolShortcuts(state.ui?.toolShortcuts),
       },
+      objectSnap: { ...(state.objectSnap || {}) },
+      dimSettings: { ...(state.dimSettings || {}) },
+      lineSettings: { ...(state.lineSettings || {}) },
+      rectSettings: { ...(state.rectSettings || {}) },
+      circleSettings: { ...(state.circleSettings || {}) },
+      filletSettings: { ...(state.filletSettings || {}) },
+      trimSettings: { ...(state.trimSettings || {}) },
+      positionSettings: { ...(state.positionSettings || {}) },
+      textSettings: { ...(state.textSettings || {}) },
+      hatchSettings: { ...(state.hatchSettings || {}) },
+      dlineSettings: { ...(state.dlineSettings || {}) },
+      previewSettings: { ...(state.previewSettings || {}) },
     };
   }
 
@@ -203,7 +276,7 @@ export function createPersistenceRuntime(config) {
         const dataFromFile = await readProjectSettingsFile(dirHandle);
         if (applyLoadedSettings(dataFromFile)) {
           updateProjectFolderState(dirHandle, "file");
-          return true;
+          return dataFromFile;
         }
       }
       if (typeof localStorage === "undefined") return false;
@@ -212,7 +285,7 @@ export function createPersistenceRuntime(config) {
       const data = JSON.parse(raw);
       const ok = applyLoadedSettings(data);
       updateProjectFolderState(projectDirHandle, ok && dirHandle ? "file" : "localStorage");
-      return ok;
+      return ok ? data : false;
     } catch (_) {
       return false;
     }
@@ -350,6 +423,8 @@ export function createPersistenceRuntime(config) {
   return {
     saveAppSettingsNow,
     scheduleSaveAppSettings,
+    applyLoadedSettings,
+    applyLoadedToolSettings,
     loadAppSettingsAtStartup,
     chooseProjectFolder,
     clearProjectFolder,

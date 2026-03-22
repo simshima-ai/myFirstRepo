@@ -9,10 +9,11 @@ export function bindInitTailEvents(params) {
     normalizePositiveNumber,
     normalizeLineWidthPreset,
     normalizeLineTypePreset,
-    normalizePageScalePreset,
-    normalizeMaxZoomPreset,
-    normalizeMenuScalePreset,
-  } = params;
+  normalizePageScalePreset,
+  normalizeMaxZoomPreset,
+  normalizeWheelZoomPreset,
+  normalizeMenuScalePreset,
+} = params;
   const isTouchDebugEnabled = (() => {
     try {
       if (new URLSearchParams(window.location.search).has("debugTouch")) return true;
@@ -25,6 +26,44 @@ export function bindInitTailEvents(params) {
     if (!isTouchDebugEnabled) return;
     try { console.log(`[touch-debug] ${msg}`); } catch (_) {}
     actions.setStatus?.(`[touch-debug] ${msg}`);
+  };
+  const touchPanelDrag = {
+    active: false,
+    pointerId: null,
+    startX: 0,
+    startY: 0,
+    startLeft: 0,
+    startTop: 0,
+  };
+  const clampTouchPanelPos = (x, y) => {
+    const panel = dom.touchToolPanel;
+    const width = Math.max(180, Number(panel?.offsetWidth || 250) || 250);
+    const height = Math.max(90, Number(panel?.offsetHeight || 120) || 120);
+    const maxX = Math.max(8, window.innerWidth - width - 8);
+    const maxY = Math.max(8, window.innerHeight - height - 8);
+    return {
+      x: Math.max(8, Math.min(maxX, Number(x) || 14)),
+      y: Math.max(8, Math.min(maxY, Number(y) || 14)),
+    };
+  };
+  const applyTouchPanelPos = (x, y) => {
+    const pos = clampTouchPanelPos(x, y);
+    if (dom.touchToolPanel) {
+      dom.touchToolPanel.style.left = `${pos.x}px`;
+      dom.touchToolPanel.style.top = `${pos.y}px`;
+    }
+    if (!state.ui) state.ui = {};
+    state.ui.touchPanelPos = pos;
+    return pos;
+  };
+  const finishTouchPanelDrag = (commit = false) => {
+    if (!touchPanelDrag.active) return;
+    touchPanelDrag.active = false;
+    const pos = state.ui?.touchPanelPos || {
+      x: touchPanelDrag.startLeft,
+      y: touchPanelDrag.startTop,
+    };
+    if (commit) actions.setTouchPanelPosition?.(pos);
   };
   if (dom.moveGroupBtn) {
     dom.moveGroupBtn.addEventListener("click", () => {
@@ -271,6 +310,38 @@ export function bindInitTailEvents(params) {
       actions.refitViewToPage?.();
     });
   }
+  if (dom.startSetupPageSizeSelect) {
+    dom.startSetupPageSizeSelect.addEventListener("change", () => {
+      actions.setPageSetup({ size: dom.startSetupPageSizeSelect.value });
+      actions.refitViewToPage?.();
+    });
+  }
+  if (dom.startSetupCustomPageToggle || dom.startSetupCustomPageWidthInput || dom.startSetupCustomPageHeightInput) {
+    const applyStartSetupCustomPageSize = () => {
+      const enabled = !!dom.startSetupCustomPageToggle?.checked;
+      const w = normalizePositiveNumber(dom.startSetupCustomPageWidthInput?.value, state.pageSetup?.customWidthMm ?? 297, 1);
+      const h = normalizePositiveNumber(dom.startSetupCustomPageHeightInput?.value, state.pageSetup?.customHeightMm ?? 210, 1);
+      if (dom.startSetupCustomPageWidthInput) dom.startSetupCustomPageWidthInput.value = String(w);
+      if (dom.startSetupCustomPageHeightInput) dom.startSetupCustomPageHeightInput.value = String(h);
+      actions.setPageSetup({ customSizeEnabled: enabled, customWidthMm: w, customHeightMm: h });
+      actions.refitViewToPage?.();
+    };
+    if (dom.startSetupCustomPageToggle) dom.startSetupCustomPageToggle.addEventListener("change", applyStartSetupCustomPageSize);
+    if (dom.startSetupCustomPageWidthInput) {
+      dom.startSetupCustomPageWidthInput.addEventListener("change", applyStartSetupCustomPageSize);
+      dom.startSetupCustomPageWidthInput.addEventListener("input", applyStartSetupCustomPageSize);
+    }
+    if (dom.startSetupCustomPageHeightInput) {
+      dom.startSetupCustomPageHeightInput.addEventListener("change", applyStartSetupCustomPageSize);
+      dom.startSetupCustomPageHeightInput.addEventListener("input", applyStartSetupCustomPageSize);
+    }
+  }
+  if (dom.startSetupOrientationSelect) {
+    dom.startSetupOrientationSelect.addEventListener("change", () => {
+      actions.setPageSetup({ orientation: dom.startSetupOrientationSelect.value });
+      actions.refitViewToPage?.();
+    });
+  }
   if (dom.pageScaleInput) {
     const applyPageScalePreset = () => {
       const v = normalizePageScalePreset(dom.pageScaleInput.value);
@@ -301,11 +372,85 @@ export function bindInitTailEvents(params) {
       dom.customScaleInput.addEventListener("input", applyCustomScale);
     }
   }
+  if (dom.startSetupPageScaleSelect) {
+    const applyStartSetupPageScalePreset = () => {
+      const v = normalizePageScalePreset(dom.startSetupPageScaleSelect.value);
+      dom.startSetupPageScaleSelect.value = String(v);
+      const customOn = !!dom.startSetupCustomScaleToggle?.checked;
+      const patch = { presetScale: v };
+      if (!customOn) patch.scale = v;
+      actions.setPageSetup(patch);
+      if (!customOn) actions.refitViewToPage?.();
+    };
+    dom.startSetupPageScaleSelect.addEventListener("change", applyStartSetupPageScalePreset);
+    dom.startSetupPageScaleSelect.addEventListener("input", applyStartSetupPageScalePreset);
+  }
+  if (dom.startSetupCustomScaleToggle || dom.startSetupCustomScaleInput) {
+    const applyStartSetupCustomScale = () => {
+      const enabled = !!dom.startSetupCustomScaleToggle?.checked;
+      const v = normalizePositiveNumber(dom.startSetupCustomScaleInput?.value, state.pageSetup?.customScale ?? state.pageSetup?.scale ?? 1, 0.0001);
+      if (dom.startSetupCustomScaleInput) dom.startSetupCustomScaleInput.value = String(v);
+      const patch = { customScaleEnabled: enabled, customScale: v };
+      if (enabled) patch.scale = v;
+      else patch.scale = normalizePageScalePreset(dom.startSetupPageScaleSelect?.value ?? state.pageSetup?.presetScale ?? 1);
+      actions.setPageSetup(patch);
+      actions.refitViewToPage?.();
+    };
+    if (dom.startSetupCustomScaleToggle) dom.startSetupCustomScaleToggle.addEventListener("change", applyStartSetupCustomScale);
+    if (dom.startSetupCustomScaleInput) {
+      dom.startSetupCustomScaleInput.addEventListener("change", applyStartSetupCustomScale);
+      dom.startSetupCustomScaleInput.addEventListener("input", applyStartSetupCustomScale);
+    }
+  }
+  if (dom.startSetupPageUnitSelect) {
+    dom.startSetupPageUnitSelect.addEventListener("change", () => {
+      actions.setPageSetup({ unit: dom.startSetupPageUnitSelect.value || "mm" });
+      actions.refitViewToPage?.();
+    });
+  }
+  if (dom.startSetupPageShowFrameToggle) {
+    dom.startSetupPageShowFrameToggle.addEventListener("change", () => {
+      actions.setPageSetup({ showFrame: !!dom.startSetupPageShowFrameToggle.checked });
+    });
+  }
+  if (dom.startSetupPageInnerMarginInput) {
+    const applyStartSetupPageMargin = () => {
+      const v = normalizePositiveNumber(dom.startSetupPageInnerMarginInput?.value, state.pageSetup?.innerMarginMm ?? 10, 0);
+      dom.startSetupPageInnerMarginInput.value = String(v);
+      actions.setPageSetup({ innerMarginMm: v });
+    };
+    dom.startSetupPageInnerMarginInput.addEventListener("change", applyStartSetupPageMargin);
+    dom.startSetupPageInnerMarginInput.addEventListener("input", applyStartSetupPageMargin);
+  }
+  if (dom.startSetupStartBtn) {
+    dom.startSetupStartBtn.addEventListener("click", () => {
+      actions.setStartSetupVisible?.(false);
+      actions.refitViewToPage?.();
+      actions.setStatus?.(String(state.ui?.language || "en").toLowerCase().startsWith("ja") ? "作図を開始できます" : "Ready to start drawing");
+    });
+  }
+  if (dom.startSetupSelectProjectFolderBtn) {
+    dom.startSetupSelectProjectFolderBtn.addEventListener("click", () => {
+      void actions.chooseProjectFolder?.();
+    });
+  }
+  if (dom.startSetupClearProjectFolderBtn) {
+    dom.startSetupClearProjectFolderBtn.addEventListener("click", () => {
+      void actions.clearProjectFolder?.();
+    });
+  }
   if (dom.maxZoomInput) {
     dom.maxZoomInput.addEventListener("change", () => {
       const v = normalizeMaxZoomPreset(dom.maxZoomInput.value);
       dom.maxZoomInput.value = String(v);
       actions.setMaxZoomScale?.(v);
+    });
+  }
+  if (dom.wheelZoomFactorSelect) {
+    dom.wheelZoomFactorSelect.addEventListener("change", () => {
+      const v = normalizeWheelZoomPreset(dom.wheelZoomFactorSelect.value);
+      dom.wheelZoomFactorSelect.value = String(v);
+      actions.setWheelZoomFactor?.(v);
     });
   }
   if (dom.uiLanguageSelect) {
@@ -320,10 +465,63 @@ export function bindInitTailEvents(params) {
       actions.setMenuScalePct?.(v);
     });
   }
+  if (dom.menuScaleModeSelect) {
+    dom.menuScaleModeSelect.addEventListener("change", () => {
+      const mode = String(dom.menuScaleModeSelect.value || "auto").toLowerCase() === "manual" ? "manual" : "auto";
+      dom.menuScaleModeSelect.value = mode;
+      actions.setMenuScaleMode?.(mode);
+    });
+  }
+  if (dom.menuScaleAutoSelect) {
+    dom.menuScaleAutoSelect.addEventListener("change", () => {
+      const preset = String(dom.menuScaleAutoSelect.value || "normal").toLowerCase();
+      dom.menuScaleAutoSelect.value = preset;
+      actions.setMenuScaleAutoPreset?.(preset);
+    });
+  }
   if (dom.touchModeToggle) {
     dom.touchModeToggle.addEventListener("change", () => {
       actions.setTouchMode?.(!!dom.touchModeToggle.checked);
     });
+  }
+  if (dom.touchToolPanelHeader) {
+    dom.touchToolPanelHeader.addEventListener("pointerdown", (e) => {
+      if (!state.ui?.touchMode) return;
+      if (e.button != null && e.button !== 0) return;
+      const panel = dom.touchToolPanel;
+      if (!panel) return;
+      const rect = panel.getBoundingClientRect();
+      touchPanelDrag.active = true;
+      touchPanelDrag.pointerId = e.pointerId ?? null;
+      touchPanelDrag.startX = Number(e.clientX) || 0;
+      touchPanelDrag.startY = Number(e.clientY) || 0;
+      touchPanelDrag.startLeft = rect.left;
+      touchPanelDrag.startTop = rect.top;
+      try { dom.touchToolPanelHeader.setPointerCapture?.(e.pointerId); } catch (_) {}
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation?.();
+    });
+    dom.touchToolPanelHeader.addEventListener("pointermove", (e) => {
+      if (!touchPanelDrag.active) return;
+      if (touchPanelDrag.pointerId != null && e.pointerId !== touchPanelDrag.pointerId) return;
+      const dx = (Number(e.clientX) || 0) - touchPanelDrag.startX;
+      const dy = (Number(e.clientY) || 0) - touchPanelDrag.startY;
+      applyTouchPanelPos(touchPanelDrag.startLeft + dx, touchPanelDrag.startTop + dy);
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation?.();
+    });
+    const endDrag = (e) => {
+      if (!touchPanelDrag.active) return;
+      if (touchPanelDrag.pointerId != null && e?.pointerId != null && e.pointerId !== touchPanelDrag.pointerId) return;
+      if (e?.cancelable) e.preventDefault();
+      e?.stopPropagation?.();
+      try { dom.touchToolPanelHeader.releasePointerCapture?.(touchPanelDrag.pointerId); } catch (_) {}
+      finishTouchPanelDrag(true);
+    };
+    dom.touchToolPanelHeader.addEventListener("pointerup", endDrag);
+    dom.touchToolPanelHeader.addEventListener("pointercancel", endDrag);
+    window.addEventListener("pointerup", endDrag);
+    window.addEventListener("pointercancel", endDrag);
   }
   if (dom.selectProjectFolderBtn) {
     dom.selectProjectFolderBtn.addEventListener("click", () => {
@@ -381,6 +579,14 @@ export function bindInitTailEvents(params) {
       if (e?.cancelable) e.preventDefault();
       if (e?.stopPropagation) e.stopPropagation();
       if (!state.ui?.touchMode) return;
+      const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
+      const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
+      if (String(state.tool || "") === "line" && !state.lineSettings?.sizeLocked) {
+        const ok = !!actions.confirmTouchLineStep?.();
+        touchDebugLog(`line confirm pressed mode=${lineMode} => ${ok}`);
+        actions.draw?.();
+        return;
+      }
       const linearDraft = state.polylineDraft;
       const canFinalizeLinearDraft =
         !!linearDraft &&
@@ -399,8 +605,6 @@ export function bindInitTailEvents(params) {
         actions.confirmTouchRectStep?.();
         return;
       }
-      const lineModeRaw = String(state.lineSettings?.mode || (state.lineSettings?.continuous ? "continuous" : "segment")).toLowerCase();
-      const lineMode = (lineModeRaw === "continuous" || lineModeRaw === "freehand") ? lineModeRaw : "segment";
       if (tool === "line" && (lineMode === "continuous" || lineMode === "freehand")) {
         const ok = lineMode === "freehand"
           ? !!actions.finalizeBsplineDraft?.()
@@ -409,32 +613,28 @@ export function bindInitTailEvents(params) {
         actions.draw?.();
         return;
       }
-      if (tool === "dim" && String(state.dimSettings?.linearMode || "single") === "chain") {
+      if (tool === "dim") {
         const draft = state.dimDraft;
-        if (draft && draft.type === "dimchain") {
-          if (!draft.awaitingPlacement && (draft.points || []).length >= 2) {
-            draft.awaitingPlacement = true;
-            actions.setStatus?.("Chain dim: click to place dimension line.");
-            actions.draw?.();
-            return;
-          }
-          if (draft.awaitingPlacement && draft.place) {
-            actions.finalizeDimDraft?.();
-            actions.setStatus?.("Dim finished");
-            actions.draw?.();
-            return;
-          }
-        }
+        const ok = (draft && draft.type === "dimchain" && draft.awaitingPlacement)
+          ? !!actions.finishTouchDimDraft?.()
+          : !!actions.confirmTouchDimStep?.();
+        touchDebugLog(draft && draft.type === "dimchain" && draft.awaitingPlacement
+          ? `dim generate pressed => ${ok}`
+          : `dim add target pressed => ${ok}`);
+        actions.draw?.();
+        return;
       }
       if (tool === "circle") {
-        const modeRaw = String(state.circleSettings?.mode || "").toLowerCase();
-        const mode = (modeRaw === "fixed" || modeRaw === "threepoint" || modeRaw === "drag")
-          ? modeRaw
-          : ((state.circleSettings?.radiusLocked ? "fixed" : "drag"));
-        if (mode === "threepoint") {
-          actions.executeCircleThreePointFromTargets?.();
-          return;
-        }
+        const ok = !!actions.confirmTouchCircleStep?.();
+        touchDebugLog(`circle confirm pressed => ${ok}`);
+        actions.draw?.();
+        return;
+      }
+      if (tool === "text") {
+        const ok = !!actions.confirmTouchTextStep?.();
+        touchDebugLog(`text place pressed => ${ok}`);
+        actions.draw?.();
+        return;
       }
       if (tool === "patterncopy") {
         actions.executePatternCopy?.();
@@ -456,21 +656,30 @@ export function bindInitTailEvents(params) {
     dom.touchConfirmBtn.addEventListener("click", runTouchConfirm);
     dom.touchConfirmBtn.addEventListener("pointerup", runTouchConfirm);
   }
-  if (dom.touchCancelBtn) {
-    const runTouchCancel = (e = null) => {
+  if (dom.touchLineFinishBtn) {
+    const runTouchLineFinish = (e = null) => {
+      if (e?.cancelable) e.preventDefault();
+      if (e?.stopPropagation) e.stopPropagation();
+      if (!state.ui?.touchMode) return;
+      if (String(state.tool || "") === "dim") {
+        actions.prepareTouchDimChain?.();
+        return;
+      }
+      actions.finishTouchLineDraft?.();
+    };
+    dom.touchLineFinishBtn.addEventListener("click", runTouchLineFinish);
+    dom.touchLineFinishBtn.addEventListener("pointerup", runTouchLineFinish);
+  }
+  if (dom.touchSelectBackBtn) {
+    const runTouchSelectBack = (e = null) => {
       if (e?.cancelable) e.preventDefault();
       if (e?.stopPropagation) e.stopPropagation();
       if (!state.ui?.touchMode) return;
       actions.cancelTouchPending?.();
-    };
-    dom.touchCancelBtn.addEventListener("click", runTouchCancel);
-    dom.touchCancelBtn.addEventListener("pointerup", runTouchCancel);
-  }
-  if (dom.touchSelectBackBtn) {
-    dom.touchSelectBackBtn.addEventListener("click", () => {
-      if (!state.ui?.touchMode) return;
       actions.setTool?.("select");
-    });
+    };
+    dom.touchSelectBackBtn.addEventListener("click", runTouchSelectBack);
+    dom.touchSelectBackBtn.addEventListener("pointerup", runTouchSelectBack);
   }
   if (dom.touchMultiSelectBtn) {
     dom.touchMultiSelectBtn.addEventListener("click", () => {

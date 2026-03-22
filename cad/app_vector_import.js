@@ -1,3 +1,5 @@
+import { mmPerUnit } from "./geom.js";
+
 function num(v, d = NaN) {
   const n = Number(v);
   return Number.isFinite(n) ? n : d;
@@ -102,10 +104,85 @@ function svgArcEndpointToCenter(x1, y1, rx, ry, phiDeg, largeArcFlag, sweepFlag,
   return { cx, cy, rx: arx, ry: ary, phi, start, delta };
 }
 
+function distPointToLine(px, py, x1, y1, x2, y2) {
+  const dx = Number(x2) - Number(x1);
+  const dy = Number(y2) - Number(y1);
+  if (Math.hypot(dx, dy) <= 1e-12) return Math.hypot(Number(px) - Number(x1), Number(py) - Number(y1));
+  return Math.abs(dy * Number(px) - dx * Number(py) + Number(x2) * Number(y1) - Number(y2) * Number(x1)) / Math.hypot(dx, dy);
+}
+
+function cubicBezierPoint(p0, p1, p2, p3, t) {
+  const u = 1 - t;
+  const tt = t * t;
+  const uu = u * u;
+  const uuu = uu * u;
+  const ttt = tt * t;
+  return {
+    x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+    y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y,
+  };
+}
+
+function quadraticBezierPoint(p0, p1, p2, t) {
+  const u = 1 - t;
+  const tt = t * t;
+  const uu = u * u;
+  return {
+    x: uu * p0.x + 2 * u * t * p1.x + tt * p2.x,
+    y: uu * p0.y + 2 * u * t * p1.y + tt * p2.y,
+  };
+}
+
+function flattenCubicBezierToLines(p0, p1, p2, p3, tolerance = 0.25, maxDepth = 10) {
+  const pts = [p0];
+  const recur = (a, b, c, d, depth) => {
+    const flat = Math.max(
+      distPointToLine(b.x, b.y, a.x, a.y, d.x, d.y),
+      distPointToLine(c.x, c.y, a.x, a.y, d.x, d.y)
+    );
+    if (flat <= tolerance || depth >= maxDepth) {
+      pts.push(d);
+      return;
+    }
+    const ab = midPoint(a, b);
+    const bc = midPoint(b, c);
+    const cd = midPoint(c, d);
+    const abc = midPoint(ab, bc);
+    const bcd = midPoint(bc, cd);
+    const abcd = midPoint(abc, bcd);
+    recur(a, ab, abc, abcd, depth + 1);
+    recur(abcd, bcd, cd, d, depth + 1);
+  };
+  recur(p0, p1, p2, p3, 0);
+  return pointsToLineSegments(pts);
+}
+
+function flattenQuadraticBezierToLines(p0, p1, p2, tolerance = 0.25, maxDepth = 10) {
+  const pts = [p0];
+  const recur = (a, b, c, depth) => {
+    const flat = distPointToLine(b.x, b.y, a.x, a.y, c.x, c.y);
+    if (flat <= tolerance || depth >= maxDepth) {
+      pts.push(c);
+      return;
+    }
+    const ab = midPoint(a, b);
+    const bc = midPoint(b, c);
+    const abc = midPoint(ab, bc);
+    recur(a, ab, abc, depth + 1);
+    recur(abc, bc, c, depth + 1);
+  };
+  recur(p0, p1, p2, 0);
+  return pointsToLineSegments(pts);
+}
+
 function approxEllipticArcToLines(arc, x1, y1, x2, y2) {
   const out = [];
   if (!arc) return out;
-  const segs = Math.max(4, Math.min(48, Math.ceil(Math.abs(arc.delta) / (Math.PI / 12))));
+  const arcLen = Math.abs(Number(arc.delta) || 0) * Math.max(Math.abs(Number(arc.rx) || 0), Math.abs(Number(arc.ry) || 0));
+  const segs = Math.max(12, Math.min(256, Math.max(
+    Math.ceil(Math.abs(arc.delta) / (Math.PI / 24)),
+    Math.ceil(arcLen / 4)
+  )));
   const cosPhi = Math.cos(arc.phi);
   const sinPhi = Math.sin(arc.phi);
   const pointAt = (t) => {
@@ -123,6 +200,40 @@ function approxEllipticArcToLines(arc, x1, y1, x2, y2) {
     const cur = (i === segs) ? { x: Number(x2), y: Number(y2) } : pointAt(t);
     out.push({ type: "line", x1: prev.x, y1: prev.y, x2: cur.x, y2: cur.y });
     prev = cur;
+  }
+  return out;
+}
+
+function approximateEllipsePoints(cx, cy, rx, ry) {
+  const radiusRef = Math.max(Math.abs(Number(rx) || 0), Math.abs(Number(ry) || 0));
+  const circumferenceRef = Math.PI * 2 * radiusRef;
+  const segs = Math.max(48, Math.min(256, Math.ceil(circumferenceRef / 4)));
+  const pts = [];
+  for (let i = 0; i < segs; i += 1) {
+    const a = (i / segs) * Math.PI * 2;
+    pts.push({
+      x: Number(cx) + Math.cos(a) * Number(rx),
+      y: Number(cy) + Math.sin(a) * Number(ry),
+    });
+  }
+  return pts;
+}
+
+function midPoint(a, b) {
+  return {
+    x: (Number(a.x) + Number(b.x)) * 0.5,
+    y: (Number(a.y) + Number(b.y)) * 0.5,
+  };
+}
+
+function pointsToLineSegments(points) {
+  const out = [];
+  for (let i = 1; i < (points || []).length; i += 1) {
+    const p0 = points[i - 1];
+    const p1 = points[i];
+    if (![p0?.x, p0?.y, p1?.x, p1?.y].every((v) => Number.isFinite(Number(v)))) continue;
+    if (Math.hypot(Number(p1.x) - Number(p0.x), Number(p1.y) - Number(p0.y)) <= 1e-12) continue;
+    out.push({ type: "line", x1: Number(p0.x), y1: Number(p0.y), x2: Number(p1.x), y2: Number(p1.y) });
   }
   return out;
 }
@@ -277,13 +388,18 @@ export function parseSvgToCadShapes(text) {
       const cy = num(el.getAttribute("cy"));
       const r = Math.abs(num(el.getAttribute("r")));
       if ([cx, cy, r].every(Number.isFinite) && r > 1e-12) {
-        const segs = 48;
-        const pts = [];
-        for (let i = 0; i < segs; i++) {
-          const a = (i / segs) * Math.PI * 2;
-          pts.push({ x: cx + Math.cos(a) * r, y: cy + Math.sin(a) * r });
-        }
+        const pts = approximateEllipsePoints(cx, cy, r, r);
         pushPolyline(pts, true, tr);
+      }
+      continue;
+    }
+    if (tag === "ellipse") {
+      const cx = num(el.getAttribute("cx"));
+      const cy = num(el.getAttribute("cy"));
+      const rx = Math.abs(num(el.getAttribute("rx")));
+      const ry = Math.abs(num(el.getAttribute("ry")));
+      if ([cx, cy, rx, ry].every(Number.isFinite) && rx > 1e-12 && ry > 1e-12) {
+        pushPolyline(approximateEllipsePoints(cx, cy, rx, ry), true, tr);
       }
       continue;
     }
@@ -300,6 +416,9 @@ export function parseSvgToCadShapes(text) {
       let i = 0;
       let cmd = "";
       let cx = 0, cy = 0, sx = 0, sy = 0;
+      let prevC2 = null;
+      let prevQ = null;
+      let warnedCurveApprox = false;
       const take = () => (i < tokens.length && tokens[i].t === "num") ? Number(tokens[i++].v) : NaN;
       while (i < tokens.length) {
         if (tokens[i].t === "cmd") cmd = String(tokens[i++].v);
@@ -312,12 +431,16 @@ export function parseSvgToCadShapes(text) {
           cx = rel ? (cx + x) : x;
           cy = rel ? (cy + y) : y;
           sx = cx; sy = cy;
+          prevC2 = null;
+          prevQ = null;
           cmd = rel ? "l" : "L";
           continue;
         }
         if (c === "z") {
           pushLine(cx, cy, sx, sy, tr);
           cx = sx; cy = sy;
+          prevC2 = null;
+          prevQ = null;
           continue;
         }
         if (c === "l") {
@@ -327,6 +450,8 @@ export function parseSvgToCadShapes(text) {
           const ny = rel ? (cy + y) : y;
           pushLine(cx, cy, nx, ny, tr);
           cx = nx; cy = ny;
+          prevC2 = null;
+          prevQ = null;
           continue;
         }
         if (c === "h") {
@@ -335,6 +460,8 @@ export function parseSvgToCadShapes(text) {
           const nx = rel ? (cx + x) : x;
           pushLine(cx, cy, nx, cy, tr);
           cx = nx;
+          prevC2 = null;
+          prevQ = null;
           continue;
         }
         if (c === "v") {
@@ -343,6 +470,8 @@ export function parseSvgToCadShapes(text) {
           const ny = rel ? (cy + y) : y;
           pushLine(cx, cy, cx, ny, tr);
           cy = ny;
+          prevC2 = null;
+          prevQ = null;
           continue;
         }
         if (c === "a") {
@@ -358,24 +487,56 @@ export function parseSvgToCadShapes(text) {
             for (const s of segs) pushLine(s.x1, s.y1, s.x2, s.y2, tr);
           }
           cx = nx; cy = ny;
+          prevC2 = null;
+          prevQ = null;
           continue;
         }
         if (c === "c" || c === "s" || c === "q" || c === "t") {
-          warnings.push("Curves were approximated/ignored in SVG path");
           if (c === "c") {
             const x1 = take(), y1 = take(), x2 = take(), y2 = take(), x = take(), y = take();
             if (![x1, y1, x2, y2, x, y].every(Number.isFinite)) break;
+            const p0 = { x: cx, y: cy };
+            const p1 = { x: rel ? (cx + x1) : x1, y: rel ? (cy + y1) : y1 };
+            const p2 = { x: rel ? (cx + x2) : x2, y: rel ? (cy + y2) : y2 };
             const nx = rel ? (cx + x) : x;
             const ny = rel ? (cy + y) : y;
-            pushLine(cx, cy, nx, ny, tr); cx = nx; cy = ny;
+            const segs = flattenCubicBezierToLines(p0, p1, p2, { x: nx, y: ny });
+            for (const s of segs) pushLine(s.x1, s.y1, s.x2, s.y2, tr);
+            cx = nx; cy = ny;
+            prevC2 = p2;
+            prevQ = null;
+            warnedCurveApprox = true;
             continue;
           }
-          if (c === "s" || c === "q") {
-            const x1 = take(), y1 = take(), x = take(), y = take();
-            if (![x1, y1, x, y].every(Number.isFinite)) break;
+          if (c === "s") {
+            const x2 = take(), y2 = take(), x = take(), y = take();
+            if (![x2, y2, x, y].every(Number.isFinite)) break;
+            const p0 = { x: cx, y: cy };
+            const p1 = prevC2 ? { x: cx * 2 - Number(prevC2.x), y: cy * 2 - Number(prevC2.y) } : { x: cx, y: cy };
+            const p2 = { x: rel ? (cx + x2) : x2, y: rel ? (cy + y2) : y2 };
             const nx = rel ? (cx + x) : x;
             const ny = rel ? (cy + y) : y;
-            pushLine(cx, cy, nx, ny, tr); cx = nx; cy = ny;
+            const segs = flattenCubicBezierToLines(p0, p1, p2, { x: nx, y: ny });
+            for (const s of segs) pushLine(s.x1, s.y1, s.x2, s.y2, tr);
+            cx = nx; cy = ny;
+            prevC2 = p2;
+            prevQ = null;
+            warnedCurveApprox = true;
+            continue;
+          }
+          if (c === "q") {
+            const x1 = take(), y1 = take(), x = take(), y = take();
+            if (![x1, y1, x, y].every(Number.isFinite)) break;
+            const p0 = { x: cx, y: cy };
+            const p1 = { x: rel ? (cx + x1) : x1, y: rel ? (cy + y1) : y1 };
+            const nx = rel ? (cx + x) : x;
+            const ny = rel ? (cy + y) : y;
+            const segs = flattenQuadraticBezierToLines(p0, p1, { x: nx, y: ny });
+            for (const s of segs) pushLine(s.x1, s.y1, s.x2, s.y2, tr);
+            cx = nx; cy = ny;
+            prevC2 = null;
+            prevQ = p1;
+            warnedCurveApprox = true;
             continue;
           }
           if (c === "t") {
@@ -383,12 +544,20 @@ export function parseSvgToCadShapes(text) {
             if (![x, y].every(Number.isFinite)) break;
             const nx = rel ? (cx + x) : x;
             const ny = rel ? (cy + y) : y;
-            pushLine(cx, cy, nx, ny, tr); cx = nx; cy = ny;
+            const p0 = { x: cx, y: cy };
+            const p1 = prevQ ? { x: cx * 2 - Number(prevQ.x), y: cy * 2 - Number(prevQ.y) } : { x: cx, y: cy };
+            const segs = flattenQuadraticBezierToLines(p0, p1, { x: nx, y: ny });
+            for (const s of segs) pushLine(s.x1, s.y1, s.x2, s.y2, tr);
+            cx = nx; cy = ny;
+            prevC2 = null;
+            prevQ = p1;
+            warnedCurveApprox = true;
             continue;
           }
         }
         break;
       }
+      if (warnedCurveApprox) warnings.push("Curves were approximated in SVG path");
       continue;
     }
   }
@@ -404,6 +573,23 @@ function parseDxfPairs(text) {
     out.push({ code, value: String(lines[i + 1] || "").trim() });
   }
   return out;
+}
+
+function dxfTextToPlainText(value) {
+  let text = String(value || "");
+  text = text.replace(/\\P/g, " ");
+  text = text.replace(/\\A\d+;?/g, "");
+  text = text.replace(/\\[LlOoKk]/g, "");
+  text = text.replace(/%%d/g, "°").replace(/%%p/g, "±").replace(/%%c/g, "Ø");
+  text = text.replace(/\\{|\\"/g, "");
+  text = text.replace(/\\}/g, "");
+  return text.trim();
+}
+
+function dxfTextHeightToPt(height, sourceUnit = "mm") {
+  const h = Math.max(0, Number(height) || 0);
+  const unitMm = Math.max(1e-9, Number(mmPerUnit(sourceUnit)) || 1);
+  return Math.max(0.1, (h * unitMm * 72) / 25.4);
 }
 
 function entityCodeFirst(ent, code, d = NaN) {
@@ -454,6 +640,79 @@ function parseLwPolyline(ent, asPolyline = false) {
     else out.push({ type: "line", x1: a.x, y1: a.y, x2: b.x, y2: b.y });
   }
   return out;
+}
+
+function parseDxfTextEntity(type, ent, sourceUnit = "mm") {
+  const rawText = [];
+  for (const p of ent) {
+    if (p.code === 1 || p.code === 3) rawText.push(String(p.value || ""));
+  }
+  const x10 = entityCodeFirst(ent, 10);
+  const y10 = entityCodeFirst(ent, 20);
+  const x11 = entityCodeFirst(ent, 11);
+  const y11 = entityCodeFirst(ent, 21);
+  const has10 = Number.isFinite(x10) && Number.isFinite(y10);
+  const has11 = Number.isFinite(x11) && Number.isFinite(y11);
+  const x = has10 ? x10 : (has11 ? x11 : NaN);
+  const y = has10 ? y10 : (has11 ? y11 : NaN);
+  if (![x, y].every(Number.isFinite)) return null;
+  const rot = entityCodeFirst(ent, 50, 0);
+  const height = entityCodeFirst(ent, 40, NaN);
+  const text = dxfTextToPlainText(rawText.join(""));
+  if (!text) return null;
+  return {
+    type: "text",
+    x1: x,
+    y1: y,
+    x2: x,
+    y2: y,
+    text,
+    textColor: "#0f172a",
+    textSizePt: dxfTextHeightToPt(Number.isFinite(height) ? height : 12, sourceUnit),
+    textRotate: Number.isFinite(rot) ? rot : 0,
+    textFontFamily: "Yu Gothic UI",
+    textBold: false,
+    textItalic: false,
+  };
+}
+
+function parseDxfDimensionEntity(ent, sourceUnit = "mm") {
+  const subclasses = ent.filter((p) => Number(p.code) === 100).map((p) => String(p.value || ""));
+  const subclass = subclasses.find((v) => /AcDb(?:Aligned|Rotated)Dimension/i.test(v)) || "";
+  if (!subclass) return null;
+  const x1 = entityCodeFirst(ent, 13);
+  const y1 = entityCodeFirst(ent, 23);
+  const x2 = entityCodeFirst(ent, 14);
+  const y2 = entityCodeFirst(ent, 24);
+  const px = entityCodeFirst(ent, 10);
+  const py = entityCodeFirst(ent, 20);
+  const tx = entityCodeFirst(ent, 11);
+  const ty = entityCodeFirst(ent, 21);
+  if (![x1, y1, x2, y2].every(Number.isFinite)) return null;
+  const textHeight = entityCodeFirst(ent, 40, NaN);
+  const rot = entityCodeFirst(ent, 50, NaN);
+  const precision = Number.isFinite(entityCodeFirst(ent, 70, NaN)) ? 1 : 1;
+  return {
+    type: "dim",
+    x1, y1, x2, y2,
+    px: Number.isFinite(px) && Number.isFinite(py) ? px : undefined,
+    py: Number.isFinite(px) && Number.isFinite(py) ? py : undefined,
+    tx: Number.isFinite(tx) && Number.isFinite(ty) ? tx : undefined,
+    ty: Number.isFinite(tx) && Number.isFinite(ty) ? ty : undefined,
+    textColor: "#0f172a",
+    textFontFamily: "Yu Gothic UI",
+    textBold: false,
+    textItalic: false,
+    fontSize: dxfTextHeightToPt(Number.isFinite(textHeight) ? textHeight : 3, sourceUnit),
+    precision,
+    dimArrowType: "open",
+    dimArrowSizePt: 10,
+    dimArrowDirection: "normal",
+    extOffset: 2,
+    extOver: 2,
+    rOverrun: 5,
+    textRotate: Number.isFinite(rot) ? rot : "auto",
+  };
 }
 
 function parsePolylineOld(pairs, startIdx, asPolyline = false) {
@@ -510,6 +769,7 @@ function parsePolylineOld(pairs, startIdx, asPolyline = false) {
 function parseDxfToCadShapesBase(text, options = null) {
   const opts = (options && typeof options === "object") ? options : {};
   const asPolyline = !!opts.polylineize;
+  const sourceUnit = String(opts.sourceUnit || opts.detectedSourceUnit || "mm").toLowerCase();
   const pairs = parseDxfPairs(text);
   const out = [];
   const warnings = [];
@@ -564,8 +824,18 @@ function parseDxfToCadShapesBase(text, options = null) {
       for (const s of parts) out.push(s);
       continue;
     }
+    if (type === "TEXT" || type === "MTEXT") {
+      const textShape = parseDxfTextEntity(type, ent, sourceUnit);
+      if (textShape) out.push(textShape);
+      continue;
+    }
+    if (type === "DIMENSION") {
+      const dimShape = parseDxfDimensionEntity(ent, sourceUnit);
+      if (dimShape) out.push(dimShape);
+      continue;
+    }
   }
-  if (!out.length) warnings.push("No supported DXF entities found (LINE/CIRCLE/ARC/LWPOLYLINE/POLYLINE).");
+  if (!out.length) warnings.push("No supported DXF entities found (LINE/CIRCLE/ARC/LWPOLYLINE/POLYLINE/TEXT/MTEXT/DIMENSION).");
   return { shapes: out, warnings };
 }
 

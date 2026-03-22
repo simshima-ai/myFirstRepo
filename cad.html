@@ -418,11 +418,12 @@
     }
 
     .badge {
-      font-size: 10px;
+      font-size: clamp(8px, calc(10px * var(--menu-scale)), 13px);
     }
 
     .status {
-      font-size: 12px;
+      font-size: clamp(9px, calc(12px * var(--menu-scale)), 16px);
+      padding: clamp(3px, calc(4px * var(--menu-scale)), 7px) clamp(6px, calc(8px * var(--menu-scale)), 14px);
       max-width: 48vw;
       pointer-events: none;
     }
@@ -436,7 +437,7 @@
       pointer-events: auto;
       display: flex;
       flex-direction: row;
-      gap: 8px;
+      gap: clamp(4px, calc(8px * var(--menu-scale)), 12px);
       align-items: center;
     }
 
@@ -449,7 +450,7 @@
       pointer-events: none;
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: clamp(2px, calc(4px * var(--menu-scale)), 8px);
       align-items: center;
     }
 
@@ -531,10 +532,10 @@
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.9);
       border-radius: 8px;
-      padding: 4px 8px;
+      padding: clamp(3px, calc(4px * var(--menu-scale)), 7px) clamp(6px, calc(8px * var(--menu-scale)), 14px);
       color: var(--muted);
-      font-size: 11px;
-      min-width: 180px;
+      font-size: clamp(8px, calc(11px * var(--menu-scale)), 15px);
+      min-width: clamp(96px, calc(180px * var(--menu-scale)), 320px);
       pointer-events: none;
     }
 
@@ -728,10 +729,10 @@
 
     /* Keep text edit block compact but readable */
     #selectionTextEdit {
-      display: grid !important;
+      display: grid;
       grid-template-columns: minmax(220px, 1.3fr) minmax(220px, 1fr);
-      align-items: start !important;
-      gap: 8px 12px !important;
+      align-items: start;
+      gap: 8px 12px;
     }
 
     #selectionTextEdit .section-title {
@@ -1163,6 +1164,96 @@
       flex-direction: column;
       gap: 8px;
       align-items: flex-start;
+    }
+
+    .touch-tool-panel {
+      position: fixed;
+      left: 14px;
+      top: 14px;
+      z-index: 2200;
+      width: fit-content;
+      min-width: 0;
+      max-width: calc(100vw - 28px);
+      border-radius: 14px;
+      border: 1px solid rgba(148, 163, 184, 0.42);
+      background: rgba(255, 255, 255, 0.94);
+      box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      overflow: hidden;
+      pointer-events: auto;
+    }
+
+    .touch-tool-panel-header {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px 8px;
+      background: linear-gradient(180deg, rgba(248,250,252,0.96), rgba(241,245,249,0.84));
+      border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+      cursor: move;
+      touch-action: none;
+      user-select: none;
+    }
+
+    .touch-tool-panel-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #0f172a;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .touch-tool-panel-status {
+      flex: 1 1 auto;
+      min-width: 0;
+      font-size: 11px;
+      color: #475569;
+      text-align: right;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .touch-tool-panel-body {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding: 10px 12px 12px;
+      align-items: center;
+    }
+
+    .touch-tool-panel .touch-confirm-overlay,
+    .touch-tool-panel .touch-multiselect-overlay,
+    .touch-tool-panel .touch-select-back-overlay {
+      position: static;
+      left: auto;
+      right: auto;
+      top: auto;
+      bottom: auto;
+      z-index: auto;
+      display: flex;
+      width: auto;
+      height: auto;
+      pointer-events: auto;
+      background: transparent;
+      box-shadow: none;
+      margin: 0;
+      justify-content: center;
+    }
+
+    .touch-tool-panel .touch-confirm-overlay {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 6px;
+      width: 100%;
+    }
+
+    .touch-tool-panel .touch-multiselect-overlay,
+    .touch-tool-panel .touch-select-back-overlay {
+      justify-content: stretch;
+      width: 100%;
     }
 
     .touch-confirm-btn {
@@ -1712,6 +1803,145 @@
       margin-bottom: 2px;
     }
 
+    #startSetupOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: rgba(15, 23, 42, 0.22);
+      backdrop-filter: blur(6px);
+      z-index: 1200;
+    }
+
+    #startSetupCard {
+      width: min(840px, calc(100vw - 32px));
+      max-height: calc(100vh - 48px);
+      overflow: auto;
+      background: rgba(255, 255, 255, 0.96);
+      border: 1px solid rgba(148, 163, 184, 0.45);
+      border-radius: 20px;
+      box-shadow: 0 26px 80px rgba(15, 23, 42, 0.22);
+      padding: 18px 18px 16px;
+    }
+
+    #startSetupTitle {
+      font-size: 20px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 0 0 4px;
+    }
+
+    #startSetupSubtitle {
+      font-size: 12px;
+      color: #475569;
+      margin: 0 0 12px;
+    }
+
+    #startSetupBody {
+      display: grid;
+      grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+
+    #startSetupMain {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .start-setup-section {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 12px 14px;
+      border: 1px solid rgba(203, 213, 225, 0.85);
+      border-radius: 16px;
+      background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 0.98));
+    }
+
+    .start-setup-section + .start-setup-section {
+      margin-top: 0;
+    }
+
+    .start-setup-section-title {
+      font-size: 13px;
+      font-weight: 800;
+      color: #334155;
+    }
+
+    .start-setup-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px 12px;
+      align-items: start;
+    }
+
+    .start-setup-grid .full {
+      grid-column: 1 / -1;
+    }
+
+    .start-setup-item {
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .start-setup-inline {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .start-setup-inline input[type="number"],
+    .start-setup-inline select,
+    .start-setup-item input[type="number"],
+    .start-setup-item select {
+      min-height: 32px;
+    }
+
+    .start-setup-actions {
+      display: flex;
+      justify-content: flex-end;
+      margin-top: 12px;
+    }
+
+    #startSetupStartBtn {
+      min-width: 120px;
+      min-height: 38px;
+      font-size: 14px;
+      font-weight: 800;
+      border-radius: 999px;
+      background: #0f172a;
+      color: #fff;
+      border: none;
+      cursor: pointer;
+    }
+
+    #startSetupStartBtn:hover {
+      background: #1e293b;
+    }
+
+    #startSetupGridAutoHint {
+      font-size: 10px;
+      color: #64748b;
+    }
+
+    @media (max-width: 760px) {
+      #startSetupBody {
+        grid-template-columns: 1fr;
+      }
+
+      .start-setup-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
   </style>
 </head>
 
@@ -1722,53 +1952,53 @@
         <div class="cad-home-logo"><span class="logo-s">S-</span>CAD</div>
       </a>
       <div id="cadHomeMenu" class="cad-home-menu">
-        <div class="cad-home-menu-title">Mode</div>
-        <button id="cadHomeModeViewer" type="button">Viewer Mode</button>
-        <button id="cadHomeModeEasy" type="button">Easy Mode</button>
-        <button id="cadHomeModeCad" type="button">CAD Mode</button>
-        <a id="cadHomeMenuWebtop" href="./index.html">Web Top</a>
+        <div class="cad-home-menu-title"></div>
+        <button id="cadHomeModeViewer" type="button"></button>
+        <button id="cadHomeModeEasy" type="button"></button>
+        <button id="cadHomeModeCad" type="button"></button>
+        <a id="cadHomeMenuWebtop" href="./index.html"></a>
       </div>
       <div class="left-aux-stack">
         <div class="section" data-panel-id="snap">
-          <button class="section-title panel-toggle" type="button">Snap</button>
+          <button class="section-title panel-toggle" type="button"></button>
           <div class="snap-grid">
-            <label><input id="gridSnapToggle" type="checkbox" checked><span>Grid</span></label>
-            <label><input id="objSnapEndpointToggle" type="checkbox" checked><span>Endpoint</span></label>
-            <label><input id="objSnapToggle" type="checkbox" checked><span>On Curve</span></label>
-            <label><input id="objSnapMidpointToggle" type="checkbox"><span>Midpoint</span></label>
-            <label><input id="objSnapCenterToggle" type="checkbox" checked><span>Center</span></label>
-            <label><input id="objSnapIntersectionToggle" type="checkbox" checked><span>Intersection</span></label>
-            <label><input id="objSnapTangentToggle" type="checkbox"><span>Tangent</span></label>
-            <label><input id="objSnapVectorToggle" type="checkbox"><span>Vector</span></label>
-            <label class="snap-span-2"><input id="objSnapTangentKeepToggle" type="checkbox"><span>Keep Attributes</span></label>
+            <label><input id="gridSnapToggle" type="checkbox" checked><span></span></label>
+            <label><input id="objSnapEndpointToggle" type="checkbox" checked><span></span></label>
+            <label><input id="objSnapToggle" type="checkbox" checked><span></span></label>
+            <label><input id="objSnapMidpointToggle" type="checkbox"><span></span></label>
+            <label><input id="objSnapCenterToggle" type="checkbox" checked><span></span></label>
+            <label><input id="objSnapIntersectionToggle" type="checkbox" checked><span></span></label>
+            <label><input id="objSnapTangentToggle" type="checkbox"><span></span></label>
+            <label><input id="objSnapVectorToggle" type="checkbox"><span></span></label>
+            <label class="snap-span-2"><input id="objSnapTangentKeepToggle" type="checkbox"><span></span></label>
           </div>
         </div>
         <div class="section" data-panel-id="attrs" id="attrPanel">
-          <button class="section-title panel-toggle" type="button">Attributes</button>
+          <button class="section-title panel-toggle" type="button"></button>
           <div id="attrList"></div>
           <div class="attr-row">
             <input id="attrNameInput" type="text" placeholder="name">
             <input id="attrValueInput" type="text" placeholder="value">
-            <button id="attrAddBtn" type="button">Add</button>
+            <button id="attrAddBtn" type="button"></button>
           </div>
         </div>
       </div>
       <div class="section" data-panel-id="tools">
-        <button class="section-title panel-toggle" type="button">Create</button>
+        <button class="section-title panel-toggle" type="button"></button>
         <div id="toolButtons" class="tool-buttons"></div>
       </div>
       <div class="section" data-panel-id="editTools">
-        <button class="section-title panel-toggle" type="button">Edit</button>
+        <button class="section-title panel-toggle" type="button"></button>
         <div id="editToolButtons" class="tool-buttons"></div>
       </div>
       <div class="section" data-panel-id="fileTools">
-        <button class="section-title panel-toggle" type="button">File</button>
+        <button class="section-title panel-toggle" type="button"></button>
         <div id="fileToolButtons" class="tool-buttons"></div>
-        <a id="openManualBtn" class="menu-link-btn" href="./manual.html">Manual</a>
+        <a id="openManualBtn" class="menu-link-btn" href="./manual.html"></a>
       </div>
       <div class="section utilities" style="display:none;">
-        <div class="section-title">View</div>
-        <label>Grid
+        <div class="section-title"></div>
+        <label>
           <select id="gridSizeInput">
             <option value="1">1</option>
             <option value="5">5</option>
@@ -1779,64 +2009,224 @@
             <option value="1000">1000</option>
           </select>
         </label>
-        <label>Grid Show <input id="gridShowToggle" type="checkbox" checked></label>
-        <label>Auto Grid <input id="gridAutoToggle" type="checkbox" checked></label>
+        <label><input id="gridShowToggle" type="checkbox" checked></label>
+        <label><input id="gridAutoToggle" type="checkbox" checked></label>
       </div>
     </aside>
     <main class="main">
       <canvas id="cadCanvas"></canvas>
+      <div id="startSetupOverlay">
+        <div id="startSetupCard">
+          <div id="startSetupTitle">新規作成</div>
+          <div id="startSetupSubtitle">用紙とグリッドを決めてから開始できます。</div>
+          <div id="startSetupBody">
+            <div class="start-setup-section">
+              <div id="startSetupProjectFolderLabel" class="start-setup-section-title">プロジェクトフォルダ</div>
+              <div class="start-setup-inline">
+                <button id="startSetupSelectProjectFolderBtn" type="button">フォルダ選択</button>
+                <button id="startSetupClearProjectFolderBtn" type="button">解除</button>
+              </div>
+              <div id="startSetupProjectFolderStatus" style="font-size:11px; color:#64748b;"></div>
+            </div>
+            <div id="startSetupMain">
+              <div class="start-setup-section">
+                <div id="startSetupPageTitle" class="start-setup-section-title">用紙設定</div>
+                <div class="start-setup-grid">
+                  <label class="start-setup-item">
+                    <span id="startSetupPageSizeLabel">用紙サイズ</span>
+                    <select id="startSetupPageSizeSelect">
+                      <option value="A4">A4</option>
+                      <option value="A3">A3</option>
+                      <option value="A2">A2</option>
+                      <option value="A1">A1</option>
+                      <option value="Letter">Letter</option>
+                      <option value="Legal">Legal</option>
+                      <option value="Tabloid">Tabloid</option>
+                      <option value="Ledger">Ledger</option>
+                    </select>
+                  </label>
+                  <label class="start-setup-item">
+                    <span id="startSetupOrientationLabel">向き</span>
+                    <select id="startSetupOrientationSelect">
+                      <option value="landscape">Landscape</option>
+                      <option value="portrait">Portrait</option>
+                    </select>
+                  </label>
+                  <label class="start-setup-item">
+                    <span id="startSetupScaleLabel">尺度 (1:)</span>
+                    <select id="startSetupPageScaleSelect">
+                      <option value="1">1</option>
+                      <option value="5">5</option>
+                      <option value="10">10</option>
+                      <option value="50">50</option>
+                      <option value="100">100</option>
+                      <option value="500">500</option>
+                      <option value="1000">1000</option>
+                    </select>
+                  </label>
+                  <label class="start-setup-item">
+                    <span id="startSetupUnitLabel">単位</span>
+                    <select id="startSetupPageUnitSelect">
+                      <option value="mm">mm</option>
+                      <option value="cm">cm</option>
+                      <option value="m">m</option>
+                      <option value="inch">inch</option>
+                    </select>
+                  </label>
+                  <div class="start-setup-item full">
+                    <div class="start-setup-inline">
+                      <label class="start-setup-inline">
+                        <input id="startSetupCustomPageToggle" type="checkbox">
+                        <span id="startSetupCustomPageToggleLabel">カスタムサイズ</span>
+                      </label>
+                      <span id="startSetupWidthLabel">幅</span>
+                      <input id="startSetupCustomPageWidthInput" type="number" min="1" step="1" value="297" style="width:88px;">
+                      <span id="startSetupCustomPageWidthUnitLabel">(mm)</span>
+                      <span id="startSetupHeightLabel">高さ</span>
+                      <input id="startSetupCustomPageHeightInput" type="number" min="1" step="1" value="210" style="width:88px;">
+                      <span id="startSetupCustomPageHeightUnitLabel">(mm)</span>
+                    </div>
+                  </div>
+                  <div class="start-setup-item full">
+                    <div class="start-setup-inline">
+                      <label class="start-setup-inline">
+                        <input id="startSetupCustomScaleToggle" type="checkbox">
+                        <span id="startSetupCustomScaleToggleLabel">カスタム尺度</span>
+                      </label>
+                      <span>1:</span>
+                      <input id="startSetupCustomScaleInput" type="number" min="0.0001" step="0.1" value="1" style="width:88px;">
+                      <span id="startSetupMarginLabel">余白</span>
+                      <input id="startSetupPageInnerMarginInput" type="number" min="0" step="1" value="10" style="width:88px;">
+                      <span id="startSetupPageInnerMarginUnitLabel">(mm)</span>
+                      <label class="start-setup-inline">
+                        <input id="startSetupPageShowFrameToggle" type="checkbox" checked>
+                        <span id="startSetupPageShowFrameLabel">用紙枠を表示</span>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="start-setup-section">
+                <div id="startSetupGridTitle" class="start-setup-section-title">グリッド設定</div>
+                <div class="start-setup-grid">
+                  <label class="start-setup-item">
+                    <span id="startSetupGridSizeLabel">基準グリッド</span>
+                    <div class="start-setup-inline">
+                      <select id="startSetupGridSizeSelect">
+                        <option value="1">1</option>
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="500">500</option>
+                        <option value="1000">1000</option>
+                      </select>
+                      <span id="startSetupGridUnitLabel">(mm)</span>
+                    </div>
+                  </label>
+                  <div class="start-setup-item">
+                    <span></span>
+                    <div class="start-setup-inline">
+                      <label class="start-setup-inline">
+                        <input id="startSetupCustomGridToggle" type="checkbox">
+                        <span id="startSetupCustomGridToggleLabel">カスタムグリッド</span>
+                      </label>
+                      <input id="startSetupCustomGridInput" type="number" min="1" step="1" value="10" style="width:88px;">
+                      <span id="startSetupCustomGridUnitLabel">(mm)</span>
+                    </div>
+                  </div>
+                  <div class="start-setup-item full">
+                    <div class="start-setup-inline">
+                      <label class="start-setup-inline">
+                        <input id="startSetupGridShowToggle" type="checkbox" checked>
+                        <span id="startSetupGridShowLabel">グリッド表示</span>
+                      </label>
+                      <label class="start-setup-inline">
+                        <input id="startSetupGridAutoToggle" type="checkbox" checked>
+                        <span id="startSetupGridAutoLabel">自動切替</span>
+                      </label>
+                      <span id="startSetupGridAutoTimingTitle">切替タイミング</span>
+                      <input id="startSetupGridAutoTimingSlider" type="range" min="0" max="100" step="1" value="35" style="flex:1 1 220px;">
+                      <span id="startSetupGridAutoTimingLabel">Preview</span>
+                    </div>
+                    <div id="startSetupGridAutoHint">Grid interval switches automatically based on zoom.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="start-setup-actions">
+            <button id="startSetupStartBtn" type="button">開始</button>
+          </div>
+        </div>
+      </div>
       <div class="top-context" id="topContext">
         <div class="top-context-panels" id="topContextPanels">
           <div class="section" data-context="select">
-            <div style="display:flex; align-items:center; gap:6px;">
-              <div class="section-title" style="margin:0; white-space:nowrap;">Selection Mode</div>
-              <button id="selectPickObjectBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;">Object</button>
-              <button id="selectPickGroupBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;">Groups</button>
+            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
+              <div class="section-title" style="margin:0; white-space:nowrap;"></div>
+              <button id="selectPickObjectBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;"></button>
+              <button id="selectPickGroupBtn" type="button" style="font-size:12px; padding:2px 8px; min-width:56px;"></button>
+            </div>
+            <div style="display:grid; grid-template-columns:auto 72px auto 72px auto auto; gap:6px; align-items:center; justify-content:start; margin-top:6px;">
+              <span>dX</span><input id="selectToolDxInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
+              <span>dY</span><input id="selectToolDyInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
+              <button id="selectToolMoveBtn" type="button"></button>
+              <button id="selectToolCopyBtn" type="button"></button>
             </div>
           </div>
           <div class="section" data-context="vertex">
-            <div class="section-title">Vertex Edit</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto auto auto auto 68px auto 68px auto; gap:4px; align-items:center; justify-content:start;">
-              <span>Mode</span>
+              <span></span>
               <select id="vertexModeSelect" style="min-width:92px;">
-                <option value="move" selected>Move Vertex</option>
-                <option value="insert">Insert Vertex</option>
+                <option value="move" selected></option>
+                <option value="insert"></option>
               </select>
               <label style="display:inline-flex; align-items:center; gap:2px; justify-content:flex-start; white-space:nowrap;">
                 <input id="vertexLinkCoincidentToggle" type="checkbox" checked style="margin-left:0;">
               </label>
               <span>dX</span><input id="vertexMoveDxInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
               <span>dY</span><input id="vertexMoveDyInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
-              <button id="moveVertexBtn" type="button">Move</button>
-              <button id="deleteVertexBtn" type="button">Delete Vertex</button>
+              <button id="moveVertexBtn" type="button"></button>
+              <button id="deleteVertexBtn" type="button"></button>
+            </div>
+          </div>
+          <div class="section" data-context="move">
+            <div class="section-title"></div>
+            <div style="display:grid; grid-template-columns:auto 72px auto 72px auto auto; gap:6px; align-items:center; justify-content:start;">
+              <span>dX</span><input id="moveToolDxInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
+              <span>dY</span><input id="moveToolDyInput" type="number" value="0" step="1" style="width:100%; min-width:0;">
+              <button id="moveToolApplyBtn" type="button"></button>
+              <button id="moveToolCopyBtn" type="button"></button>
             </div>
           </div>
           <div class="section" data-context="line" style="font-size:12px;">
-            <div class="section-title">Line</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto minmax(84px,1fr) auto; gap:6px; align-items:center; justify-content:start;">
-              <span>Mode</span>
+              <span></span>
               <select id="lineModeSelect" style="width:auto; min-width:84px;">
-                <option value="segment" selected>Segment</option>
-                <option value="continuous">Continuous</option>
-                <option value="freehand">B-Spline</option>
+                <option value="segment" selected></option>
+                <option value="continuous"></option>
+                <option value="freehand"></option>
               </select>
-              <button id="lineTouchFinalizeBtn" type="button" style="display:none; justify-self:start;">Confirm</button>
+              <button id="lineTouchFinalizeBtn" type="button" style="display:none; justify-self:start;"></button>
             </div>
             <div style="display:grid; grid-template-columns:auto 78px auto 78px auto auto auto; gap:4px; align-items:center; justify-content:start;">
-              <span>Length</span><input id="lineLengthInput" type="number" value="100" min="0" step="1"
+              <span></span><input id="lineLengthInput" type="number" value="100" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>Angle</span><input id="lineAngleInput" type="number" value="0" step="1"
+              <span></span><input id="lineAngleInput" type="number" value="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>Anchor</span>
+              <span></span>
               <select id="lineAnchorSelect" style="width:auto; min-width:64px;">
-                <option value="endpoint_a" selected>EndpointA</option>
-                <option value="endpoint_b">EndpointB</option>
-                <option value="center">Center</option>
+                <option value="endpoint_a" selected></option>
+                <option value="endpoint_b"></option>
+                <option value="center"></option>
               </select>
-              <button id="applyLineInputBtn" type="button">Create</button>
+              <button id="applyLineInputBtn" type="button"></button>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr auto 64px; gap:6px; align-items:center; justify-content:start;">
-              <span>Line Width (mm)</span>
+              <span></span>
               <select id="lineToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -1846,43 +2236,48 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>Line Type</span>
+              <span></span>
               <select id="lineToolLineTypeInput">
-                <option value="solid" selected>Solid</option>
-                <option value="dashed">Dashed</option>
-                <option value="dotted">Dotted</option>
-                <option value="dashdot">Dash-dot</option>
-                <option value="longdash">Long Dash</option>
-                <option value="center">Center</option>
-                <option value="hidden">Hidden</option>
+                <option value="solid" selected></option>
+                <option value="dashed"></option>
+                <option value="dotted"></option>
+                <option value="dashdot"></option>
+                <option value="longdash"></option>
+                <option value="center"></option>
+                <option value="hidden"></option>
               </select>
-              <span>Color</span>
+              <span></span>
               <input id="lineToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
           <div class="section" data-context="rect" style="font-size:12px; min-width:300px;">
-            <div class="section-title">Rectangle</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto 84px auto 84px auto auto auto; gap:4px; align-items:center;">
-              <span>Width</span><input id="rectWidthInput" type="number" value="100" min="0" step="1"
+              <span></span><input id="rectWidthInput" type="number" value="100" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>Height</span><input id="rectHeightInput" type="number" value="100" min="0" step="1"
+              <span></span><input id="rectHeightInput" type="number" value="100" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <span>Base Point</span>
+              <span></span>
               <select id="rectAnchorSelect" style="width:auto; min-width:84px;">
-                <option value="c" selected>Center</option>
-                <option value="tl">Top Left</option>
-                <option value="tc">Top Center</option>
-                <option value="tr">Top Right</option>
-                <option value="cl">Center Left</option>
-                <option value="cr">Center Right</option>
-                <option value="bl">Bottom Left</option>
-                <option value="bc">Bottom Center</option>
-                <option value="br">Bottom Right</option>
+                <option value="c" selected></option>
+                <option value="tl"></option>
+                <option value="tc"></option>
+                <option value="tr"></option>
+                <option value="cl"></option>
+                <option value="cr"></option>
+                <option value="bl"></option>
+                <option value="bc"></option>
+                <option value="br"></option>
               </select>
-              <button id="applyRectInputBtn" type="button">Create</button>
+              <button id="applyRectInputBtn" type="button"></button>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; margin-top:4px;">
+              <label style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
+                <input id="rectAsPolylineToggle" type="checkbox" style="margin-left:0;">
+              </label>
             </div>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr auto 64px; gap:6px; align-items:center;">
-              <span>Line Width (mm)</span>
+              <span></span>
               <select id="rectToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -1907,29 +2302,29 @@
             </div>
           </div>
           <div class="section" data-context="circle" style="font-size:12px;">
-            <div class="section-title">Circle</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto 1fr auto 92px auto 1fr; gap:6px; align-items:center; justify-content:start;">
-              <span>Mode</span>
+              <span></span>
               <select id="circleModeSelect">
-                <option value="drag" selected>2-Point Click</option>
-                <option value="fixed">Fixed Radius</option>
-                <option value="threepoint">3-Point</option>
+                <option value="drag" selected></option>
+                <option value="fixed"></option>
+                <option value="threepoint"></option>
               </select>
-              <span>Radius</span>
+              <span></span>
               <input id="circleRadiusInput" type="number" value="50" min="0" step="1"
                 style="width:100%; min-width:0;">
-              <button id="applyCircleInputBtn" type="button" style="justify-self:start;">Create</button>
+              <button id="applyCircleInputBtn" type="button" style="justify-self:start;"></button>
               <label style="display:inline-flex; align-items:center; gap:4px; justify-content:flex-end; white-space:nowrap; justify-self:end;">
-                Show Center Mark <input id="circleCenterMarkToggle" type="checkbox" style="margin-left:0;">
+                <input id="circleCenterMarkToggle" type="checkbox" style="margin-left:0;">
               </label>
             </div>
-            <div id="circleThreePointHint" style="display:none; font-size:11px; color:#475569;">Select 3 objects with center coordinates</div>
+            <div id="circleThreePointHint" style="display:none; font-size:11px; color:#475569;"></div>
             <div id="circleThreePointOps" style="display:none;">
               <button id="circleThreePointAddBtn" type="button">Add Target</button>
               <button id="circleThreePointRunBtn" type="button">Run</button>
             </div>
             <div style="display:grid; grid-template-columns:auto 92px auto 110px auto 42px; gap:6px; align-items:center; justify-content:start;">
-              <span>Line Width (mm)</span>
+              <span></span>
               <select id="circleToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -1939,46 +2334,46 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>Line Type</span>
+              <span></span>
               <select id="circleToolLineTypeInput">
-                <option value="solid" selected>Solid</option>
-                <option value="dashed">Dashed</option>
-                <option value="dotted">Dotted</option>
-                <option value="dashdot">Dash-dot</option>
-                <option value="longdash">Long Dash</option>
-                <option value="center">Center</option>
-                <option value="hidden">Hidden</option>
+                <option value="solid" selected></option>
+                <option value="dashed"></option>
+                <option value="dotted"></option>
+                <option value="dashdot"></option>
+                <option value="longdash"></option>
+                <option value="center"></option>
+                <option value="hidden"></option>
               </select>
-              <span>Color</span>
+              <span></span>
               <input id="circleToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
           <div class="section" data-context="fillet">
-            <div class="section-title">Fillet</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto auto auto auto auto auto auto; gap:6px; align-items:center; justify-content:start;">
               <label for="filletRadiusInput" style="display:inline-flex; align-items:center; gap:2px; margin:0;">
-                <span id="filletRadiusLabel">Radius</span>
+                <span id="filletRadiusLabel"></span>
                 <input id="filletRadiusInput" type="number" value="20" min="0.1" step="1" style="width:56px; min-width:0;">
               </label>
-              <span id="filletModeLabel">Mode</span>
+              <span id="filletModeLabel"></span>
               <select id="filletLineModeSelect" style="width:auto; min-width:74px;">
-                <option value="trim" selected>Trim</option>
-                <option value="split">Split Only</option>
+                <option value="trim" selected></option>
+                <option value="split"></option>
               </select>
-              <button id="applyFilletBtn" type="button" style="display:none;">Run</button>
+              <button id="applyFilletBtn" type="button" style="display:none;"></button>
             </div>
           </div>
           <div class="section" data-context="trim">
-            <div class="section-title">Trim</div>
+            <div class="section-title"></div>
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <label>Do Not Delete (Split Only) <input id="trimNoDeleteToggle" type="checkbox"></label>
+              <label><input id="trimNoDeleteToggle" type="checkbox"></label>
             </div>
           </div>
           <div class="section" data-context="group" style="font-size:12px;">
-            <div class="section-title" id="groupCtxTitle">Groups</div>
+            <div class="section-title" id="groupCtxTitle"></div>
             <div id="groupCtxObjectOps" style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, max-content)); gap:8px 12px; align-items:start; font-size:12px;">
               <div id="mergeGroupsRow" style="display:none; flex-wrap:wrap; gap:6px; align-items:center;">
-                <button id="mergeGroupsBtn" type="button">Group Selected Shapes</button>
+                <button id="mergeGroupsBtn" type="button"></button>
               </div>
               <div id="lineCircleMoveOps"
                 style="display:none; grid-template-columns:auto 72px auto 72px auto auto; gap:6px; align-items:center; justify-content:start;">
@@ -1986,12 +2381,12 @@
                   style="width:100%; min-width:0;">
                 <span>dY</span><input id="selectMoveDyInput" type="number" value="0" step="1"
                   style="width:100%; min-width:0;">
-                <button id="moveSelectedShapesBtn" type="button">Move</button>
-                <button id="copySelectedShapesBtn" type="button">Copy</button>
+                <button id="moveSelectedShapesBtn" type="button"></button>
+                <button id="copySelectedShapesBtn" type="button"></button>
               </div>
               <div id="selectionStyleOps"
                 style="display:none; grid-template-columns:auto 92px auto 110px; gap:6px; align-items:center; justify-content:start;">
-                <span>Line Width (mm)</span>
+                <span></span>
                 <select id="selectionLineWidthInput" style="width:100%; min-width:0;">
                   <option value="0.1">0.1</option>
                   <option value="0.25" selected>0.25</option>
@@ -2001,7 +2396,7 @@
                   <option value="1.5">1.5</option>
                   <option value="2">2</option>
                 </select>
-                <span>Line Type</span>
+                <span></span>
                 <select id="selectionLineTypeInput" style="width:100%; min-width:0;">
                   <option value="solid">Solid</option>
                   <option value="dashed">Dashed</option>
@@ -2014,54 +2409,54 @@
               </div>
               <div id="selectionColorOps"
                 style="display:none; grid-template-columns:auto 92px; gap:6px; align-items:center; justify-content:start;">
-                <span>Color</span>
+                <span></span>
                 <input id="selectionColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
               </div>
               <div id="selectionPositionOps"
                 style="display:none; grid-template-columns:auto 92px; gap:6px; align-items:center; justify-content:start;">
-                <span>Size</span>
+                <span></span>
                 <input id="selectionPositionSizeInput" type="number" min="1" step="1" value="20"
                   style="width:100%; min-width:0;">
               </div>
               <div id="selectionImageOps"
                 style="display:none; flex-direction:column; gap:6px; align-items:flex-start; justify-content:start;">
                 <div style="display:grid; grid-template-columns:auto 92px auto 92px; gap:6px; align-items:center; justify-content:start;">
-                  <span>Width</span>
+                  <span></span>
                   <input id="selectionImageWidthInput" type="number" min="1" step="1" value="200"
                     style="width:100%; min-width:0;">
-                  <span>Height</span>
+                  <span></span>
                   <input id="selectionImageHeightInput" type="number" min="1" step="1" value="150"
                     style="width:100%; min-width:0;">
                 </div>
                 <div style="display:grid; grid-template-columns:auto auto auto auto; gap:10px; align-items:center; justify-content:start;">
-                  <span>Size Locked</span>
+                  <span></span>
                   <input id="selectionImageLockAspectToggle" type="checkbox" checked>
-                  <span>Transform Locked</span>
+                  <span></span>
                   <input id="selectionImageLockTransformToggle" type="checkbox">
                 </div>
               </div>
               <div id="selectionCircleOps"
                 style="display:none; flex-direction:column; align-items:flex-start; justify-content:start; gap:6px;">
                 <div style="display:grid; grid-template-columns:auto 92px auto; gap:6px; align-items:center; justify-content:start;">
-                  <span>Radius</span>
+                  <span></span>
                   <input id="selectionCircleRadiusInput" type="number" min="0" step="1" value="50"
                     style="width:100%; min-width:0;">
-                  <button id="selectionApplyCircleRadiusBtn" type="button">Apply</button>
+                  <button id="selectionApplyCircleRadiusBtn" type="button"></button>
                 </div>
                 <label style="display:inline-flex; align-items:center; gap:6px;">
-                  Show Center Mark
+                  
                   <input id="selectionCircleCenterMarkToggle" type="checkbox">
                 </label>
               </div>
               <div id="selectionTextEdit"
                 style="display:none; border-top:1px solid var(--line); padding-top:6px;">
-                <span class="section-title">Edit Selected Text</span>
+                <span class="section-title"></span>
                 <input id="selectionTextContentInput" type="text" placeholder="Enter text" style="width:100%;">
                 <div class="selection-text-core">
-                  <span>Text Size (pt)</span><input id="selectionTextSizePtInput" type="number" min="1" step="1">
-                  <span>Rotate</span><input id="selectionTextRotateInput" type="number" step="1">
-                  <label>Bold <input id="selectionTextBoldInput" type="checkbox"></label>
-                  <label>Italic <input id="selectionTextItalicInput" type="checkbox"></label>
+                  <span></span><input id="selectionTextSizePtInput" type="number" min="1" step="1">
+                  <span></span><input id="selectionTextRotateInput" type="number" step="1">
+                  <label><input id="selectionTextBoldInput" type="checkbox"></label>
+                  <label><input id="selectionTextItalicInput" type="checkbox"></label>
                   <input id="selectionTextColorInput" type="color">
                 </div>
                 <select id="selectionTextFontFamilyInput">
@@ -2070,61 +2465,61 @@
                   <option value="Arial">Arial</option>
                   <option value="sans-serif">sans-serif</option>
                 </select>
-                <div id="selectionLeaderStyleEdit"
-                  style="display:none; flex-direction:column; gap:6px; border-top:1px dashed var(--line); padding-top:6px;">
-                  <span class="section-title">Leader Style</span>
-                  <div class="leader-style-grid">
-                    <span>Arrow Shape</span>
-                    <select id="selectionLeaderArrowTypeSelect">
-                      <option value="open">Open</option>
-                      <option value="closed">Closed</option>
-                      <option value="hollow">Hollow</option>
-                      <option value="circle">Circle</option>
-                      <option value="circle_filled">Filled Circle</option>
-                    </select>
-                    <span>Arrow Size</span>
-                    <input id="selectionLeaderArrowSizeInput" type="number" min="1" step="0.5">
-                    <span>Line Width (mm)</span>
-                    <input id="selectionLeaderLineWidthInput" type="number" min="0.1" step="0.05">
-                    <span>Line Color</span>
-                    <input id="selectionLeaderColorInput" type="color">
-                  </div>
+              </div>
+              <div id="selectionLeaderStyleEdit"
+                style="display:none; flex-direction:column; gap:6px; border-top:1px dashed var(--line); padding-top:6px;">
+                <span class="section-title"></span>
+                <div class="leader-style-grid">
+                  <span></span>
+                  <select id="selectionLeaderArrowTypeSelect">
+                    <option value="open"></option>
+                    <option value="closed"></option>
+                    <option value="hollow"></option>
+                    <option value="circle"></option>
+                    <option value="circle_filled"></option>
+                  </select>
+                  <span></span>
+                  <input id="selectionLeaderArrowSizeInput" type="number" min="1" step="0.5">
+                  <span></span>
+                  <input id="selectionLeaderLineWidthInput" type="number" min="0.1" step="0.05">
+                  <span></span>
+                  <input id="selectionLeaderColorInput" type="color">
                 </div>
               </div>
             </div>
             <div id="groupCtxGroupOps" style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
               <div class="compact-actions" style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
-                <button id="moveGroupOriginOnlyBtn" type="button">Move Origin Only</button>
-                <button id="unparentGroupBtn" type="button">Unparent</button>
+                <button id="moveGroupOriginOnlyBtn" type="button"></button>
+                <button id="unparentGroupBtn" type="button"></button>
               </div>
               <div id="groupRelativeMoveOps" style="display:grid; grid-template-columns:auto 1fr auto 1fr auto auto; gap:6px; align-items:center;">
                 <span>dX</span><input id="groupMoveDxInput" type="number" value="0" step="1">
                 <span>dY</span><input id="groupMoveDyInput" type="number" value="0" step="1">
-                <button id="moveGroupBtn" type="button">Move</button>
-                <button id="copyGroupBtn" type="button">Copy</button>
+                <button id="moveGroupBtn" type="button"></button>
+                <button id="copyGroupBtn" type="button"></button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:6px; align-items:center;">
-                <label>Rotate Snap
+                <label>
                   <input id="groupRotateSnapInput" type="number" value="5" min="0.1" step="0.1">
                 </label>
-                <button id="deleteGroupBtn" type="button">Delete This Group</button>
+                <button id="deleteGroupBtn" type="button"></button>
               </div>
               <div style="display:flex; align-items:center; gap:16px; flex-wrap:wrap;">
                 <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
                   <input id="groupScaleEnableToggle" type="checkbox" style="margin-left:0;">
-                  <span id="groupScaleEnableLabel">Allow Group Scale</span>
+                  <span id="groupScaleEnableLabel"></span>
                 </div>
                 <div style="display:flex; align-items:center; gap:8px; white-space:nowrap;">
                   <input id="groupScaleKeepAspectToggle" type="checkbox" style="margin-left:0;">
-                  <span id="groupScaleKeepAspectLabel">Keep Aspect</span>
+                  <span id="groupScaleKeepAspectLabel"></span>
                 </div>
               </div>
               <div style="display:grid; grid-template-columns:auto 1fr auto 1fr auto; gap:6px; align-items:center;">
-                <span id="groupScaleFactorXLabel">Scale X</span>
+                <span id="groupScaleFactorXLabel"></span>
                 <input id="groupScaleFactorXInput" type="number" min="0.000001" step="0.01" value="1">
-                <span id="groupScaleFactorYLabel">Scale Y</span>
+                <span id="groupScaleFactorYLabel"></span>
                 <input id="groupScaleFactorYInput" type="number" min="0.000001" step="0.01" value="1">
-                <button id="groupScaleApplyBtn" type="button">Apply</button>
+                <button id="groupScaleApplyBtn" type="button"></button>
               </div>
               <input id="groupScaleFactorInput" type="hidden" value="1">
               <div style="display:flex; flex-direction:column; gap:6px; border-top:1px solid var(--line); padding-top:6px;">
@@ -2134,19 +2529,19 @@
                 </label>
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
                   <button id="groupAimPickBtn" type="button">Pick Target</button>
-                  <button id="groupAimClearBtn" type="button">Clear</button>
+                  <button id="groupAimClearBtn" type="button"></button>
                 </div>
                 <div id="groupAimStatus" style="font-size:11px; color:var(--muted); min-height:1.2em;">Target: None</div>
               </div>
             </div>
           </div>
           <div class="section" data-context="position" style="font-size:12px; min-width:300px;">
-            <div class="section-title">Position Marker</div>
-            <label>Size
+            <div class="section-title"></div>
+            <label>
               <input id="positionSizeInput" type="number" value="20" min="1" step="1" style="width:100%; min-width:0;">
             </label>
             <div style="display:grid; grid-template-columns:auto 1fr auto 1fr auto 64px; gap:6px; align-items:center;">
-              <span>Line Width (mm)</span>
+              <span></span>
               <select id="positionToolLineWidthInput">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -2156,22 +2551,22 @@
                 <option value="1.5">1.5</option>
                 <option value="2">2</option>
               </select>
-              <span>Line Type</span>
+              <span></span>
               <select id="positionToolLineTypeInput">
-                <option value="solid" selected>Solid</option>
-                <option value="dashed">Dashed</option>
-                <option value="dotted">Dotted</option>
-                <option value="dashdot">Dash-dot</option>
-                <option value="longdash">Long Dash</option>
-                <option value="center">Center</option>
-                <option value="hidden">Hidden</option>
+                <option value="solid" selected></option>
+                <option value="dashed"></option>
+                <option value="dotted"></option>
+                <option value="dashdot"></option>
+                <option value="longdash"></option>
+                <option value="center"></option>
+                <option value="hidden"></option>
               </select>
               <span>Color</span>
               <input id="positionToolColorInput" type="color" value="#0f172a" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
           </div>
           <div class="section" data-context="text" style="font-size:12px;">
-            <div class="section-title">Text</div>
+            <div class="section-title"></div>
             <div style="display:flex; flex-direction:column; gap:6px;">
               <input id="textContentInput" type="text" placeholder="Text content" style="width:100%;">
               <div style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
@@ -2190,7 +2585,7 @@
                 <input id="textColorInput" type="color" value="#0f172a">
               </div>
               <label style="display:grid; grid-template-columns:auto 1fr; gap:6px; align-items:center;">
-                <span>Line Width (mm)</span>
+                <span></span>
                 <select id="textToolLineWidthInput">
                   <option value="0.1">0.1</option>
                   <option value="0.25" selected>0.25</option>
@@ -2216,31 +2611,31 @@
             </div>
           </div>
           <div class="section" data-context="importadjust" style="font-size:12px;">
-            <div class="section-title">Import Adjust</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto 92px auto 92px auto auto; gap:6px; align-items:center; justify-content:start;">
-              <span>Scale</span>
+            <span></span>
               <input id="importAdjustScaleInput" type="number" min="0.000001" step="0.01" value="1" style="width:100%; min-width:0;">
-              <span>dX</span>
+              <span></span>
               <input id="importAdjustDxInput" type="number" step="1" value="0" style="width:100%; min-width:0;">
-              <span>dY</span>
+              <span></span>
               <input id="importAdjustDyInput" type="number" step="1" value="0" style="width:100%; min-width:0;">
             </div>
             <div style="display:flex; align-items:center; gap:8px; justify-content:flex-start;">
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
-                <span id="importSourceUnitLabel">Source Unit</span>
+                <span id="importSourceUnitLabel"></span>
                 <select id="importSourceUnitSelect" style="width:100px;">
-                  <option value="auto">Auto</option>
-                  <option value="unitless">Unitless</option>
-                  <option value="mm">mm</option>
-                  <option value="cm">cm</option>
-                  <option value="m">m</option>
-                  <option value="inch">inch</option>
-                  <option value="px">px</option>
-                  <option value="pt">pt</option>
+                  <option value="auto"></option>
+                  <option value="unitless"></option>
+                  <option value="mm"></option>
+                  <option value="cm"></option>
+                  <option value="m"></option>
+                  <option value="inch"></option>
+                  <option value="px"></option>
+                  <option value="pt"></option>
                 </select>
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
-                <span id="importAsPolylineLabel">As Polyline</span>
+                <span id="importAsPolylineLabel"></span>
                 <input id="importAdjustFlipXToggle" type="checkbox" style="margin-left:0;">
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
@@ -2248,33 +2643,33 @@
                 <input id="importAdjustFlipYToggle" type="checkbox" style="margin-left:0;">
               </label>
               <label style="display:inline-flex; align-items:center; gap:6px; justify-content:flex-start;">
-                <span id="importAsPolylineLabel">As Polyline</span>
+                <span id="importAsPolylineLabel"></span>
                 <input id="importAsPolylineToggle" type="checkbox" style="margin-left:0;">
               </label>
-              <button id="importAdjustApplyBtn" type="button">Apply</button>
-              <button id="importAdjustCancelBtn" type="button">Cancel</button>
+              <button id="importAdjustApplyBtn" type="button"></button>
+              <button id="importAdjustCancelBtn" type="button"></button>
             </div>
           </div>
           <div class="section" data-context="trace" style="font-size:12px;">
-            <div class="section-title" id="tracePanelTitle">Image Trace (Experimental)</div>
+            <div class="section-title" id="tracePanelTitle"></div>
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <div id="traceTargetInfo" style="font-size:11px; color:#475569;">Select an imported image</div>
+              <div id="traceTargetInfo" style="font-size:11px; color:#475569;"></div>
               <div style="display:grid; grid-template-columns:auto 1fr auto 1fr; gap:6px; align-items:center;">
-                <span id="traceMaxDimLabel">Max Resolution</span>
+                <span id="traceMaxDimLabel"></span>
                 <input id="traceMaxDimInput" type="number" min="64" max="2048" step="1" value="420">
-                <span id="traceEdgePercentLabel">Edge Amount</span>
+                <span id="traceEdgePercentLabel"></span>
                 <input id="traceEdgePercentInput" type="number" min="1" max="99" step="1" value="72">
-                <span id="traceSimplifyLabel">Simplify</span>
+                <span id="traceSimplifyLabel"></span>
                 <input id="traceSimplifyInput" type="number" min="0" max="12" step="0.05" value="1.25">
-                <span id="traceMinSegLabel">Min Segment</span>
+                <span id="traceMinSegLabel"></span>
                 <input id="traceMinSegInput" type="number" min="0" max="40" step="0.1" value="1.2">
-                <span id="traceMaxSegLabel">Max Segments</span>
+                <span id="traceMaxSegLabel"></span>
                 <input id="traceMaxSegmentsInput" type="number" min="100" max="50000" step="100" value="12000">
-                <span id="traceOffsetXLabel">Offset X</span>
+                <span id="traceOffsetXLabel"></span>
                 <input id="traceOffsetXInput" type="number" step="1" value="0">
-                <span id="traceOffsetYLabel">Offset Y</span>
+                <span id="traceOffsetYLabel"></span>
                 <input id="traceOffsetYInput" type="number" step="1" value="0">
-                <span id="traceLineWidthLabel">Line Width (mm)</span>
+                <span id="traceLineWidthLabel"></span>
                 <input id="traceLineWidthInput" type="number" min="0.01" max="10" step="0.01" value="0.1">
                 <span id="traceLineTypeLabel">Line Type</span>
                 <select id="traceLineTypeInput">
@@ -2298,7 +2693,7 @@
             </div>
           </div>
           <div class="section" data-context="dim" style="font-size:12px;">
-            <div class="section-title">Dimension Settings</div>
+            <div class="section-title"></div>
             <div style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;">
               <div id="dimModeOptions" style="display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px;">
                 <label style="display:inline-flex; align-items:center; gap:4px;">Linear
@@ -2333,7 +2728,7 @@
                   <option value="3">0.001</option>
                 </select>
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">Arrow Shape
+              <label style="display:inline-flex; align-items:center; gap:4px;">
                 <select id="dimArrowTypeSelect" style="width:90px; font-size:12px; padding:2px;">
                   <option value="open" selected>Open</option>
                   <option value="closed">Filled Triangle</option>
@@ -2362,12 +2757,22 @@
               </label>
               <label style="display:inline-flex; align-items:center; gap:4px;">Text Rotate
                 <select id="dimTextRotateInput" style="width:60px; font-size:12px; padding:2px;">
-                  <option value="auto" selected>Auto</option>
+                  <option value="auto" selected></option>
                   <option value="0">Horizontal</option>
                   <option value="90">90 deg</option>
                   <option value="-90">-90 deg</option>
                 </select>
               </label>
+              <label style="display:inline-flex; align-items:center; gap:4px;">Numeric Priority
+                <input id="dimNumericPriorityToggle" type="checkbox">
+              </label>
+              <label id="dimNumericValueWrap" style="display:inline-flex; align-items:center; gap:4px;">Value
+                <input id="dimNumericValueInput" type="number" value="" step="0.1" style="width:72px; font-size:12px; padding:2px;">
+              </label>
+              <div id="dimChainNumericValuesWrap" style="display:none; flex-direction:column; gap:4px; min-width:220px;">
+                <div style="font-size:12px;">Chain Values</div>
+                <div id="dimChainNumericValuesList" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
+              </div>
               <label id="dimExtOffsetWrap" style="display:inline-flex; align-items:center; gap:4px;">Ext Offset
                 <input id="dimExtOffsetInput" type="number" value="2" step="1" min="0"
                   style="width:40px; font-size:12px; padding:2px;">
@@ -2380,7 +2785,7 @@
                 <input id="dimROvershootInput" type="number" value="5" step="1" min="0"
                   style="width:40px; font-size:12px; padding:2px;">
               </label>
-              <label style="display:inline-flex; align-items:center; gap:4px;">Line Width (mm)
+              <label style="display:inline-flex; align-items:center; gap:4px;">
                 <select id="dimToolLineWidthInput" style="width:64px; font-size:12px; padding:2px;">
                   <option value="0.1">0.1</option>
                   <option value="0.25" selected>0.25</option>
@@ -2417,12 +2822,12 @@
                   style="display:none; padding:2px 8px; font-size:12px;">Finalize Dim</button>
               </div>
               <div id="dimMergeGroupsRow" style="display:none; align-items:center;">
-                <button id="dimMergeGroupsBtn" type="button">Group Selected Shapes</button>
+                <button id="dimMergeGroupsBtn" type="button"></button>
               </div>
             </div>
           </div>
           <div class="section" data-context="hatch" style="font-size:12px;">
-            <div class="section-title">Hatching</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto 74px auto 74px auto 74px; gap:6px; align-items:center;">
               <span>Pitch(mm)</span><input id="hatchPitchInput" type="number" value="5" min="0.1" step="1"
                 style="width:100%; min-width:0;">
@@ -2437,7 +2842,7 @@
                 <input id="hatchDashMmInput" type="number" value="5" min="0.1" step="1" style="width:60px; min-width:0;">
                 <input id="hatchGapMmInput" type="number" value="2" min="0.1" step="1" style="width:60px; min-width:0;">
               </div>
-              <span>Line Width (mm)</span>
+              <span></span>
               <select id="hatchToolLineWidthInput" style="width:100%; min-width:0;">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -2452,7 +2857,7 @@
                 <input id="hatchFillToggle" type="checkbox">
                 <input id="hatchFillColorInput" type="color" value="#dbeafe" style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
               </label>
-              <span>Line Color</span>
+              <span></span>
               <input id="hatchLineColorInput" type="color" value="#0f172a"
                 style="width:42px; min-width:42px; padding:0; border:1px solid #cbd5e1;">
             </div>
@@ -2464,7 +2869,7 @@
           </div>
 
           <div class="section" data-context="patterncopy">
-            <div class="section-title">Pattern Copy</div>
+            <div class="section-title"></div>
             <div style="display:flex; flex-direction:column; gap:8px;">
               <select id="patternCopyModeSelect" style="width:100%;">
                 <option value="array">Array</option>
@@ -2489,7 +2894,7 @@
 
               <div id="patternCopyRotateOptions" style="display:none; flex-direction:column; gap:4px;">
                 <div style="display:grid; grid-template-columns:auto 1fr; gap:4px; align-items:center;">
-                  <span>Angle</span><input id="patternCopyRotateAngleInput" type="number" value="45" step="1"
+                  <span></span><input id="patternCopyRotateAngleInput" type="number" value="45" step="1"
                     style="width:100%; min-width:0;">
                 </div>
                 <div style="display:grid; grid-template-columns:auto 1fr; gap:4px; align-items:center;">
@@ -2505,12 +2910,12 @@
                 <div id="patternCopyAxisStatus" style="font-size:12px; color:#64748b; margin-top:2px;"></div>
               </div>
 
-              <button id="patternCopyApplyBtn" type="button">Run Copy</button>
+              <button id="patternCopyApplyBtn" type="button"></button>
             </div>
           </div>
 
           <div class="section" data-context="doubleline">
-            <div class="section-title">Double Line</div>
+            <div class="section-title"></div>
             <div style="display:grid; grid-template-columns:auto 78px auto 66px auto auto 64px auto 84px auto 118px auto 124px; gap:6px; align-items:center; justify-content:start;">
               <span>Mode</span>
               <select id="dlineModeSelect" style="width:auto; min-width:68px;">
@@ -2520,7 +2925,7 @@
               <span>Offset</span><input id="dlineOffsetInput" type="number" value="5" min="0.1" step="1"
                 style="width:100%; min-width:0;">
               <span id="dlineOffsetUnitLabel">(mm)</span>
-              <span>Line Width (mm)</span>
+              <span></span>
               <select id="dlineToolLineWidthInput" style="width:auto; min-width:58px;">
                 <option value="0.1">0.1</option>
                 <option value="0.25" selected>0.25</option>
@@ -2543,12 +2948,12 @@
               <label for="dlineAsPolylineToggle" id="dlineAsPolylineLabel" style="display:inline-flex; align-items:center; gap:4px; white-space:nowrap;">
                 <input id="dlineAsPolylineToggle" type="checkbox"><span>Create as Polyline</span>
               </label>
-              <button id="applyDLineBtn" type="button">Apply</button>
+              <button id="applyDLineBtn" type="button"></button>
             </div>
           </div>
 
           <div class="section" data-context="preview">
-            <div class="section-title">Preview</div>
+            <div class="section-title"></div>
             <label>Precision
               <select id="previewPrecisionSelect">
                 <option value="0">0</option>
@@ -2560,13 +2965,13 @@
           </div>
           <div class="section" data-context="settings">
             <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-              <div class="section-title" style="margin:0;">Settings</div>
-              <div id="buildBadge" class="badge" style="font-size:10px; white-space:nowrap;"></div>
+              <div class="section-title" style="margin:0;"></div>
+              <div id="settingsBuildBadge" class="badge" style="font-size:11px; white-space:nowrap; font-weight:700; background:#eff6ff; border-color:#93c5fd; color:#0f172a;"></div>
             </div>
             <div style="display:flex; flex-direction:column; gap:6px;">
-              <div style="font-size:12px; color:var(--muted); font-weight:700;">Page Settings</div>
+              <div id="pageSettingsTitle" style="font-size:12px; color:var(--muted); font-weight:700;"></div>
               <div class="settings-grid">
-                <label class="settings-item">Page Size
+                <label class="settings-item">
                   <select id="pageSizeSelect">
                     <option value="A4">A4</option>
                     <option value="A3">A3</option>
@@ -2581,7 +2986,7 @@
                 <div class="settings-wide" style="display:flex; flex-direction:column; align-items:flex-start; gap:4px; width:100%;">
                   <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px; align-self:flex-start;">
                     <input id="customPageSizeToggle" type="checkbox">
-                    <span id="customPageSizeToggleLabel">Custom Page Size</span>
+                    <span id="customPageSizeToggleLabel"></span>
                   </label>
                   <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
                     <label style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
@@ -2616,7 +3021,7 @@
                 <div class="settings-wide" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
                   <label style="display:flex; align-items:center; gap:6px;">
                     <input id="customScaleToggle" type="checkbox">
-                    <span id="customScaleToggleLabel">Custom Scale</span>
+                    <span id="customScaleToggleLabel"></span>
                   </label>
                   <span>1:</span>
                   <input id="customScaleInput" type="number" min="0.0001" step="0.1" value="1" style="width:98px;">
@@ -2631,17 +3036,17 @@
                 </label>
                 <label class="settings-item"><input id="pageShowFrameToggle" type="checkbox" checked> Paper Frame</label>
                 <label class="settings-item" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-                  <span id="pageInnerMarginLabel">Inner Margin</span>
+                  <span id="pageInnerMarginLabel"></span>
                   <input id="pageInnerMarginInput" type="number" min="0" step="1" value="10" style="width:92px;">
                   <span id="pageInnerMarginUnitLabel">(mm)</span>
                 </label>
               </div>
             </div>
             <hr style="margin: 10px 0; opacity: 0.1;">
-            <div class="section-title" style="margin-top: 5px;">GridSettings</div>
+            <div class="section-title" id="gridSettingsTitle" style="margin-top: 5px;"></div>
             <div class="settings-grid">
               <label class="settings-item" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
-                <span id="baseGridLabel">Base Grid</span>
+                <span id="baseGridLabel"></span>
                 <select id="gridSizeContextInput">
                   <option value="1">1</option>
                   <option value="5">5</option>
@@ -2656,20 +3061,20 @@
               <div class="settings-wide" style="display:flex; align-items:center; justify-content:flex-start; gap:8px;">
                 <label style="display:flex; align-items:center; gap:6px;">
                   <input id="customGridToggle" type="checkbox">
-                  <span id="customGridToggleLabel">Custom Grid</span>
+                  <span id="customGridToggleLabel"></span>
                 </label>
                 <input id="customGridInput" type="number" min="1" step="1" value="10" style="width:98px;">
                 <span id="customGridUnitLabel">(mm)</span>
               </div>
               <label class="settings-item">
-                <input id="gridShowContextToggle" type="checkbox" checked> <span id="gridShowContextLabel">Show</span>
+                <input id="gridShowContextToggle" type="checkbox" checked> <span id="gridShowContextLabel"></span>
               </label>
               <label class="settings-item">
-                <input id="gridAutoContextToggle" type="checkbox" checked> <span id="gridAutoContextLabel">Auto Grid</span>
+                <input id="gridAutoContextToggle" type="checkbox" checked> <span id="gridAutoContextLabel"></span>
               </label>
               <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
                 <label style="display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px; font-size:12px;">
-                  <span id="gridAutoTimingTitle">Auto Grid Timing</span>
+                  <span id="gridAutoTimingTitle"></span>
                   <input id="gridAutoTimingSlider" type="range" min="0" max="100" step="1" value="35">
                   <span id="gridAutoTimingLabel">Preview</span>
                 </label>
@@ -2685,63 +3090,57 @@
                     <option value="en">English</option>
                   </select>
                 </label>
-                <label class="settings-item">Menu Scale
-                  <select id="menuScaleSelect">
-                    <option value="50">50%</option>
-                    <option value="55">55%</option>
-                    <option value="60">60%</option>
-                    <option value="65">65%</option>
-                    <option value="70">70%</option>
-                    <option value="75">75%</option>
-                    <option value="80">80%</option>
-                    <option value="85">85%</option>
-                    <option value="90">90%</option>
-                    <option value="95">95%</option>
-                    <option value="100" selected>100%</option>
-                    <option value="105">105%</option>
-                    <option value="110">110%</option>
-                    <option value="115">115%</option>
-                    <option value="120">120%</option>
-                    <option value="125">125%</option>
-                    <option value="130">130%</option>
-                    <option value="135">135%</option>
-                    <option value="140">140%</option>
-                    <option value="145">145%</option>
-                    <option value="150">150%</option>
-                    <option value="155">155%</option>
-                    <option value="160">160%</option>
-                    <option value="165">165%</option>
-                    <option value="170">170%</option>
-                    <option value="175">175%</option>
-                    <option value="180">180%</option>
-                    <option value="185">185%</option>
-                    <option value="190">190%</option>
-                    <option value="195">195%</option>
-                    <option value="200">200%</option>
+                <label class="settings-item"><span></span>
+                  <input id="touchModeToggle" type="checkbox">
+                </label>
+                <label class="settings-item"><span id="menuScaleModeLabel">Menu Scale Mode</span>
+                  <select id="menuScaleModeSelect">
+                    <option value="auto" selected>Auto</option>
+                    <option value="manual">Manual</option>
                   </select>
+                </label>
+                <label class="settings-item"><span id="menuScaleAutoLabel">Auto Scale</span>
+                  <select id="menuScaleAutoSelect">
+                    <option value="subtle">Subtle</option>
+                    <option value="normal" selected>Normal</option>
+                    <option value="dynamic">Dynamic</option>
+                    <option value="strong">Strong</option>
+                  </select>
+                </label>
+                <label class="settings-item">Menu Scale
+                  <input id="menuScaleSelect" type="number" min="50" max="200" step="5" value="100">
                 </label>
                 <div class="settings-wide" style="display:flex; flex-direction:column; gap:4px;">
                   <hr style="margin: 2px 0 3px; opacity: 0.1;">
-                  <div id="leftMenuVisibilityLabel" style="font-size:12px; color:var(--muted); font-weight:700;">Left Menu Visibility</div>
+                  <div id="leftMenuVisibilityLabel" style="font-size:12px; color:var(--muted); font-weight:700;"></div>
                   <div id="leftMenuVisibilityList" style="display:grid; grid-template-columns:repeat(3,minmax(110px,1fr)); gap:4px 8px;"></div>
                 </div>
                 <div class="settings-wide">
                   <hr style="margin: 4px 0 2px; opacity: 0.1;">
                 </div>
                 <div class="settings-wide" style="display:flex; flex-direction:column; gap:6px;">
-                  <div id="shortcutSettingsLabel" style="font-size:12px; color:var(--muted);">Keyboard Shortcuts</div>
-                  <div id="shortcutSettingsHint" style="font-size:11px; color:#64748b;">Shortcut settings for major tools and delete</div>
+                  <div id="shortcutSettingsLabel" style="font-size:12px; color:var(--muted);"></div>
+                  <div id="shortcutSettingsHint" style="font-size:11px; color:#64748b;"></div>
                   <div id="toolShortcutList" style="display:grid; grid-template-columns:repeat(4,minmax(110px,1fr)); gap:4px 8px;"></div>
                   <div>
-                    <button id="resetToolShortcutsBtn" type="button">Reset to Defaults</button>
+                    <button id="resetToolShortcutsBtn" type="button"></button>
                   </div>
                 </div>
-                <label class="settings-item" style="display:none;">Max Zoom
+                <label class="settings-item" style="display:none;">
                   <select id="maxZoomInput">
                     <option value="1">100%</option>
                     <option value="10">1000%</option>
                     <option value="100" selected>10000%</option>
                     <option value="1000">100000%</option>
+                  </select>
+                </label>
+                <label class="settings-item">Wheel Zoom
+                  <select id="wheelZoomFactorSelect">
+                    <option value="1.05">Very Slow</option>
+                    <option value="1.1" selected>Slow</option>
+                    <option value="1.2">Normal</option>
+                    <option value="1.35">Fast</option>
+                    <option value="1.5">Very Fast</option>
                   </select>
                 </label>
                 <label class="settings-item">Show Frame Rate
@@ -2781,14 +3180,14 @@
         <div class="section" data-panel-id="groups">
           <div id="groupPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="Resize group panel height"></div>
           <div id="groupPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="Resize group panel width"></div>
-          <button class="section-title panel-toggle" type="button">Groups</button>
+          <button class="section-title panel-toggle" type="button"></button>
           <div id="groupList" style="display:flex; flex-direction:column; gap:3px;"></div>
           <div class="section inner-collapsible" data-inner-owner="groups">
             <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="groupOps">Group Ops</button>
             <div data-layer-inner-panel="groupOps" style="display:flex; flex-direction:column; gap:4px;">
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="newGroupNameInput" type="text" placeholder="Group name">
-                <button id="createGroupBtn" type="button">Create Group</button>
+                <button id="createGroupBtn" type="button"></button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="renameGroupNameInput" type="text" placeholder="Group name">
@@ -2816,24 +3215,24 @@
         <div class="section" data-panel-id="layers">
           <div id="layerPanelResizeHandleTop" class="panel-resize-handle panel-resize-handle-top" title="Resize layer panel height"></div>
           <div id="layerPanelResizeHandleLeft" class="panel-resize-handle panel-resize-handle-left" title="Resize layer panel width"></div>
-          <button class="section-title panel-toggle" type="button">Layers</button>
+          <button class="section-title panel-toggle" type="button"></button>
           <div id="layerList" style="display:flex; flex-direction:column; gap:3px;"></div>
           <div class="section inner-collapsible" data-inner-owner="layers">
             <button class="section-subtitle panel-toggle" type="button" data-layer-inner-toggle="ops">Layer Ops</button>
             <div data-layer-inner-panel="ops" style="display:flex; flex-direction:column; gap:4px;">
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="newLayerNameInput" type="text" placeholder="New layer name">
-                <button id="addLayerBtn" type="button">Create New</button>
+                <button id="addLayerBtn" type="button"></button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
                 <input id="renameLayerNameInput" type="text" placeholder="Layer name">
                 <button id="renameLayerBtn" type="button">Rename</button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <button id="moveSelectionLayerBtn" type="button" style="grid-column:1 / -1;">Move Objects</button>
+                <button id="moveSelectionLayerBtn" type="button" style="grid-column:1 / -1;"></button>
               </div>
               <div style="display:grid; grid-template-columns:1fr auto; gap:4px;">
-                <button id="deleteLayerBtn" type="button" style="grid-column:1 / -1;">Delete Layer</button>
+                <button id="deleteLayerBtn" type="button" style="grid-column:1 / -1;"></button>
               </div>
               <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px;">
                 <button id="moveLayerUpBtn" type="button">Up</button>
@@ -2862,46 +3261,56 @@
       </div>
       <div class="bottom-left-overlay">
         <div id="statusText" class="status"></div>
+        <div id="buildBadge" class="badge" style="font-size:11px; white-space:nowrap; font-weight:700; background:#eff6ff; border-color:#93c5fd; color:#0f172a;"></div>
+        <div id="selectionDebugBadge" class="badge" style="display:none; font-size:11px; white-space:nowrap; font-weight:700; background:#f8fafc; border-color:#cbd5e1; color:#334155;"></div>
         <div id="viewerImportMeta" class="viewer-import-meta">
           <div class="viewer-import-meta-row">
-            <span id="viewerImportUnitLabel" class="viewer-import-meta-label">Detected unit</span>
-            <span id="viewerImportUnitValue" class="viewer-import-meta-value">unitless</span>
+            <span id="viewerImportUnitLabel" class="viewer-import-meta-label"></span>
+            <span id="viewerImportUnitValue" class="viewer-import-meta-value"></span>
           </div>
           <div class="viewer-import-meta-row">
-            <span id="viewerImportBoundsLabel" class="viewer-import-meta-label">Bounds</span>
-            <span id="viewerImportBoundsValue" class="viewer-import-meta-value">-</span>
+            <span id="viewerImportBoundsLabel" class="viewer-import-meta-label"></span>
+            <span id="viewerImportBoundsValue" class="viewer-import-meta-value"></span>
           </div>
           <div class="viewer-import-scale-buttons">
             <button id="viewerImportScaleBtn1" type="button" style="display:none;">x1</button>
             <button id="viewerImportScaleBtn2" type="button" style="display:none;">x10</button>
             <button id="viewerImportScaleBtn3" type="button" style="display:none;">x0.1</button>
-            <button id="viewerImportResetViewBtn" type="button">Reset View</button>
+            <button id="viewerImportResetViewBtn" type="button"></button>
           </div>
         </div>
         <div id="gridScaleIndicator" class="grid-scale-indicator">
           <div class="grid-scale-bar-wrap"><div id="gridScaleBar" class="grid-scale-bar"></div></div>
-          <div id="gridScaleText">1 grid = - mm</div>
+          <div id="gridScaleText"></div>
         </div>
       </div>
-      <div id="touchConfirmOverlay" class="touch-confirm-overlay">
-        <button id="touchConfirmBtn" class="touch-confirm-btn" type="button">Confirm</button>
-        <button id="touchCancelBtn" class="touch-cancel-btn" type="button">Cancel</button>
-      </div>
-      <div id="touchMultiSelectOverlay" class="touch-multiselect-overlay">
-        <button id="touchMultiSelectBtn" class="touch-multiselect-btn" type="button">Multi-Select OFF</button>
-      </div>
-      <div id="touchSelectBackOverlay" class="touch-select-back-overlay">
-        <button id="touchSelectBackBtn" class="touch-select-back-btn" type="button">Back to Select</button>
+      <div id="touchToolPanel" class="touch-tool-panel" style="display:none;">
+        <div id="touchToolPanelHeader" class="touch-tool-panel-header">
+          <div id="touchToolPanelTitle" class="touch-tool-panel-title"></div>
+          <div id="touchToolPanelStatus" class="touch-tool-panel-status"></div>
+        </div>
+        <div class="touch-tool-panel-body">
+          <div id="touchConfirmOverlay" class="touch-confirm-overlay">
+            <button id="touchConfirmBtn" class="touch-confirm-btn" type="button"></button>
+            <button id="touchLineFinishBtn" class="touch-cancel-btn" type="button"></button>
+          </div>
+          <div id="touchMultiSelectOverlay" class="touch-multiselect-overlay">
+            <button id="touchMultiSelectBtn" class="touch-multiselect-btn" type="button">Multi-Select OFF</button>
+          </div>
+          <div id="touchSelectBackOverlay" class="touch-select-back-overlay">
+            <button id="touchSelectBackBtn" class="touch-select-back-btn" type="button">選択ツールに戻る</button>
+          </div>
+        </div>
       </div>
       <div class="bottom-scale-overlay">
-        <div id="gridAutoDebugText" class="grid-auto-debug" style="display:none;">auto-grid debug</div>
+        <div id="gridAutoDebugText" class="grid-auto-debug" style="display:none;"></div>
       </div>
-      <div id="debugConsolePanel" class="debug-console" style="display:none;">
-        <div class="debug-console-head">
-          <div class="debug-console-title">Debug Console</div>
+        <div id="debugConsolePanel" class="debug-console" style="display:none;">
+          <div class="debug-console-head">
+          <div id="debugConsoleTitle" class="debug-console-title"></div>
           <div class="debug-console-actions">
-            <button id="debugConsoleCopyBtn" type="button">Copy</button>
-            <button id="debugConsoleClearBtn" type="button">Clear</button>
+            <button id="debugConsoleCopyBtn" type="button"></button>
+            <button id="debugConsoleClearBtn" type="button"></button>
           </div>
         </div>
         <div id="debugConsoleBody" class="debug-console-body"></div>
@@ -2909,15 +3318,15 @@
     </main>
   </div>
   <input id="jsonFileInput" type="file" accept=".json,application/json,.dxf,.svg,.png,.jpg,.jpeg,.webp,.gif,.bmp,image/*" hidden>
-  <div id="pngExportModal" class="modal-backdrop" aria-hidden="true">
-    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pngExportTitle">
-      <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
-        <div id="pngExportTitle" style="font-size:14px; font-weight:700; color:#334155;">PNG Export</div>
+      <div id="pngExportModal" class="modal-backdrop" aria-hidden="true">
+        <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="pngExportTitle">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:8px;">
+        <div id="pngExportTitle" style="font-size:14px; font-weight:700; color:#334155;"></div>
         <button id="pngExportCloseBtn" type="button">Close</button>
       </div>
       <div class="modal-grid">
-        <label>Filename <input id="pngFilenameInput" type="text" value=""></label>
-        <label>Range
+        <label><input id="pngFilenameInput" type="text" value=""></label>
+        <label>
           <select id="pngRangeModeSelect">
             <option value="page" selected>Page</option>
             <option value="view">View</option>
@@ -2925,22 +3334,22 @@
             <option value="custom">Custom</option>
           </select>
         </label>
-        <label id="pngCustomXWrap">Center X <input id="pngCustomXInput" type="number" value="0" step="0.1"></label>
-        <label id="pngCustomYWrap">Center Y <input id="pngCustomYInput" type="number" value="0" step="0.1"></label>
+        <label id="pngCustomXWrap"><input id="pngCustomXInput" type="number" value="0" step="0.1"></label>
+        <label id="pngCustomYWrap"><input id="pngCustomYInput" type="number" value="0" step="0.1"></label>
         <label id="pngCustomWWrap">Width <input id="pngCustomWInput" type="number" value="100" min="0.0001" step="0.1"></label>
         <label id="pngCustomHWrap">Height <input id="pngCustomHInput" type="number" value="100" min="0.0001" step="0.1"></label>
 
-        <label>Size Mode
+        <label>
           <select id="pngSizeModeSelect">
             <option value="pixels" selected>Pixels</option>
             <option value="dpi">DPI</option>
           </select>
         </label>
         <label>DPI <input id="pngDpiInput" type="number" min="1" step="1" value="300"></label>
-        <label>Width(px) <input id="pngWidthInput" type="number" min="1" step="1" value="2048"></label>
-        <label>Height(px) <input id="pngHeightInput" type="number" min="1" step="1" value="1536"></label>
-        <label>Scale Multiplier <input id="pngScaleMulInput" type="number" min="0.01" step="0.01" value="1"></label>
-        <label>Margin(px) <input id="pngMarginInput" type="number" min="0" step="1" value="0"></label>
+        <label><input id="pngWidthInput" type="number" min="1" step="1" value="2048"></label>
+        <label><input id="pngHeightInput" type="number" min="1" step="1" value="1536"></label>
+        <label><input id="pngScaleMulInput" type="number" min="0.01" step="0.01" value="1"></label>
+        <label><input id="pngMarginInput" type="number" min="0" step="1" value="0"></label>
 
         <label>Background
           <select id="pngBackgroundModeSelect">
@@ -2949,8 +3358,8 @@
             <option value="color">Color</option>
           </select>
         </label>
-        <label>BG Color <input id="pngBackgroundColorInput" type="color" value="#ffffff"></label>
-        <label>Color Mode
+        <label><input id="pngBackgroundColorInput" type="color" value="#ffffff"></label>
+        <label>
           <select id="pngColorModeSelect">
             <option value="normal" selected>Normal</option>
             <option value="layer">Layer Colorize</option>
@@ -2959,18 +3368,18 @@
         </label>
         <div></div>
 
-        <label><input id="pngIncludeGridToggle" type="checkbox"> Include Grid</label>
-        <label><input id="pngIncludeAxesToggle" type="checkbox"> Include Axes</label>
-        <label><input id="pngIncludePageFrameToggle" type="checkbox"> Include Page Frame</label>
-        <label><input id="pngIncludeSelectionToggle" type="checkbox"> Include Selection Highlight</label>
-        <label><input id="pngAntialiasToggle" type="checkbox" checked> Antialias</label>
-        <label><input id="pngSrgbToggle" type="checkbox" checked> sRGB</label>
-        <label>Line Width Scale <input id="pngLineScaleInput" type="number" min="0.1" step="0.1" value="1"></label>
-        <label>Min Line Width(px) <input id="pngMinLinePxInput" type="number" min="0" step="0.1" value="0"></label>
+        <label><input id="pngIncludeGridToggle" type="checkbox"></label>
+        <label><input id="pngIncludeAxesToggle" type="checkbox"></label>
+        <label><input id="pngIncludePageFrameToggle" type="checkbox"></label>
+        <label><input id="pngIncludeSelectionToggle" type="checkbox"></label>
+        <label><input id="pngAntialiasToggle" type="checkbox" checked></label>
+        <label><input id="pngSrgbToggle" type="checkbox" checked></label>
+        <label><input id="pngLineScaleInput" type="number" min="0.1" step="0.1" value="1"></label>
+        <label><input id="pngMinLinePxInput" type="number" min="0" step="0.1" value="0"></label>
       </div>
       <div style="display:flex; justify-content:flex-end; gap:8px;">
-        <button id="pngExportCancelBtn" type="button">Cancel</button>
-        <button id="pngExportApplyBtn" type="button">Export PNG</button>
+        <button id="pngExportCancelBtn" type="button"></button>
+        <button id="pngExportApplyBtn" type="button"></button>
       </div>
     </div>
   </div>

@@ -1,3 +1,5 @@
+import { getDimGeometry, getDimChainGeometry } from "./dim_geom.js";
+
 export function bindLayerAndGroupBasicEvents(state, dom, actions) {
   if (dom.layerList) {
     dom.layerList.addEventListener("click", (e) => {
@@ -38,6 +40,58 @@ export function bindLayerAndGroupBasicEvents(state, dom, actions) {
 }
 
 export function bindDimSettingsEvents(state, dom, actions) {
+  const getSelectedDim = () => {
+    const ids = new Set((state.selection?.ids || []).map(Number));
+    if (!ids.size) return null;
+    for (const s of (state.shapes || [])) {
+      if (!ids.has(Number(s.id))) continue;
+      if (s.type === "dim" || s.type === "dimchain" || s.type === "dimangle" || s.type === "dimleader" || s.type === "circleDim") {
+        return s;
+      }
+    }
+    return null;
+  };
+  const collectDimChainNumericValues = () => {
+    const list = dom.dimChainNumericValuesList;
+    if (!list) return [];
+    const inputs = Array.from(list.querySelectorAll("input[data-dim-chain-value-index]"));
+    const values = [];
+    for (const input of inputs) {
+      const raw = String(input.value || "").trim();
+      if (raw === "") {
+        values.push(null);
+        continue;
+      }
+      const n = Number(raw);
+      values.push(Number.isFinite(n) ? n : null);
+    }
+    return values;
+  };
+  const applySelectedDimChainValues = () => {
+    const selectedDim = getSelectedDim();
+    if (!selectedDim || selectedDim.type !== "dimchain") return;
+    const values = collectDimChainNumericValues();
+    actions.setDimSettings({ numericPriority: true });
+    actions.applyDimSettingsToSelection({ numericPriority: true, numericValues: values });
+  };
+  const getCurrentDimNumericValue = (dim) => {
+    const g = getDimGeometry(dim);
+    if (!g) return null;
+    const comp = Number(dim?.groupScaleComp);
+    const scaleComp = Number.isFinite(comp) && comp > 1e-9 ? comp : 1;
+    const v = Number(g.len) / scaleComp;
+    return Number.isFinite(v) ? v : null;
+  };
+  const getCurrentDimChainNumericValues = (dim) => {
+    const g = getDimChainGeometry(dim);
+    if (!g || !Array.isArray(g.segments)) return [];
+    const comp = Number(dim?.groupScaleComp);
+    const scaleComp = Number.isFinite(comp) && comp > 1e-9 ? comp : 1;
+    return g.segments.map((seg) => {
+      const v = Number(seg?.len) / scaleComp;
+      return Number.isFinite(v) ? v : null;
+    });
+  };
   if (dom.dimLinearMode) dom.dimLinearMode.addEventListener("change", () => actions.setDimSettings({ linearMode: dom.dimLinearMode.value }));
   if (dom.dimIgnoreGridSnapToggle) dom.dimIgnoreGridSnapToggle.addEventListener("change", () => actions.setDimSettings({ ignoreGridSnap: !!dom.dimIgnoreGridSnapToggle.checked }));
   if (dom.dimCircleMode) dom.dimCircleMode.addEventListener("change", () => actions.setDimSettings({ circleMode: dom.dimCircleMode.value }));
@@ -99,6 +153,34 @@ export function bindDimSettingsEvents(state, dom, actions) {
     actions.setDimSettings({ textRotate: tv });
     actions.applyDimSettingsToSelection({ textRotate: tv });
   });
+  if (dom.dimNumericPriorityToggle) dom.dimNumericPriorityToggle.addEventListener("change", () => {
+    const on = !!dom.dimNumericPriorityToggle.checked;
+    const selectedDim = getSelectedDim();
+    const patch = { numericPriority: on };
+    if (on && selectedDim?.type === "dim") {
+      const current = getCurrentDimNumericValue(selectedDim);
+      if (Number.isFinite(current)) patch.numericValue = current;
+    }
+    if (on && selectedDim?.type === "dimchain") {
+      const currentValues = getCurrentDimChainNumericValues(selectedDim);
+      if (currentValues.length > 0) patch.numericValues = currentValues;
+    }
+    actions.setDimSettings({ numericPriority: on });
+    actions.applyDimSettingsToSelection(patch);
+  });
+  if (dom.dimNumericValueInput) dom.dimNumericValueInput.addEventListener("change", () => {
+    const raw = String(dom.dimNumericValueInput.value || "").trim();
+    const v = raw === "" ? null : Number(raw);
+    actions.setDimSettings({ numericValue: Number.isFinite(v) ? v : null });
+    actions.applyDimSettingsToSelection({ numericValue: Number.isFinite(v) ? v : null });
+  });
+  if (dom.dimChainNumericValuesList) {
+    dom.dimChainNumericValuesList.addEventListener("change", (e) => {
+      const input = e.target?.closest?.("input[data-dim-chain-value-index]");
+      if (!input) return;
+      applySelectedDimChainValues();
+    });
+  }
   if (dom.dimExtOffsetInput) dom.dimExtOffsetInput.addEventListener("change", () => {
     const v = Number(dom.dimExtOffsetInput.value) || 0;
     actions.setDimSettings({ extOffset: v });
@@ -139,14 +221,31 @@ export function bindDimSettingsEvents(state, dom, actions) {
   }
   if (dom.applyDimSettingsBtn) {
     dom.applyDimSettingsBtn.addEventListener("click", () => {
+      const selectedDim = getSelectedDim();
+      const isChain = selectedDim?.type === "dimchain";
+      const isDim = selectedDim?.type === "dim";
       const p = Math.max(0, Math.min(3, Math.round(Number(dom.dimPrecisionSelect?.value) || 0)));
       const tv = dom.dimTextRotateInput?.value;
+      const numericValues = isChain
+        ? collectDimChainNumericValues()
+        : undefined;
+      const hasChainValues = Array.isArray(numericValues) && numericValues.length > 0;
+      const currentNumericValue = isDim ? getCurrentDimNumericValue(selectedDim) : null;
       actions.applyDimSettingsToSelection({
         precision: p,
         circleArrowSide: (dom.dimCircleArrowSide?.value === "inside") ? "inside" : "outside",
         fontSize: Math.max(1, Number(dom.dimFontSizeInput?.value) || 12),
         leaderText: String(dom.dimLabelTextInput?.value || "").trim() || "NOTE",
         textRotate: tv === "auto" ? "auto" : (Number(tv) || 0),
+        numericPriority: !!dom.dimNumericPriorityToggle?.checked,
+        numericValue: (() => {
+          const rawValue = String(dom.dimNumericValueInput?.value || "").trim();
+          if (rawValue === "" && Number.isFinite(currentNumericValue)) return currentNumericValue;
+          if (rawValue === "") return null;
+          const n = Number(rawValue);
+          return Number.isFinite(n) ? n : (Number.isFinite(currentNumericValue) ? currentNumericValue : null);
+        })(),
+        ...(hasChainValues ? { numericValues } : {}),
         extOffset: Number(dom.dimExtOffsetInput?.value) || 0,
         extOver: Number(dom.dimExtOverInput?.value) || 0,
       });

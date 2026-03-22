@@ -23,7 +23,7 @@ export {
     setObjectSnapEnabled, setObjectSnapKind, setGridSize, setGridSnap, setGridShow,
     setGridAuto, setGridAutoThresholds, setLayerColorize, setGroupColorize, setEditOnlyActiveLayer,
     setGroupRotateSnap, setVertexLinkCoincident, setLineInputs, setLineSizeLocked, setLineAnchor,
-    setRectInputs, setRectSizeLocked, setRectAnchor, setCircleRadiusInput, setCircleMode,
+    setRectInputs, setRectAsPolyline, setRectSizeLocked, setRectAnchor, setCircleRadiusInput, setCircleMode,
     setCircleRadiusLocked, setPositionSize, setLineWidthMm, setToolLineType, setToolColor, setSelectedLineWidthMm,
     setSelectedLineType, setSelectedColor, setSelectionCircleCenterMark, setFilletRadius,
     setFilletLineMode, setFilletNoTrim, setVertexMoveInputs, updateSelectedImageSettings

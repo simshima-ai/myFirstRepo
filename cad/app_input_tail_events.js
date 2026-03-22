@@ -47,7 +47,14 @@
 
     dom.canvas.addEventListener("wheel", (e) => {
         e.preventDefault();
-        const factor = e.deltaY > 0 ? 0.9 : 1.1;
+        const selectFactor = Number(dom.wheelZoomFactorSelect?.value);
+        const zoomFactor = Math.max(
+            1.01,
+            Number.isFinite(selectFactor) && selectFactor > 0
+                ? selectFactor
+                : Number(state.ui?.wheelZoomFactor) || 1.1
+        );
+        const factor = e.deltaY > 0 ? (1 / zoomFactor) : zoomFactor;
         zoomAt(state, getMouseScreen(dom, e), factor);
         if (draw) draw();
     }, { passive: false });
